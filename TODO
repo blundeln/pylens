@@ -1,6 +1,5 @@
 TODO
 ----
-
 - Check through all code and improve comments
 - DynamicLens - pass a function which creates a lens when it is called with
   context params (e.g. current collection)
