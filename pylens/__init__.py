@@ -1611,49 +1611,12 @@ def debug_indent_function() :
 from nbdebug import set_indent_function
 set_indent_function(debug_indent_function)
 
-
-##############################################################
-# Testing
-##############################################################
-
-def tests(args) :
-  unit_tests(args)
-
 def auto_name_lenses(local_variables) :
+  """Gives names to lenses based on their local variable names, which is
+  useful for tracing parsing. Should be called with globals()/locals()"""
   for variable_name, obj in local_variables.iteritems() :
     if isinstance(obj, BaseLens) :
       obj.name = variable_name
-
-
-def unit_tests(args=None) :
-  
-  import unittest
-
-  # Discover test routines.
-  TESTS = {}
-  for name, item in globals().iteritems() :
-    if name.lower().endswith("_test") :
-      TESTS[name] = item
-    if hasattr(item, "TESTS"):
-      TESTS[item.__name__] = item.TESTS
-
-  test_name = args[-1]
-  if test_name == "test" :
-    test_name = None
-
-  if test_name and test_name not in TESTS :
-    raise Exception("There is not test called: %s" % test_name)
-
-  test_suite = unittest.TestSuite()
-  for name, test_function in TESTS.iteritems() :
-    if test_name and name != test_name :
-      continue
-    testcase = unittest.FunctionTestCase(test_function, description=name)
-    test_suite.addTest(testcase)
-  
-  runner = unittest.TextTestRunner()
-  runner.run(test_suite)
-
 
 
 ###########################
@@ -1662,15 +1625,7 @@ def unit_tests(args=None) :
 
 def main() :
   # This can be useful for testing.
-  pass
+  d("Testing")
 
 if __name__ == "__main__":
-  import sys
-  # Optionally run tests.
-  if "test" in sys.argv :
-    print("*\n"*3)
-    print("Running tests")
-    print("*\n"*3)
-    tests(sys.argv)
-  else :
-    main()
+  main()

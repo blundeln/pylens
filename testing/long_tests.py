@@ -33,8 +33,8 @@
 #  Longer tests, which must have suffix '_test' to be picked up for automated
 #  testing.
 # 
-#  TODO: This needs to be fixed after moving from the core lib file, and
-#  should probably be changed to it import the lib, as a user would.
+
+from pylens import *
 
 def deb_xxxtest() :
 
@@ -113,7 +113,7 @@ def touching_lens_test() :
   and_3 = Literal("G") + OneOrMore(Literal("H")) + Literal("I")
   and_4 = Word(nums) + Literal("K") + Literal("L")
   lens = (and_1 | and_2) + (and_3 | and_4)
-
+  
   # So we expect:
   #  A -> B -> C -> [G,J]  then   G -> H -> I -> None
   #  D -> E -> F -> [G,J]   ..    J -> K -> L -> None

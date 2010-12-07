@@ -7,7 +7,6 @@ target: 1.0a1
   - Add installation script
   
 target: future
-  - Break up module into files
   - DynamicLens - pass a function which creates a lens when it is called with
     context params (e.g. current collection)
   - Ambiguity check.

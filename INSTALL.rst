@@ -2,16 +2,17 @@
 Pylens Installation
 =========================================================
 
-TODO
+TODO: Use some python installation system, such as setuptools
 
 Testing
 =========================================================
 
-Most objects declare their own tests, so the following will run all test
-cases.
+Most objects declare their own tests, so the following will run all tests
+cases::
 
-% python pylens/__init__.py test
+  $ python testing/run_tests.py test
 
-Or, to test specific things
+Or, to test specific things::
 
-% python pylens/__init__.py test And
+  $ python testing/run_tests.py test And
+  $ python testing/run_tests.py test iface_test

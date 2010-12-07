@@ -29,6 +29,7 @@
 # Author: Nick Blundell <blundeln@gmail.com>
 # Organisation: www.nickblundell.org.uk
 #
+# XXX: Deprecated: Now such tests will be put in modules such as long_tests
 from pylens import *
 import pprint
 
