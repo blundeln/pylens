@@ -1,10 +1,11 @@
 TODO
 ----
 target: 1.0a1
-  - Check through all code and improve comments
+  - Check through all code and improve comments and structure
   - Recurse Lens
    - Freeze recursion
   - Add installation script
+  - Improve basic docs
   
 target: future
   - DynamicLens - pass a function which creates a lens when it is called with

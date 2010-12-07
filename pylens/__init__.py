@@ -35,8 +35,7 @@ from excepts import *
 from util import *
 from token_collections import *
 from readers import *
-
-
+#XXX: from base_lenses import *
 
 #########################################################
 # Base Lenses
@@ -45,7 +44,8 @@ from readers import *
 
 class BaseLens(object): # object, important to use new-style classes, for inheritance, etc.
   """
-  Base lens, which should be extended by all lenses.
+  Base lens, which should be extended by all lenses, and which encapsulates
+  much of the complexity of the framework.
   """
   
   def __init__(self, type=None, name=None) :
@@ -53,7 +53,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     self.name = name
     self._recurse_lens = None
 
-    # For connecting lenses for ambiguity checks
+    # For connecting lenses, for ambiguity checks.
     self._next_lenses = []
     self._previous_lenses = []
   
@@ -345,7 +345,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
   def _preprocess_lens(self, lens) :
     """Preprocesses a lens to ensure any type to lens conversion and checking for recursive lens."""
-    lens = coerce_to_lens(lens)
+    lens = BaseLens.coerce_to_lens(lens)
 
     d(str(lens))
 
@@ -409,15 +409,16 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
   __repr__ = __str__
 
 
-def coerce_to_lens(lens_operand):
-  """Intelligently convert a type to a lens (e.g. string instance to a Literal lens)"""
-  if isinstance(lens_operand, str) :
-    lens_operand = Literal(lens_operand)
-  elif inspect.isclass(lens_operand) and hasattr(lens_operand, "__lens__") :   
-    lens_operand = Group(lens_operand.__lens__, type=lens_operand)
-  
-  assert isinstance(lens_operand, BaseLens), "Unable to coerce %s to a lens" % lens_operand
-  return lens_operand
+  @staticmethod
+  def coerce_to_lens(lens_operand):
+    """Intelligently convert a type to a lens (e.g. string instance to a Literal lens)"""
+    if isinstance(lens_operand, str) :
+      lens_operand = Literal(lens_operand)
+    elif inspect.isclass(lens_operand) and hasattr(lens_operand, "__lens__") :   
+      lens_operand = Group(lens_operand.__lens__, type=lens_operand)
+    
+    assert isinstance(lens_operand, BaseLens), "Unable to coerce %s to a lens" % lens_operand
+    return lens_operand
 
 class Lens(BaseLens) :
   """Base class of standard lenses, that can get and store an abstract token."""
@@ -497,6 +498,8 @@ class CombinatorLens(BaseLens) :
 
     # Now add the label to the collection - postprocessing the token, to make it easier for user manipulation.
     token_collection.add_token(lens._postprocess_outgoing_token(token), label)
+
+
 
 
 ##################################################
@@ -1571,11 +1574,11 @@ WS  = Whitespace
 #
 
 def get(lens, *args, **kargs) :
-  lens = coerce_to_lens(lens)
+  lens = BaseLens.coerce_to_lens(lens)
   return lens.get(*args, **kargs)
 
 def put(lens, *args, **kargs) :
-  lens = coerce_to_lens(lens)
+  lens = BaseLens.coerce_to_lens(lens)
   return lens.put(*args, **kargs)
 create = put
 
