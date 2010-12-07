@@ -46,39 +46,52 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
   """
   Base lens, which should be extended by all lenses, and which encapsulates
   much of the complexity of the framework.
+
+  The get and put methods of this base class wrap the get and put methods of
+  the child class (_get, _put), ensuring any normalisation and handling
+  rollback on Exceptions.
   """
   
   def __init__(self, type=None, name=None) :
+    # Set python type of lense data and a name, for debugging.
     self.type = type
     self.name = name
+    
+    # Used for passing up references to a child recurse lens, so that may at
+    # some point be bound to the top-level lens.
     self._recurse_lens = None
 
     # For connecting lenses, for ambiguity checks.
     self._next_lenses = []
     self._previous_lenses = []
-  
+ 
+
   def get(self, concrete_input, check_fully_consumed=True, postprocess_token=True) :
     """
     If a parent lens plans to store a token, then it will retain more information (specifically on the tokens label)
     if it postprocesses the token immediately prior to storing it.
     """
-    # If input a string, wrap in a concrete reader
+    # If input a string, wrap in a stateful string reader.
     if isinstance(concrete_input, str) :
       concrete_input_reader = ConcreteInputReader(concrete_input)
     else :
       concrete_input_reader = concrete_input
-      # Disable this if we are not the are the outer-most parser, since it doesn't make sense.
+      # If we already have a reader, then we are not the top-level lens, so do
+      # not need to check for full input string consumption
       check_fully_consumed = False
 
     # Show what we are doing.
     d("%s GET: CR -> '%s'" % (self, str(concrete_input_reader)))
     
-    # Now call get proper to consume the input and parse a token, whether a store or not.
+    # Now call 'get' proper to consume the input and parse a token, whether a
+    # store or not, and if there is a parsing exception, we rollback the
+    # reader state.
     with reader_rollback(concrete_input_reader) :
       abstract_data = self._get(concrete_input_reader)
 
-    # Return nothing if this lens is not a STORE lens.
-    # If we have a combinator, we always return what it returns (e.g. an empty container, a token from a sub-lens.
+    # Return nothing if this lens is not a STORE lens, since it extracts no
+    # abstract data type.  However, if we have a combinator, we always return what it returns (e.g. an empty
+    # container, a token from a sub-lens).
     if isinstance(self, Lens) :
       if self.store :
         assert abstract_data != None, "Should have got something here from our lens."
@@ -87,9 +100,17 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
     d("Sucessfully GOT: %s" % (isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data))
 
+    # If we expect full consuption of the conrete input, flag what has been
+    # left un-consumed.
     if check_fully_consumed and not concrete_input_reader.is_fully_consumed() :
       raise Exception("Concrete string not fully consumed: remaining: %s" % concrete_input_reader.get_remaining())
     
+   
+    # All lenses internally deal with tokens, since a token can hold the data
+    # and any meta-data, such as the token's label.  At the API level, the
+    # user will be concerned only with the native abstract data (e.g. a class,
+    # an int, etc.), so we allow optional postprocessing before the data is
+    # returned.
     if postprocess_token :
       return self._postprocess_outgoing_token(abstract_data)
     else :
@@ -98,14 +119,12 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
   def put(self, abstract_data, concrete_input=None, check_fully_consumed=True, label=None) :
     """
-    We handle a lot of the complexity of reader rollback and labelled tokens here so that specific lenses
-    do not need to worry about this stuff.
-    Since some lenses may return contents and a key/label, label lets us specify this when putting a token directly.
+    We handle a lot of the complexity of reader rollback and labelled tokens
+    here, so that specific lenses do not need to worry about this stuff.  Since
+    some lenses may return contents and a key/label, label lets us specify
+    this when putting a token directly.
     """
     # TODO: implement check_fully_consumed appropriately for concrete and abstract readers.
-
-    # Decide if token or reader
-    # If token, normalise it to include the label
 
     # If a combinator lens, pass to _put (which takes a token or reader)
     # Now assume standard lens
@@ -120,8 +139,12 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     #    We must try several normalised tokens
   
     assert abstract_data != None, "Must have some kind of abstract data to PUT."
-    
-    # Decide if we have been passed a token or a reader
+   
+    # Note that there are two kinds of things we can be putting here: a single
+    # token, or a collection of tokens held within a stateful reader, from
+    # which our child lenses will put individual items (which themselves could
+    # be tokens or collections). So here we decide if we have been passed a
+    # token or a stateful token reader and set variables as such.
     if isinstance(abstract_data, AbstractTokenReader) :
       abstract_token_reader = abstract_data
       token = None
@@ -131,23 +154,25 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
       abstract_data = self._preprocess_incoming_token(abstract_data, label=label)
       token = abstract_data
 
-    # Normalise the concrete input into a reader.
+    # Again, as with get(), normalise the concrete input into a stateful reader.
     if concrete_input :
       concrete_input_reader = isinstance(concrete_input, str) and ConcreteInputReader(concrete_input) or concrete_input
     else :
       concrete_input_reader = None
    
-
     # Display what we are doing.
-    type_of_data = abstract_token_reader and "ATR" or "Token"
-    if concrete_input_reader :
-      d("%s PUT: State -> (%s: %s, CR: '%s')" % (self, type_of_data, str(abstract_data), str(concrete_input_reader)))
-    else :
-      d("%s CREATE: State -> (%s: %s)" % (self, type_of_data, str(abstract_data)))
+    if IN_DEBUG_MODE :
+      type_of_data = abstract_token_reader and "ATR" or "Token"
+      if concrete_input_reader :
+        d("%s PUT: State -> (%s: %s, CR: '%s')" % (self, type_of_data, str(abstract_data), str(concrete_input_reader)))
+      else :
+        d("%s CREATE: State -> (%s: %s)" % (self, type_of_data, str(abstract_data)))
    
 
+    # XXX: Got here with commenting.
     #
-    # Easy case: if we are a combinator, pass straight through to PUT proper.
+    # First off, the easy case: if we are a combinator, pass straight through
+    # to PUT proper.
     #
     if isinstance(self, CombinatorLens) :
       with reader_rollback(abstract_data, concrete_input_reader) :
@@ -451,6 +476,8 @@ class Lens(BaseLens) :
   def _display_id(self) :
     """Useful for identifying specific lenses when debugging."""
     return self.name or str(hash(self) % 256)  # Hash gives us a reasonably easy to distinguish id for lens if no name set.
+
+
 
 class CombinatorLens(BaseLens) :
   """Base class of lenses that combine other lenses in some way."""
@@ -958,12 +985,15 @@ class OneOrMore(CombinatorLens) :
     output = lens.put(['x','y','z'], "m1x3_p6")
     d(output)
 
+
 class Recurse(CombinatorLens):
-  # During construction, lenses pass up references to Recurse so that it may bind to
-  # the top level lens, though this must be frozen to the local lens definition.
-  # TODO: Freeze ascention - will use reflection to freeze when find var to which this Recurse binds.
-  # TODO: Reconcile different recurse lenses as the same lens (e.g. X + Recurse() + Z | Y + Recurse() + P)
-  #       Only required if we allow multiple instances
+  """
+  During construction, lenses pass up references to Recurse so that it may bind to
+  the top level lens, though this must be frozen to the local lens definition.
+  TODO: Freeze ascension - will use reflection to freeze when find var to which this Recurse binds.
+  TODO: Reconcile different recurse lenses as the same lens (e.g. X + Recurse() + Z | Y + Recurse() + P)
+        Only required if we allow multiple instances
+  """
   def __init__(self, **kargs):
     super(Recurse, self).__init__(**kargs)
     self._bound_lens = None

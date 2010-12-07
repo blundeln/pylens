@@ -6,6 +6,7 @@ target: 1.0a1
    - Freeze recursion
   - Add installation script
   - Improve basic docs
+  - encapsulate debug routines for optional inclusion
   
 target: future
   - DynamicLens - pass a function which creates a lens when it is called with
