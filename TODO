@@ -1,35 +1,20 @@
 TODO
 ----
-- Check through all code and improve comments
-- DynamicLens - pass a function which creates a lens when it is called with
-  context params (e.g. current collection)
-- Ambiguity check.
-- Recurse Lens
- - Freeze recursion
-- Implement PutGet check for sanity checking lenses.
-- Implement full lenses for deb conf and interfaces.
-- Apache lens
-- How can we simplify the lens definition?
-  - Context of lens definition -> auto whitespace
-- Alter obj attr names to be valid python variables.
-
-IDEAS
------
-- Objects
- - Register default creation args when saying for classes, e.g. datetime.
- - See python __getinitargs__(), also __getstate__() and __setstate__()
-
-- Simple conversion of tokens e.g. single value into an And becomes list of one
- - Need to consider problem, though, that getting a single token has no way to store key.
-
-- Lens could specify type for conversion in get and put (e.g. Word(nums, type=int))
-- re-look at ambig - so I can sanity check this work.
- - charset class idea -> work in to AnyOf lens.
- - do ambig stuff.
-   - Baselens has is_ambig (general) -> _is_ambig (sepcific) default is False
-   - lenses report length, and have function get_edge lenses, defaults to [self, self]
-   - Essential that user gets simple feedback on how to correct lens.
-- Test with real lens
- - How can we simplify the lens definition?
-- Setup default whitespace and keywords.
-- Self documentation of code
+target: 1.0a1
+  - Check through all code and improve comments
+  - Recurse Lens
+   - Freeze recursion
+  - Add installation script
+  
+target: future
+  - Break up module into files
+  - DynamicLens - pass a function which creates a lens when it is called with
+    context params (e.g. current collection)
+  - Ambiguity check.
+  - Add API docs to code.
+  - Implement PutGet check for sanity checking lenses.
+  - Implement full lenses for deb conf and interfaces.
+  - Apache lens
+  - How can we simplify the lens definition?
+    - Context of lens definition -> auto whitespace
+  - Alter obj attr names to be valid python variables.
