@@ -38,7 +38,7 @@ from readers import *
 #XXX: from base_lenses import *
 
 #########################################################
-# Core Lenses
+# Base Lenses
 #
 
 class BaseLens(object): # object, important to use new-style classes, for inheritance, etc.
@@ -333,9 +333,8 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
         if not best_output or len(output) > best_output[0] :
           best_output = (output, get_readers_state(abstract_token_reader, concrete_input_reader))
       except LensException:
-        # Failed to put token, so restore the initial readers state, ready to
-        # try another candidate label.
-        continue
+        # Failed to put token, so record nothing.
+        pass
       
       # Then restore the initial state, for the next candidate label PUT attempt.
       set_readers_state(start_reader_state, abstract_token_reader, concrete_input_reader)
@@ -508,18 +507,22 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
 class Lens(BaseLens) :
   """Base class of standard lenses, that can GET and PUT an abstract token."""
-  def __init__(self, store=False, label=None, is_label=False, default=None, name=None, **kargs) :
+  def __init__(self, store=None, label=None, is_label=False, default=None, name=None, **kargs) :
     super(Lens, self).__init__(**kargs)
-    
+
+    # If store is not set and we have or are a label, assume store=True; else False
+    if store == None: 
+      if is_label or label:
+        store = True
+      else:
+        store = False
+
     self.store    = store     # Controls whether or not this lens returns or consumes a token in GET, PUT respectively.
     self.label    = label     # Allows this lens to use a labelled token, for storage and retrival.
     self.is_label = is_label  # If set, this lens' token will be used as a label for the current container.
     self.default  = default   # Default output for CREATE, should this lens be acting as a non-store lens.
     self.name     = name      # Specific name for this lens - useful only for debugging.
 
-    # If the lens is or has a label, implies it is a store lens.
-    if self.is_label or self.label:
-      self.store = True
 
   def _put(self, abstract_token, concrete_input_reader) :
     """
@@ -608,9 +611,9 @@ class CombinatorLens(BaseLens) :
 ##################################################
 # Core lenses
 #
-
     
 class And(CombinatorLens) :
+  """A lens that is formed from the ANDing of two sub-lenses."""
 
   def __init__(self, left_lens, right_lens, **kargs):
    
@@ -621,14 +624,15 @@ class And(CombinatorLens) :
     left_lens = self._preprocess_lens(left_lens)
     right_lens = self._preprocess_lens(right_lens)
 
-    # Flatten sub-lenses that are also Ands, so we don't have too much nesting, which makes debugging lenses a nightmare.
+    # Flatten sub-lenses that are also Ands, so we don't have too much nesting,
+    # which makes debugging lenses a nightmare.
     for lens in [left_lens, right_lens] :
       if isinstance(lens, self.__class__) : 
         self.lenses.extend(lens.lenses)
       else :
         self.lenses.append(lens)
 
-    # Link the edge lenses.
+    # Link the edge lenses to help with ambiguity checking.
     for i in range(len(self.lenses)-1) :
       lens = self.lenses[i]
       next_lens = self.lenses[i+1]
@@ -639,22 +643,34 @@ class And(CombinatorLens) :
 
 
   def _get(self, concrete_input_reader) :
+    """
+    Returns a collection of tokens obtained by sequentially looping through the
+    ANDed lenses.
+    """
+    # Create a collect, of type appropriate for this lens (e.g. dict, list, hybrid, etc.)
     token_collection = self._create_collection()
+    # Store tokens for each lens.
     for lens in self.lenses :
+      # Note that token info is needed for storing the token, so we do not
+      # prematurely postprocess tokens, which will happen in _store_token.
       self._store_token(lens.get(concrete_input_reader, postprocess_token=False), lens, token_collection)
+    
     return token_collection
 
 
   def _put(self, abstract_data, concrete_input_reader) :
     
-    # And can accept the current abstract reader, since nested Ands are avoided in lens construction.
+    # If we already have a token reader, AND will pass that directly on to its
+    # sub-lenses, since collections are flattened on lens construction (i.e. we
+    # do not by default have collections of collections).
     if isinstance(abstract_data, AbstractTokenReader) :
       abstract_token_reader = abstract_data
     elif isinstance(abstract_data, AbstractCollection) :
       abstract_token_reader = AbstractTokenReader(abstract_data)
     else :
-      raise LensException("Expected a collection token.")
+      raise LensException("Expected a collection token or a token reader.")
 
+    # Simply concatenate output from the sub-lenses.
     output = ""
     for lens in self.lenses :
       output += lens.put(abstract_token_reader, concrete_input_reader)
@@ -671,11 +687,13 @@ class And(CombinatorLens) :
 
   @staticmethod
   def TESTS() :
-    # GET
+    # These tests flex the use of labels.
+
+    d("GET")
     lens = AnyOf(alphas, store=True) + AnyOf(nums, store=True, label="2nd_char") + AnyOf(alphas, store=True, is_label=True) + AnyOf(nums, store=True)
     token = lens.get("m1x3p6", check_fully_consumed=False)
-    assert_match(str(token), "...<x> -> {None: ['m', '3'], '2nd_char': ['1']}")
-    # PUT
+    assert_match(str(token), "...<x> -> {'2nd_char': ['1'], None: ['m', '3']}")
+
     d("PUT")
     tokens = GenericCollection(["n", "8"])
     tokens["2nd_char"] = "4"
@@ -684,7 +702,9 @@ class And(CombinatorLens) :
     assert output == "n4g8"
 
     # CREATE
-    output = lens.create(tokens)
+    d("CREATE")
+    d(str(tokens))
+    output = lens.create(tokens, label="g")
     assert output == "n4g8"
     
     d("TEST TYPE CASTING")
@@ -865,7 +885,7 @@ class Or(CombinatorLens) :
     lens = AnyOf(nums, store=store, default="4") | AnyOf(alphas, store=store, default="B") | (AnyOf(alphanums, label="l", store=store, default="3") + AnyOf(alphas, store=store, default="x"))
     token = lens.get("2m_x3p6", check_fully_consumed=False)
     d(token)
-    assert_match(str(token), "...['m'], 'l': ['2']...")
+    assert_match(str(token), "...{'l': ['2'], None: ['m']}...")
     
     d("PUT")
     token["l"] = '8'
@@ -880,8 +900,8 @@ class Or(CombinatorLens) :
     output = lens.create(token, check_fully_consumed=False)
     d(output)
     assert output == "8p"
-  
-    
+   
+
     # Now see what happens with a non-store lens.
     d("NON-STORE")
     store = False
@@ -889,6 +909,7 @@ class Or(CombinatorLens) :
 
     d("GET")
     token = lens.get("2m_x3p6", check_fully_consumed=False)
+    d(str(token))
     # This should give us an empty GenericCollection
     assert isinstance(token, GenericCollection) and not token.dict
 
@@ -1161,9 +1182,9 @@ class AnyOf(Lens) :
     if self.name :
       return self.name
     if self.negate :
-      return "not in [%s]" % truncate(self.valid_chars)
+      return "not in [%s]" % range_truncate(self.valid_chars)
     else :
-      return "in [%s]" % truncate(self.valid_chars)
+      return "in [%s]" % range_truncate(self.valid_chars)
   
 
   @staticmethod

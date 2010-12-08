@@ -51,6 +51,13 @@ def truncate(s, max_len=10) :
     display_string = display_string[0:MAX_LEN] + "..."
   return display_string
 
+def range_truncate(s, max_len=10) :
+  if not IN_DEBUG_MODE :
+    return s
+  if len(s) > max_len :
+    return s[0:3] + "..." + s[-3:]
+  
+
 def assert_match(input_string, template) :
   """Flexible check to see if a string matches a template containing ellipses, for debugging."""
   # TODO: Might be an idea just to strip out whitespace completely and compare char string - or even to use a hash.

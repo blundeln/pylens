@@ -17,6 +17,15 @@ For those familiar with pyparsing, this is like pyparsing but it works in both
 directions, for parsing *and* unparsing abstract models of data, whilst
 keeping the idea of simple, in-language parser definition.
 
+Usage
+-----------------------------------------------------
+
+I will work on this, but for now, to get a feel for how it works, see the unit
+tests and longer tests in the following files::
+
+  pylens/__init__.py
+  testing/long_tests.py
+
 Status
 -----------------------------------------------------
 
@@ -27,8 +36,9 @@ richer abstractions of data (i.e. using native language objects) for use with
 lenses, but that, since we do not use an FSA like Augeas and Boomerang,
 ambiguity checking is not yet supported, though I'm interested in exploring
 how we can implement some kind of certainty of non-ambiguity into the
-framework, if not full ambiguity checking.  For more details see the work of
-Nate Foster (link below).
+framework, if not full ambiguity checking.  For more details see the work
+relating to lenses/bi-directional-programming of Nate Foster et al. (link
+below).
 
 Pylens is Inspired By
 ------------------------------------------------------
