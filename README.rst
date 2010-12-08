@@ -1,7 +1,7 @@
 Pylens - Object Serialisation through a Lens
 ====================================================
 
-Author: Nick Blundell (www.nickblundell.org.uk)
+Author: Nick Blundell (http://www.nickblundell.org.uk)
 
 This is an attempt to implement the extremely useful idea of lenses
 (bi-directional parsers) within the context of object serialisation, with the
@@ -12,6 +12,10 @@ In a nutshell, we wish to serialise some object model to and from a flat file
 with some arbitrary structure, such that changes are made surgically to those
 files to reflect changes in the model (e.g. comments and whitespace are
 preserved where possible to allow both automated and manual configuration).
+
+For those familiar with pyparsing, this is like pyparsing but it works in both
+directions, for parsing *and* unparsing abstract models of data, whilst
+keeping the idea of simple, in-language parser definition.
 
 Status
 -----------------------------------------------------

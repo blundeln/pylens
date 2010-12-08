@@ -38,9 +38,8 @@ from readers import *
 #XXX: from base_lenses import *
 
 #########################################################
-# Base Lenses
+# Core Lenses
 #
-
 
 class BaseLens(object): # object, important to use new-style classes, for inheritance, etc.
   """
@@ -354,6 +353,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
   
   def create(self, abstract_data, label=None, check_fully_consumed=True) :
+    """Basically, this is PUT with no concrete input."""
     return self.put(abstract_data, None, label=label, check_fully_consumed=check_fully_consumed)
 
 
@@ -362,15 +362,28 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
   #
   
   def _get(self, concrete_input_reader) :
+    """This is where a sub-lense will do its GET work."""
     raise NotImplementedError("in class %s" % self.__class__)
 
   def _put(self, abstract_data, concrete_input_reader) :
+    """This is where a sub-lense will do its PUT work."""
     raise NotImplementedError("in class %s" % self.__class__)
   
 
   #-------------------------
-  # Private
+  # operator overloads
   #
+  
+  def __add__(self, other_lens): return And(self, self._preprocess_lens(other_lens))
+  def __or__(self, other_lens): return Or(self, self._preprocess_lens(other_lens))
+
+  # Reflected operators, so we can write: lens = "a string" + <some_lens>
+  def __radd__(self, other_lens): return And(self._preprocess_lens(other_lens), self)
+  def __ror__(self, other_lens): return Or(self._preprocess_lens(other_lens), self)
+
+  #-------------------------
+  # (Effectively) Private
+  #-------------------------
 
   def _create_collection(self) :
     """Creates a new collection for storing tokens based on this lens' type."""
@@ -378,7 +391,12 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     return collection_class()
 
   def _get_label_of_token(self, token, origin_lens) :
-    """Gets the label by which to store the specified token, which can come from the token itself or from the lens."""
+    
+    """
+    Helper function.  Gets the label by which to store the specified token, which can come
+    from the token itself or from the lens.
+    """
+    
     # If this token has a token label, use that, else check if the lens has a token.
     label = None
     if isinstance(token, AbstractCollection) :
@@ -389,8 +407,9 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     return label
   
   #
-  # Pre- and post-processing functions to ensure internally tokens are strings or AbstractCollections,
-  # whilst allowuing the user to use other types (e.g. int, float, list, dict, classes).
+  # Pre- and post-processing functions to ensure internally tokens are
+  # normalised to strings or AbstractCollections, whilst allowing the user to
+  # use other types (e.g. int, float, list, dict, classes).
   #
 
   def _preprocess_incoming_token(self, token, label=None) :
@@ -411,7 +430,10 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
 
   def _preprocess_lens(self, lens) :
-    """Preprocesses a lens to ensure any type to lens conversion and checking for recursive lens."""
+    """
+    Preprocesses a lens to ensure any type-to-lens conversion and for the
+    binding of recursive lenses.  This will be called before processing lens arguments.
+    """
     lens = BaseLens.coerce_to_lens(lens)
 
     d(str(lens))
@@ -425,6 +447,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
   #-------------------------
   # For ambiguity checking.
+  # XXX: Work in progress
   #
 
   """These allow us to compute lenses that touch in the tree by returning the possible first leaf lenses under this lens."""
@@ -448,19 +471,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     """Gets the set of possible previous leaf lenses (i.e. the lenses that touch this lens)"""
     return self._previous_lenses
 
-  #-------------------------
-  # operator overloads
-  #
-  
-  def __add__(self, other_lens): return And(self, self._preprocess_lens(other_lens))
-  def __or__(self, other_lens): return Or(self, self._preprocess_lens(other_lens))
-
-  # Reflected operators, so we can write: lens = "a string" + <some_lens>
-  def __radd__(self, other_lens): return And(self._preprocess_lens(other_lens), self)
-  def __ror__(self, other_lens): return Or(self._preprocess_lens(other_lens), self)
-  
-
-  
+    
   #-------------------------
   # For debugging
   #
@@ -469,16 +480,22 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     """Useful for identifying specific lenses when debugging."""
     if self.name :
       return self.name
-    return str(hash(self) % 256)  # Hash gives us a reasonably easy to distinguish id for lens if no name set.
+    # If no name, a hash gives us a reasonably easy way to distinguish lenses in debug traces.
+    return str(hash(self) % 256)
 
+  # String representation.
   def __str__(self) :
+    # Bolt on the class name, to ease debugging.
     return "%s(%s)" % (self.__class__.__name__, self._display_id())
   __repr__ = __str__
 
 
+  # XXX: I don't really like these forward declarations, but for now this does
+  # the job.  Perhaps lenses can be registered with the framework for more
+  # flexible coercion.
   @staticmethod
   def coerce_to_lens(lens_operand):
-    """Intelligently convert a type to a lens (e.g. string instance to a Literal lens)"""
+    """Intelligently convert a type to a lens (e.g. string instance to a Literal lens) to ease lens definition."""
     if isinstance(lens_operand, str) :
       lens_operand = Literal(lens_operand)
     elif inspect.isclass(lens_operand) and hasattr(lens_operand, "__lens__") :   
@@ -487,14 +504,17 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     assert isinstance(lens_operand, BaseLens), "Unable to coerce %s to a lens" % lens_operand
     return lens_operand
 
+
+
 class Lens(BaseLens) :
-  """Base class of standard lenses, that can get and store an abstract token."""
+  """Base class of standard lenses, that can GET and PUT an abstract token."""
   def __init__(self, store=False, label=None, is_label=False, default=None, name=None, **kargs) :
     super(Lens, self).__init__(**kargs)
+    
     self.store    = store     # Controls whether or not this lens returns or consumes a token in GET, PUT respectively.
     self.label    = label     # Allows this lens to use a labelled token, for storage and retrival.
     self.is_label = is_label  # If set, this lens' token will be used as a label for the current container.
-    self.default  = default   # Default output for CREATE should this lens be acting as a non-store lens.
+    self.default  = default   # Default output for CREATE, should this lens be acting as a non-store lens.
     self.name     = name      # Specific name for this lens - useful only for debugging.
 
     # if the lens is or has a label, implies it is a store lens.
