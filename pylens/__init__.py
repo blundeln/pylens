@@ -50,6 +50,10 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
   The get and put methods of this base class wrap the get and put methods of
   the child class (_get, _put), ensuring any normalisation and handling
   rollback on Exceptions.
+
+  Also, by encapsulating this complexity in a base lens, descendant
+  non-combinator lenses can be written without worrying about how their tokens
+  get plucked from the token reader - they just handle how to PUT the token.
   """
   
   def __init__(self, type=None, name=None) :
@@ -98,7 +102,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
       else :
         return None
 
-    d("Sucessfully GOT: %s" % (isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data))
+    d("Successfully GOT: %s" % (isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data))
 
     # If we expect full consuption of the conrete input, flag what has been
     # left un-consumed.
@@ -169,72 +173,94 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
         d("%s CREATE: State -> (%s: %s)" % (self, type_of_data, str(abstract_data)))
    
 
-    # XXX: Got here with commenting.
     #
-    # First off, the easy case: if we are a combinator, pass straight through
-    # to PUT proper.
+    # First off, the easy case: if we are a combinator lens, pass
+    # abstract_data, whether a token or a reader, straight through to PUT
+    # proper, since a combinator can handle a reader directly (i.e. *it* can
+    # decide how to consume the tokens from that reader).
     #
     if isinstance(self, CombinatorLens) :
       with reader_rollback(abstract_data, concrete_input_reader) :
         output = self._put(abstract_data, concrete_input_reader)
-        d("Sucessfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
+        d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
         return output
 
+    #
+    # Now we can assume we are dealing with a standard (non-combinator) lens,
+    # which will process a token, either directly or the next one read from a
+    # token reader.
+    #
 
     #
-    # Now we can assume the case of a standard lens.
+    # First handle the easy case, where we have a single token to PUT.
     #
-
-    #
-    # First handle case where we have a single token to put.
-    #
-    if token != None :
-      # A non-store lens is not allowed to be passed a token to put. 
+    if token != None :  # None, since other valid values may evaluate to False
+      # A non-store lens is not allowed to be passed a token to PUT. 
       if not self.store:
         raise LensException("Not a store lens: cannot put a token.")
       
-      # Put the token
+      # Call the specific lens' PUT function with the token, rolling back
+      # reader state if lens fails to put (e.g. if it doesn't match the parsing
+      # branch).
       with reader_rollback(concrete_input_reader) :
         output = self._put(token, concrete_input_reader)
-        d("Sucessfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
+        d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
         return output
 
     #
-    # Now we assume we are working with a standard lens that has been passed an abstract_token_reader
+    # Now we can assume we are working with a standard (non-combinator) lens
+    # that has been passed an abstract token reader.
     # 
     assert(abstract_token_reader)
 
-
-    # If we are a non-store lens, we need to output either from consumed concrete, or the default if we are doing CREATE
+    #
+    # If we are a non-store lens, we need either to output and consume the
+    # original concrete input or to output the default value of this lens if we
+    # are doing CREATE.
+    #
     if not self.store :
       # If PUT ...
       if concrete_input_reader :
-        # Get the concrete text that this lens consumes with get, by remembering the initial state.
+        # Get the concrete text that this lens consumes with GET, by remembering the initial state.
         start_position = concrete_input_reader.get_position_state()
-        self.get(concrete_input_reader) # Note, get() handles rollback for us.
+        self.get(concrete_input_reader) # Note, get() (i.e. BaseLens.get()) handles rollback for us.
         output = concrete_input_reader.get_consumed_string(start_position)
       # If CREATE ...
       else :
         if self.default == None :
-          # Note, if we used a plain Exception here, then an Or lens, say, could fail if not all lenses had a default.
+          # Note, if we used a plain Exception here, then an Or lens, say,
+          # could fail if not all lenses had a default, and so LensException
+          # allows the parent lens potentially to try several lenses until one
+          # of them has a default.
           raise LensException("A default value must be set on this lens: %s." % (self))
         output = self.default
         
-      d("Sucessfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
+      d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
       return output
    
     #
-    # Now we assume we are a store lens and that we need potentially to try to put one of several next-tokens from the reader
-    # due to possibility of having labelled tokens. 
+    # Now we assume that we are a store lens, and that we need potentially to
+    # try to put one of several next-tokens from the reader, due to possibility
+    # of having labelled tokens (i.e. parallel channels of next-tokens), and in
+    # some cases we do not know the label of the next token to be put (i.e. when we CREATE).
     #
     
     #
-    # Find a suitable set of candidate token labels.
+    # Find an appropriate set of candidate labels of next-tokens that may be
+    # PUT from the token reader.
     #
-    if self.is_label : # If our lens is itself a label, we want the collection's label token
+
+    # If our lens is itself a label (i.e. it STORES a label of some concrete
+    # container), we want the label token of the container/collection
+    # represented by the token reader.
+    if self.is_label :
       candidate_labels = [AbstractTokenReader.LABEL_TOKEN]
-    elif self.label :  # If our lens has a label with which to store a token, use this to retrieve the token.
+    
+    # If our lens has a label with which to store a token, use this to
+    # retrieve the token.
+    elif self.label : 
       candidate_labels = [self.label]
+    
     # If PUT, we want to find out if the concrete input generates a label (by running get), so we can put
     # things back where we found them when we have an is_label lens within the concrete structure.
     elif concrete_input_reader :
@@ -303,10 +329,10 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     if best_output :
       set_readers_state(best_output[1], abstract_token_reader, concrete_input_reader)
       output = best_output[0]
-      d("Sucessfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
+      d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
       return output
     
-    # If we have no sucessful put, raise exception - this will happen when all tokens have been consumed.
+    # If we have no successful put, raise exception - this will happen when all tokens have been consumed.
     raise LensException("%s store lens %s failed to put a token." % (concrete_input_reader and "PUT" or "CREATE", self))
 
 
@@ -683,7 +709,7 @@ class Or(CombinatorLens) :
     # Scenarios
     # We may be passed a Token or an AbstractTokenReader
     # PUT and CREATE:
-    #  - Try to (straight) PUT all the lenses and use the firstmost sucess, favouring lenses that consume abstract tokens.
+    #  - Try to (straight) PUT all the lenses and use the firstmost success, favouring lenses that consume abstract tokens.
     #  - Do this first, since we prefer to weave things back into their concrete structure.
     # PUT
     #  - BUT, if all PUTs fail, try cross PUTting: get LL create RL, then GET RL CREATE LL - could put this with the CREATE -
@@ -1237,7 +1263,7 @@ class Until(Lens) :
       try :
         start_state = concrete_input_reader.get_position_state()
         self.lens.get(concrete_input_reader)
-        # Roll back the state after sucessfully getting the lens.
+        # Roll back the state after successfully getting the lens.
         concrete_input_reader.set_position_state(start_state)
         break
       except LensException:

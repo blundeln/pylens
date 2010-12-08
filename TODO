@@ -7,7 +7,8 @@ target: 1.0a1
   - Add installation script
   - Improve basic docs
   - encapsulate debug routines for optional inclusion
-  
+  - Fixed tests, since dict order is not predictable when checking output.
+
 target: future
   - DynamicLens - pass a function which creates a lens when it is called with
     context params (e.g. current collection)
