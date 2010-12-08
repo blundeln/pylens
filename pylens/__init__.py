@@ -284,7 +284,8 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     # So now, for the case of being a CREATE lens, we have more flexibility in
     # which token to PUT, so we add several labels and so can soon have a
     # tie-breaker to decide which to actually go with after some tentative
-    # attempts.
+    # attempts - for now, that tie-breaker is to favour the lens that generates
+    # the longest concrete output.
     else :
       # Candidates are any label (including None) in the abstract reader,
       # excluding the LABEL_TOKEN, since we would have already handled this
@@ -312,7 +313,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
     # For each candidate token label (which may also contain the None label).
     for candidate_label in candidate_labels :
-      # Try to get the token from the token reader, and continue to the next
+      # Try to GET the token from the token reader, and continue to the next
       # label if tokens with the current label have all been consumed from the
       # reader.
       d("Trying candidate label '%s'" % candidate_label)
@@ -322,23 +323,22 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
         d("No tokens with candidate label '%s'" % candidate_label)
         continue
      
-      # Normalise the token and set/update its label token to that which now points at it, if a GenericCollection
-      # XXX: Note the label token may not be consumed by the lens, so we should ignore non-consumption of the label for now.
-      # XXX: Hmm: But if this lens does not use label, does that mean it should be an is_label... need to think about this.
-      # TODO: Might as well use put rather than _put, so normalisation done
-      # there
-      candidate_token = self._preprocess_incoming_token(candidate_token, label=candidate_label)
-
-      # Try to put the token - fail -> rollback, continue
+      # Try to PUT the token; if fail, continue with next candidate label
       try :
-        output = self._put(candidate_token, concrete_input_reader)
+        # Try to put the token, with the label which points to it, which could
+        # have been altered if, say, the token was moved in the abstract
+        # structure.
+        output = self.put(candidate_token, concrete_input_reader, label=candidate_label)
+        # Store this end-state if it generates more favourable concrete output, to break ties.
+        # XXX: This favouring could be configurable.
         if not best_output or len(output) > best_output[0] :
           best_output = (output, get_readers_state(abstract_token_reader, concrete_input_reader))
       except LensException:
-        # Failed to put token, so restore the initial readers state, ready to try another candidate label.
+        # Failed to put token, so restore the initial readers state, ready to
+        # try another candidate label.
         continue
       
-      # Then restore the initial state, for the next PUT attempt.
+      # Then restore the initial state, for the next candidate label PUT attempt.
       set_readers_state(start_reader_state, abstract_token_reader, concrete_input_reader)
 
     # Choose the best output and use the state it left us in.
