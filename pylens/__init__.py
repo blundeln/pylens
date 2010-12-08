@@ -239,10 +239,11 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
       return output
    
     #
-    # Now we assume that we are a store lens, and that we need potentially to
-    # try to put one of several next-tokens from the reader, due to possibility
+    # Now we assume that we are a STORE lens, and that we need potentially to
+    # try to PUT one of several next-tokens from the reader, due to possibility
     # of having labelled tokens (i.e. parallel channels of next-tokens), and in
-    # some cases we do not know the label of the next token to be put (i.e. when we CREATE).
+    # some cases we do not know the label of the next token to be PUT (i.e.
+    # when we CREATE).
     #
     
     #
@@ -251,7 +252,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     #
 
     # If our lens is itself a label (i.e. it STORES a label of some concrete
-    # container), we want the label token of the container/collection
+    # container), we want only the label token of the container/collection
     # represented by the token reader.
     if self.is_label :
       candidate_labels = [AbstractTokenReader.LABEL_TOKEN]
@@ -261,35 +262,46 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     elif self.label : 
       candidate_labels = [self.label]
     
-    # If PUT, we want to find out if the concrete input generates a label (by running get), so we can put
-    # things back where we found them when we have an is_label lens within the concrete structure.
+    # Now, supposing the token we are looking for does not have an explicit
+    # label (as in the case immediately above) but that this lens is a container of
+    # an is_label lens, such that we need to determine, by calling GET on the
+    # concrete input, the label of the token that we are to PUT back.
     elif concrete_input_reader :
-      # Must roll this back once we have found the label, so we can shortly call put (which again calls get())
+      # Must roll this back once we have found the label, so we can shortly
+      # call put() (which again calls get()).  XXX This may be inefficient, but for
+      # now it seems to offer a clean design.
       start_position = concrete_input_reader.get_position_state()
-      original_token = self.get(concrete_input_reader) # get() will rollback if failed
+      original_token = self.get(concrete_input_reader) # get() will rollback if failed.
       concrete_input_reader.set_position_state(start_position)
-      #if hasattr(original_token, "label") : # Will only have a key if a GenericCollection
-        #candidate_labels = [original_token.label]
+      
+      # If GEt abstracted a collection, use its label (which could also be None).
       if isinstance(original_token, GenericCollection) :
         candidate_labels = [original_token.get_label_token()]
+      # Otherwise, we know that this piece of concrete input is unlabelled.
       else:
         candidate_labels = [None]
-    # If CREATE, we have more flexibilty in which token we put, and we can soon have a tie-breaker
-    # to decide which to actually go with.
+   
+    # So now, for the case of being a CREATE lens, we have more flexibility in
+    # which token to PUT, so we add several labels and so can soon have a
+    # tie-breaker to decide which to actually go with after some tentative
+    # attempts.
     else :
-      # Candidates are any label (including None) in the abstract reader, excluding the LABEL_TOKEN.
+      # Candidates are any label (including None) in the abstract reader,
+      # excluding the LABEL_TOKEN, since we would have already handled this
+      # case when checking if our lens has is_label set.
       candidate_labels = abstract_token_reader.position_state.keys()
       if AbstractTokenReader.LABEL_TOKEN in candidate_labels :
         candidate_labels.remove(AbstractTokenReader.LABEL_TOKEN)
 
+    # Show the candidate labels of next-tokens that this lens may attempt to PUT.
     d("candidate labels %s" % candidate_labels)
 
     #
-    # Now try to put tokens with these labels, and go with the most suitable put.
+    # Now try to PUT tokens with these labels, and go with the most favourable PUT.
     #
 
-    # Remember the readers state, before we start trying to put tokens, since we'll not commit until we've tried
-    # all the candidate tokens.
+    # Remember the readers' state, before we start trying to PUT tokens, since
+    # we'll not commit until we've tried all the candidate tokens.
     start_reader_state = get_readers_state(abstract_token_reader, concrete_input_reader)
     best_output = None   # Will be a tuple -> (output, end_state)
 
@@ -298,12 +310,16 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     # which lens, since all use a token, so just down to preference.
     #
 
+    # For each candidate token label (which may also contain the None label).
     for candidate_label in candidate_labels :
-      # Try to get the token from the token reader - fail (e.g. if not more tokens) -> continue, try next label
+      # Try to get the token from the token reader, and continue to the next
+      # label if tokens with the current label have all been consumed from the
+      # reader.
       d("Trying candidate label '%s'" % candidate_label)
       try :
         candidate_token = abstract_token_reader.get_next_token(label=candidate_label)
       except LensException:
+        d("No tokens with candidate label '%s'" % candidate_label)
         continue
      
       # Normalise the token and set/update its label token to that which now points at it, if a GenericCollection

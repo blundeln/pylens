@@ -2,12 +2,13 @@ TODO
 ----
 target: 1.0a1
   - Check through all code and improve comments and structure
-  - Recurse Lens
+  - Complete Recurse Lens
    - Freeze recursion
+  - Fixed tests, since dict order is not predictable when checking output.
   - Add installation script
   - Improve basic docs
   - encapsulate debug routines for optional inclusion
-  - Fixed tests, since dict order is not predictable when checking output.
+    - especially formatting of debug messages which can add a significant overhead.
 
 target: future
   - DynamicLens - pass a function which creates a lens when it is called with
