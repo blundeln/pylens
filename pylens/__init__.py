@@ -823,25 +823,26 @@ class Or(CombinatorLens) :
       # For each lens, ensure the readers state is reset back to the start state.
       set_readers_state(start_readers_state, abstract_token_reader, concrete_input_reader)
       
-    # If already we have a put that consumed a token, go with those results.
+    # If already we have a PUT that consumed a token, go with those results.
     if best_PUT and best_PUT[2]:
       # Commit to the best end-state.
       set_readers_state(best_PUT[1], abstract_token_reader, concrete_input_reader)
       return best_PUT[0]
 
-    # Handle cross PUTs, which get (consume) from one lens and create with another, which is not relevant for CREATE.
+    # Handle cross PUTs, which GET (consume) from one lens and CREATE with another.
     if concrete_input_reader :
-      d("Trying cross put.")
+      d("Trying CROSS PUT.")
       for GET_lens in self.lenses:
         for CREATE_lens in self.lenses :
           if CREATE_lens == GET_lens :
             continue # Already tried straight PUTs
           
-          # For each lens, ensure the readers state is reset back to the start state.
-          set_readers_state(start_readers_state, abstract_token_reader, concrete_input_reader)
           try :
-            GET_lens.get(concrete_input_reader) # Consume and discard with the GET lens.
+            # Consume with the GET lens, discarding any tokens.
+            GET_lens.get(concrete_input_reader)
+            # CREATE with the CREATE lens.
             output = CREATE_lens.create(abstract_data)
+            # Record the end state, if successful.
             end_state = get_readers_state(abstract_token_reader, concrete_input_reader)
             
             # Again, when we have a reader, check if tokens were consumed, so that we might prioritise.
@@ -850,12 +851,15 @@ class Or(CombinatorLens) :
             else :
               lens_consumed_tokens = True
             
-            # Update the best action.
-            if not best_PUT or (lens_consumed_tokens and not best_PUT[2]) : # We prefer the first-most lens that consumes tokens.
+            # Update the best action: we prefer the first-most lens that consumes tokens.
+            if not best_PUT or (lens_consumed_tokens and not best_PUT[2]) : 
               best_PUT = [output, end_state, lens_consumed_tokens]
             
           except LensException:
             pass
+          
+          # For new attempt, ensure the readers' state is reset back to the start state.
+          set_readers_state(start_readers_state, abstract_token_reader, concrete_input_reader)
           
           if lens_consumed_tokens : break # We have what we want.
         if lens_consumed_tokens : break # Break works only on immediate loop - one of the few justifications for a goto!
@@ -866,8 +870,10 @@ class Or(CombinatorLens) :
       return best_PUT[0]
 
     lens_assert(False, "Or should PUT (or CREATE-GET) at least one of the lenses")
-      
+     
+
   def _display_id(self) :
+    """For debugging clarity."""
     return " | ".join([str(lens) for lens in self.lenses])
 
   def get_first_lenses(self):
