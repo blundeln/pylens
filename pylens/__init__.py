@@ -1247,14 +1247,18 @@ class AnyOf(Lens) :
     assert lens.put(8, "3") == "8"
 
 
-
 class Group(Lens) :
-  """A lens that wraps any lens as a standard lens, mainly useful for keeping tokens from CombinatorLenses grouped."""
+  """
+  A lens that thinly wraps any lens as a non-combinator lens, for preserving
+  token groupings in the abstract structure
+  """
 
   def __init__(self, lens, **kargs):
-    # Little point in using a group if it is not to be stored, so automatically set it here.
+    # There is little point in using a group if it is not to be stored, so
+    # automatically set it here.
     if "store" not in kargs :
       kargs["store"] = True
+    
     super(Group, self).__init__(**kargs)
     self.lens = lens
 
@@ -1294,8 +1298,103 @@ class Group(Lens) :
 
     output = lens.create({"o":[1,3,5], "e":[2,4,6]})
     d(output)
-    # Will be one way around or the other.
+    # Will be one way around or the other, but some probably find a more deterministic way.
     assert output == "o=1,3,5;e=2,4,6;" or output == "e=2,4,6;o=1,3,5;"
+
+
+class CombineChars(Lens) :
+  """
+  Combines seperate character tokens into strings in both directions.  This is
+  extended by lenses such as Word and Literal.
+  """
+ 
+  # TODO: Should this be a lens at all, or somehting more fundamental, perhaps
+  # relating to a collection? Since how do we handle if sub lens is optionally
+  # a store or non-store? perhaps we can set the type of a lens to string?
+  # e.g. Word(alpha) -> OneOrMore(AnyOf(alpha), type=str)
+
+  def __init__(self, lens, **kargs):
+    super(CombineChars, self).__init__(**kargs)
+    self.lens = lens
+
+  def _get(self, concrete_reader) :
+    """
+    Gets the token from the sub lens, checking that it contains only a list of
+    chars (no labelled tokens) or a single char before assembling them into a single
+    string token.
+    """
+
+    token = self.lens.get(concrete_reader)
+  
+    # If we are a non-store lens, regardless of the child lens, return nothing
+    # here so that we save needless processing.
+    if not self.store :
+      return None
+
+    # If the sub-lens GOT a string ...
+    if isinstance(token, str) :
+      # We will allow it through only if it is a single char.
+      lens_assert(len(token) <= 1, "Expected a single char string or empty.")
+      return token
+
+    lens_assert(token and isinstance(token, AbstractCollection), "Expected a collection of tokens")
+    # Now we can assume we have a token collection.
+    token_collection = token
+    
+    # Check no tokens are stored with labels - we just want a straight list of tokens.
+    lens_assert(token_collection.dict.keys() == [None], "Cannot combine the output of a lens that stores tokens with labels.")
+    
+    # Build up the string from char tokens.
+    string_value = ""
+    for sub_token in token_collection.dict[None] :
+      lens_assert(isinstance(sub_token, str) and len(sub_token) == 1, "Expect only single char tokens.")
+      string_value += sub_token
+
+    # XXX: Hmmm, is there any good reason why we cannot allow the empty string?
+    lens_assert(string_value != "", "Expected at least one char token.")
+
+    return string_value
+
+  def _put(self, abstract_token, concrete_input_reader) :
+    
+    # Expand the abstract_token into an ATR(ATC), then pass to lens.
+    lens_assert(isinstance(abstract_token, str) and len(abstract_token) > 0, "Expected a non-empty string")
+
+    token_collection = GenericCollection()
+    for char in abstract_token :
+      token_collection.add_token(char)
+
+    # Return the output of the lens - using a reader in order for either combinator or simple lens to pick up as list of
+    # chars or as a single char.
+    return self.lens.put(AbstractTokenReader(token_collection), concrete_input_reader)
+
+  @staticmethod
+  def TESTS() :
+    d("GET")
+    lens = CombineChars(AnyOf(alphas, store=True) + AnyOf(nums, store=True), store=True)
+    concrete_reader = ConcreteInputReader("n6xxsf")
+    token = lens.get(concrete_reader)
+    assert(token == "n6" and concrete_reader.get_remaining() == "xxsf")
+
+    d("PUT")
+    output = lens.put("b3", "n6xxsf")
+    d(output)
+    assert(output == "b3")
+
+    # CREATE
+    output = lens.create("g9")
+    assert(output == "g9")
+
+    # For good measure - GET
+    lens = CombineChars(OneOrMore(AnyOf(alphas, store=True)), store=True)
+    concrete_reader = ConcreteInputReader("Nick1234")
+    token = lens.get(concrete_reader)
+    assert(token == "Nick" and concrete_reader.get_remaining() == "1234")
+
+    # For good measure - PUT
+    concrete_reader.reset()
+    output = lens.put("Ed", concrete_reader)
+    assert(output == "Ed" and concrete_reader.get_remaining() == "1234")
 
 
 class Until(Lens) :
@@ -1357,85 +1456,6 @@ class Until(Lens) :
       output = lens.put(atr, cr)
       d(output)
       assert output == "(monkey)"
-
-class CombineChars(Lens) :
-  """Combines seperate character tokens into strings in both directions."""
-  # Should this use group?
-  def __init__(self, lens, **kargs):
-    super(CombineChars, self).__init__(**kargs)
-    self.lens = lens
-
-  def _get(self, concrete_reader) :
-    """
-    Gets the token from the sub lense, checking that it contains only a list of chars (no labelled tokens) or single char
-    then assembles them into a single string token.
-    """
-    
-    token = self.lens.get(concrete_reader)
-  
-    # If we are a non-store return nothing now
-    if not self.store :
-      return None
-
-    # If the sub-lens returned a string, 
-    if isinstance(token, str) :
-      lens_assert(len(token) == 1, "Expected a single char string.")
-      return token
-
-    lens_assert(token and isinstance(token, AbstractCollection), "Expected a collection of tokens")
-    token_collection = token
-      # Check no tokens are stored with labels - we just want a straight list of tokens.
-    lens_assert(token_collection.dict.keys() == [None], "Cannot combine the output of a lens that stores tokens with labels.")
-    
-    string_value = ""
-    for sub_token in token_collection.dict[None] :
-      lens_assert(isinstance(sub_token, str) and len(sub_token) == 1, "Expect only single char tokens.")
-      string_value += sub_token
-
-    lens_assert(string_value != "", "Expected at least one char token.")
-
-    return string_value
-
-  def _put(self, abstract_token, concrete_input_reader) :
-    
-    # Expand the abstract_token into an ATR(ATC), then pass to lens.
-    lens_assert(isinstance(abstract_token, str) and len(abstract_token) > 0, "Expected a non-empty string")
-
-    token_collection = GenericCollection()
-    for char in abstract_token :
-      token_collection.add_token(char)
-
-    # Return the output of the lens - using a reader in order for either combinator or simple lens to pick up as list of
-    # chars or as a single char.
-    return self.lens.put(AbstractTokenReader(token_collection), concrete_input_reader)
-
-  @staticmethod
-  def TESTS() :
-    d("GET")
-    lens = CombineChars(AnyOf(alphas, store=True) + AnyOf(nums, store=True), store=True)
-    concrete_reader = ConcreteInputReader("n6xxsf")
-    token = lens.get(concrete_reader)
-    assert(token == "n6" and concrete_reader.get_remaining() == "xxsf")
-
-    d("PUT")
-    output = lens.put("b3", "n6xxsf")
-    d(output)
-    assert(output == "b3")
-
-    # CREATE
-    output = lens.create("g9")
-    assert(output == "g9")
-
-    # For good measure - GET
-    lens = CombineChars(OneOrMore(AnyOf(alphas, store=True)), store=True)
-    concrete_reader = ConcreteInputReader("Nick1234")
-    token = lens.get(concrete_reader)
-    assert(token == "Nick" and concrete_reader.get_remaining() == "1234")
-
-    # For good measure - PUT
-    concrete_reader.reset()
-    output = lens.put("Ed", concrete_reader)
-    assert(output == "Ed" and concrete_reader.get_remaining() == "1234")
 
 class Recurse(CombinatorLens):
   """

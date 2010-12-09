@@ -35,7 +35,10 @@
 from nbdebug import *
 
 class LensException(Exception):
-  """Thrown when parsing or creating lenses."""
+  """
+  Thrown when parsing or creating lenses to trigger rollback, such that parsing
+  may resume at a higher level (e.g. to try another lens path), if possible.
+  """
 
   def __init__(self, msg=None):
     self.__msg = msg

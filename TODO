@@ -11,6 +11,10 @@ target: 1.0.0a1
     - especially formatting of debug messages which can add a significant overhead.
 
 target: future
+  - Should CombineChars be replaced by type=str or something, a more fundamental approach?
+  - Shorter syntax for differentiating between store and non-store lenses so parsers less cluttered
+    - e.g. Word(...) vs S(Word(...)), or something
+    - rather than: Word(store=False) vs Word(store=True)
   - Need a way of accurately testing performance, since currently many tests require (slow) debug strings
     to validate output
   - DynamicLens - pass a function which creates a lens when it is called with
