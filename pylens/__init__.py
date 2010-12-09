@@ -1107,77 +1107,80 @@ class OneOrMore(CombinatorLens) :
     lens = OneOrMore(Empty())
     d("Do we loop indefinitely here?...")
     output = lens.create([])
-    d("No, we do not, which is good.")
+    d("No, we do not, which is good :)")
 
     d("Empty GET test")
     d("Do we loop indefinitely here?...")
     lens.get("abc", check_fully_consumed=False)
-    d("No, we do not, which is good.")
+    d("No, we do not, which is good :)")
 
 
-class Recurse(CombinatorLens):
+class Empty(Lens) :
   """
-  During construction, lenses pass up references to Recurse so that it may bind to
-  the top level lens, though this must be frozen to the local lens definition.
-  TODO: Freeze ascension - will use reflection to freeze when find var to which this Recurse binds.
-  TODO: Reconcile different recurse lenses as the same lens (e.g. X + Recurse() + Z | Y + Recurse() + P)
-        Only required if we allow multiple instances
-  """
-  def __init__(self, **kargs):
-    super(Recurse, self).__init__(**kargs)
-    self._bound_lens = None
-    return   
-    # Lets find which lens we were initialised under.
-    import inspect
-
-    
-
-    frame = inspect.currentframe()
-    frame = frame.f_back
-    d(frame.f_locals)
-    return
-    #d(frame.f_locals["self"])
-    while frame: #"self" in frame.f_locals :
-      if "self" in frame.f_locals :
-        d(frame.f_locals)
-      frame = frame.f_back
-    """for i in range(0, callerLevel) :
-        callerFrame = callerFrame.f_back
-      location = getCallerLocation(callerFrame)
-      message = indent + location+": " + message
+  Matches the empty string, used by Optional().  Can also set modes for special
+  empty matches.
   """
   
-  def bind_lens(self, lens) :
-    d("Binding to lens %s" % lens)
-    self._bound_lens = lens
-  
+  # Useful modifiers for empty matches.
+  START_OF_TEXT = "START_OF_TEXT"
+  END_OF_TEXT   = "END_OF_TEXT"
+
+  def __init__(self, mode=None, **kargs):
+    super(Empty, self).__init__(**kargs)
+    self.default = ""
+    self.mode = mode
+
   def _get(self, concrete_input_reader) :
-    assert self._bound_lens, "Recurse was unable to bind to a lens."
-    return self._bound_lens._get(concrete_input_reader)
+    
+    if self.mode == self.START_OF_TEXT :
+      lens_assert(concrete_input_reader.get_pos() == 0, "Will match only at start of text.")
+    elif self.mode == self.END_OF_TEXT :
+      lens_assert(concrete_input_reader.is_fully_consumed(), "Will match only at end of text.")
 
-  def _put(self, abstract_data, concrete_input_reader) :
-    assert self._bound_lens, "Recurse was unable to bind to a lens."
-    return self._bound_lens._put(abstract_data, concrete_input_reader)
- 
-  # TODO: When Recurse binds, it could replace the links with touching lenses.
-  # Or perhaps we override get_next_lenses - perhaps not a problem when it comes to getting char sets
-  # since we will be bound by then.
-  def get_first_lenses(self):
-    return [self]
-  def get_last_lenses(self):
-    return [self]
+    # Note this is actually a token (not None) we return, that could
+    # potentially be stored, so elsewhere in the framework, we need to ensure
+    # we check explicitly for None, since "" evaluates to False
+    return ""
+
+  def _put(self, abstract_token, concrete_input_reader) :
+    # Here we can put only the empty string token.
+    lens_assert(isinstance(abstract_token, str) and abstract_token == "")
+    return ""
 
   @staticmethod
   def TESTS() :
-    lens = ("[" + (Recurse() | Word(alphas, store=True)) + "]")
-    token = lens.get("[[hello]]")
-    d(token)
-    assert_match(str(token), "...['hello']...")
-    output = lens.put(["monkey"], "[[hello]]")
-    d(output)
-    assert output == "[[monkey]]"
+    
+    # With store
+    lens = Empty(store=True)
+    assert lens.get("anything", check_fully_consumed=False) == ""
+    assert lens.put("", "anything") == ""
+    try :
+      lens.put(" ", "anything"); assert False
+    except LensException :
+      pass # The token ' ' is invalid for this lens.
+    assert lens.create("") == ""
+
+    # Without store
+    lens = Empty()
+    assert lens.get("anything", check_fully_consumed=False) == None
+    assert lens.put(AbstractTokenReader(GenericCollection()), "anything") == ""
+    try :
+      lens.put("", "anything"); assert False
+    except LensException :
+      pass # Even though token valid, this is not a store lens, so will fail.
+    
+    # Try special modes.
+    lens = Empty(mode=Empty.START_OF_TEXT)
+    concrete_reader = ConcreteInputReader("hello")
+    concrete_reader.get_next_char()
+    try : token = lens.get(concrete_reader); assert False, "This should fail - we should not get here!"
+    except LensException: pass
+
 
 class AnyOf(Lens) :
+  """
+  Matches a single char within a specified set, and can also be negated.
+  """
   
   def __init__(self, valid_chars, negate=False, **kargs):
     super(AnyOf, self).__init__(**kargs)
@@ -1197,20 +1200,22 @@ class AnyOf(Lens) :
 
 
   def _put(self, abstract_token, concrete_input_reader) :
-    # If this is PUT (vs CREATE) then consume input.
+    # If this is PUT (vs CREATE) then first consume input.
     if concrete_input_reader :
       self.get(concrete_input_reader)
-    lens_assert(isinstance(abstract_token, str) and len(abstract_token) == 1 and self._is_valid_char(abstract_token), "Invalid abstract_token '%s'." % abstract_token)
+    lens_assert(isinstance(abstract_token, str) and len(abstract_token) == 1 and self._is_valid_char(abstract_token), "Invalid abstract_token '%s', expected %s." % (abstract_token, self._display_id()))
     return abstract_token
 
 
   def _is_valid_char(self, char) :
+    """Tests if that passed is a valid character for this lens."""
     if self.negate :
       return char not in self.valid_chars
     else :
       return char in self.valid_chars
 
   def _display_id(self) :
+    """To aid debugging."""
     if self.name :
       return self.name
     if self.negate :
@@ -1241,60 +1246,6 @@ class AnyOf(Lens) :
     assert lens.get("3") == 3
     assert lens.put(8, "3") == "8"
 
-class Empty(Lens) :
-  """Matches the empty string, used by Optional().  Can set modes for special empty matches."""
-  
-  # Useful modifiers
-  START_OF_TEXT = "START_OF_TEXT"
-  END_OF_TEXT   = "END_OF_TEXT"
-
-  def __init__(self, mode=None, **kargs):
-    super(Empty, self).__init__(**kargs)
-    self.default = ""
-    self.mode = mode
-
-  def _get(self, concrete_input_reader) :
-    
-    if self.mode == self.START_OF_TEXT :
-      lens_assert(concrete_input_reader.get_pos() == 0, "Not at start of text.")
-    elif self.mode == self.END_OF_TEXT :
-      lens_assert(concrete_input_reader.is_fully_consumed(), "Not at end of text.")
-
-    return ""  # Note this is actually a token (not None) that could potentially be stored.
-
-  def _put(self, abstract_token, concrete_input_reader) :
-    lens_assert(isinstance(abstract_token, str) and abstract_token == "")
-    return ""
-
-  @staticmethod
-  def TESTS() :
-    
-    
-    # With store
-    lens = Empty(store=True)
-    assert lens.get("anything", check_fully_consumed=False) == ""
-    assert lens.put("", "anything") == ""
-    try :
-      lens.put(" ", "anything"); assert False
-    except LensException :
-      pass # The token ' ' is invalid for this lens.
-    assert lens.create("") == ""
-
-    # Without store
-    lens = Empty()
-    assert lens.get("anything", check_fully_consumed=False) == None
-    assert lens.put(AbstractTokenReader(GenericCollection()), "anything") == ""
-    try :
-      lens.put("", "anything"); assert False
-    except LensException :
-      pass # Even though token valid, this is not a store lens, so will fail.
-    
-    # Try special modes.
-    lens = Empty(mode=Empty.START_OF_TEXT)
-    concrete_reader = ConcreteInputReader("hello")
-    concrete_reader.get_next_char()
-    try : token = lens.get(concrete_reader); assert False, "This should fail - we should not get here!"
-    except LensException: pass
 
 
 class Group(Lens) :
@@ -1485,6 +1436,69 @@ class CombineChars(Lens) :
     concrete_reader.reset()
     output = lens.put("Ed", concrete_reader)
     assert(output == "Ed" and concrete_reader.get_remaining() == "1234")
+
+class Recurse(CombinatorLens):
+  """
+  During construction, lenses pass up references to Recurse so that it may bind to
+  the top level lens, though this must be frozen to the local lens definition.
+
+  TODO: Freeze ascension - will use reflection to freeze when find var to which this Recurse binds.
+  TODO: Reconcile different recurse lenses as the same lens (e.g. X + Recurse() + Z | Y + Recurse() + P)
+        Only required if we allow multiple instances in lens definition
+  """
+  def __init__(self, **kargs):
+    super(Recurse, self).__init__(**kargs)
+    self._bound_lens = None
+    return   
+    # Let's find which lens we were initialised under.
+    import inspect
+
+    
+
+    frame = inspect.currentframe()
+    frame = frame.f_back
+    d(frame.f_locals)
+    return
+    #d(frame.f_locals["self"])
+    while frame: #"self" in frame.f_locals :
+      if "self" in frame.f_locals :
+        d(frame.f_locals)
+      frame = frame.f_back
+    """for i in range(0, callerLevel) :
+        callerFrame = callerFrame.f_back
+      location = getCallerLocation(callerFrame)
+      message = indent + location+": " + message
+  """
+  
+  def bind_lens(self, lens) :
+    d("Binding to lens %s" % lens)
+    self._bound_lens = lens
+  
+  def _get(self, concrete_input_reader) :
+    assert self._bound_lens, "Recurse was unable to bind to a lens."
+    return self._bound_lens._get(concrete_input_reader)
+
+  def _put(self, abstract_data, concrete_input_reader) :
+    assert self._bound_lens, "Recurse was unable to bind to a lens."
+    return self._bound_lens._put(abstract_data, concrete_input_reader)
+ 
+  # TODO: When Recurse binds, it could replace the links with touching lenses.
+  # Or perhaps we override get_next_lenses - perhaps not a problem when it comes to getting char sets
+  # since we will be bound by then.
+  def get_first_lenses(self):
+    return [self]
+  def get_last_lenses(self):
+    return [self]
+
+  @staticmethod
+  def TESTS() :
+    lens = ("[" + (Recurse() | Word(alphas, store=True)) + "]")
+    token = lens.get("[[hello]]")
+    d(token)
+    assert_match(str(token), "...['hello']...")
+    output = lens.put(["monkey"], "[[hello]]")
+    d(output)
+    assert output == "[[monkey]]"
 
 ##################################################
 # Useful lenses
