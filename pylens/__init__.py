@@ -714,13 +714,17 @@ class And(CombinatorLens) :
     
 
 class Or(CombinatorLens) :
-  """In the GET direction, the longest match is returned; in the PUT direction the left-most token-consuming token is favoured else left-most lens."""
+  """
+  This is the OR of two lenses.
+
+  To break ties in the GET direction, the longest match is returned; in the PUT
+  direction, to ensure tokens do actually get consumed when possible, the
+  left-most token-consuming token is favoured, else left-most lens.
+  """
   
   def __init__(self, left_lens, right_lens, **kargs):
     super(Or, self).__init__(**kargs)
     self.lenses = []
-    # TODO: Put lenses attrib in CombinatorLens along with preprocessing.
-    # Preprocess lenses
     left_lens = self._preprocess_lens(left_lens)
     right_lens = self._preprocess_lens(right_lens)
 
@@ -732,19 +736,15 @@ class Or(CombinatorLens) :
         self.lenses.append(lens)
 
 
-  def _display_id(self) :
-    return " | ".join([str(lens) for lens in self.lenses])
-
   def _get(self, concrete_input_reader) :
   
     # Scenarios
     #  - More than one lens may match
     #    - Consider AnyOf(alpha) | Empty() -> Empty() will always match
-    #    - So test all and return longest match (i.e. progresses the concrete input the furthest) if several match
+    #    - So test all, and return longest match (i.e. progresses the concrete input the furthest) if several match
     #    - If matches are same length, return firstmost match.
     #  - Note that we must be careful to differentiate between failing to get a token and getting a None token (e.g from Empty())
-    # - Perhaps could toggle greedy/non-greedy (i.e. order priority) GET per Or() instance.
-    # TODO: Could also get longest consumption that gives a token firstmost.
+    # XXX: Perhaps could toggle greedy/non-greedy (i.e. order priority) GET per Or() instance.
 
     # Remember the starting state (position) of the concrete reader.
     concrete_start_state = concrete_input_reader.get_position_state()
@@ -752,8 +752,6 @@ class Or(CombinatorLens) :
     # Try all lenses and store token and end_state
     best_match = None
     for lens in self.lenses :
-      # Ensure the reader is at the start state for each lens to parse afresh.
-      concrete_input_reader.set_position_state(concrete_start_state)
       try :
         token = lens.get(concrete_input_reader)
         end_state = concrete_input_reader.get_position_state()
@@ -762,6 +760,9 @@ class Or(CombinatorLens) :
           best_match = [token, end_state]
       except LensException:
         pass
+      
+      # Ensure the reader is at the start state for each lens to parse afresh.
+      concrete_input_reader.set_position_state(concrete_start_state)
 
     lens_assert(best_match != None, "Or should match at least one of the lenses")
 
@@ -769,59 +770,62 @@ class Or(CombinatorLens) :
     concrete_input_reader.set_position_state(best_match[1])
     return best_match[0]
 
-  def _token_should_be_merged(self) :
-    # E.g. if one of our sub-lenses is and And, OneOrMore, etc.
-    return True
-
   def _put(self, abstract_data, concrete_input_reader) :
  
-    # TODO: Should put longest, perhaps first-most more intuitive for lens designers, so they have some control.
     # Scenarios
-    # We may be passed a Token or an AbstractTokenReader
-    # PUT and CREATE:
-    #  - Try to (straight) PUT all the lenses and use the firstmost success, favouring lenses that consume abstract tokens.
-    #  - Do this first, since we prefer to weave things back into their concrete structure.
-    # PUT
-    #  - BUT, if all PUTs fail, try cross PUTting: get LL create RL, then GET RL CREATE LL - could put this with the CREATE -
-    #    since we may have change the abstract from one token type to the other.
+    #   We may be passed a Token or an AbstractTokenReader
+    #   PUT and CREATE:
+    #   - Try to (straight) PUT all the lenses and use the firstmost success, favouring lenses that consume abstract tokens.
+    #   - Do this first, since we prefer to weave abstract data back into their concrete structure.
+    #   PUT
+    #   - BUT, if all PUTs fail, try cross-PUTting: GET left lense then CREATE RL, then GET RL CREATE LL - could put this with the CREATE -
+    #     since we may have change the abstract from one token type to the other.
+    # TODO: Should put longest, perhaps first-most more intuitive for lens designers, so they have some control.
     
+    # Set variable appropriately if we have a token reader (as opposed to a single token).
     if isinstance(abstract_data, AbstractTokenReader) :
       abstract_token_reader = abstract_data
     else :
       abstract_token_reader = None
 
-    # Remember the starting state of the readers - note, this does nothing if readers are None.
+    # Remember the starting state of the readers - note, conveniently this does nothing if readers are None.
     start_readers_state = get_readers_state(abstract_token_reader, concrete_input_reader)
 
-    d("Trying straight put.")
+    d("Trying STRAIGHT PUT.")
     # Try all lenses and store reader and end_state of the longest PUT
     # This handles straight PUTs (vs. cross PUTs) and CREATE (when concrete_input_reader == None)
     best_PUT = None
-    lens_consumed_tokens = False
+    lens_consumed_tokens = False # Records if a certain lens consumed a token.
     for lens in self.lenses :
-      # For each lens, ensure the readers state is reset back to the start state.
-      set_readers_state(start_readers_state, abstract_token_reader, concrete_input_reader)
+
       try :
+        # Try PUT on the lens and upon success record the end state.
         output = lens.put(abstract_data, concrete_input_reader)
         end_state = get_readers_state(abstract_token_reader, concrete_input_reader)
         
-        # If we are dealing with an AbstractTokenReader, then check to see if the lens consumed any tokens.
-        # otherwise, we assume that it did, since otherwise the PUT would fail before we got here.
+        # If we are dealing with an AbstractTokenReader, then check to see if
+        # the lens consumed any tokens.  otherwise, we assume that it did,
+        # since otherwise the PUT (of a specific token) would fail before we
+        # got here.
         if abstract_token_reader :
           lens_consumed_tokens = start_readers_state[0] != end_state[0]
         else :
           lens_consumed_tokens = True
 
-        # Update the best action.
-        if not best_PUT or (lens_consumed_tokens and not best_PUT[2]) : # We prefer the first-most lens that consumes tokens.
+        # Update the best action: we prefer the first-most lens that consumes tokens.
+        if not best_PUT or (lens_consumed_tokens and not best_PUT[2]) : 
           best_PUT = [output, end_state, lens_consumed_tokens]
           d("BEST straight put: %s" % best_PUT)
           if lens_consumed_tokens : break # We have what we want.
       except LensException:
         pass
       
+      # For each lens, ensure the readers state is reset back to the start state.
+      set_readers_state(start_readers_state, abstract_token_reader, concrete_input_reader)
+      
     # If already we have a put that consumed a token, go with those results.
     if best_PUT and best_PUT[2]:
+      # Commit to the best end-state.
       set_readers_state(best_PUT[1], abstract_token_reader, concrete_input_reader)
       return best_PUT[0]
 
@@ -863,6 +867,9 @@ class Or(CombinatorLens) :
 
     lens_assert(False, "Or should PUT (or CREATE-GET) at least one of the lenses")
       
+  def _display_id(self) :
+    return " | ".join([str(lens) for lens in self.lenses])
+
   def get_first_lenses(self):
     """Return list of possible first lenses."""
     first_lenses = []

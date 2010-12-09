@@ -29,4 +29,4 @@
 # Author: Nick Blundell <blundeln [AT] gmail [DOT] com>
 # Organisation: www.nickblundell.org.uk
 #
-VERSION = "1.0a1"
+VERSION = "1.0.0a1"

@@ -1,6 +1,6 @@
 TODO
 ----
-target: 1.0a1
+target: 1.0.0a1
   - Check through all code and improve comments and structure
   - Complete Recurse Lens
    - Freeze recursion
@@ -11,6 +11,8 @@ target: 1.0a1
     - especially formatting of debug messages which can add a significant overhead.
 
 target: future
+  - Need a way of accurately testing performance, since currently many tests require (slow) debug strings
+    to validate output
   - DynamicLens - pass a function which creates a lens when it is called with
     context params (e.g. current collection)
   - Ambiguity check.
