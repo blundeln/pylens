@@ -565,7 +565,7 @@ class CombinatorLens(BaseLens) :
     if token == None :
       return
    
-    # Scenarios
+    # Algorithm Outline
     #  - We are about to add a token to our current collection
     #  - The token may or may not be a collection itself
     #  - The token-generating lens may or may not be a CombinatorLens
@@ -738,7 +738,7 @@ class Or(CombinatorLens) :
 
   def _get(self, concrete_input_reader) :
   
-    # Scenarios
+    # Algorithm Outline
     #  - More than one lens may match
     #    - Consider AnyOf(alpha) | Empty() -> Empty() will always match
     #    - So test all, and return longest match (i.e. progresses the concrete input the furthest) if several match
@@ -772,7 +772,7 @@ class Or(CombinatorLens) :
 
   def _put(self, abstract_data, concrete_input_reader) :
  
-    # Scenarios
+    # Algorithm Outline
     #   We may be passed a Token or an AbstractTokenReader
     #   PUT and CREATE:
     #   - Try to (straight) PUT all the lenses and use the firstmost success, favouring lenses that consume abstract tokens.
@@ -945,60 +945,55 @@ class Or(CombinatorLens) :
     
 
 class OneOrMore(CombinatorLens) :
+  """Allows a lens to be repeated, indefinitely."""
+  # TODO: Adapt this to be the lens Multiple, where min and max can be specified, then
+  # OneOrMore and perhaps ZeroOrMore can simply specialisations.
 
   def __init__(self, lens, min_items=1, max_items=None, **kargs):
     
     super(OneOrMore, self).__init__(**kargs)
-    self.lens = lens
+    # Store the lens that we will repeat
+    # TODO: Can we perhaps normalise sub-lens setting in the BaseClass so we don't forget to pre-process lenses in classes such as this.
+    self.lens = self._preprocess_lens(lens)
 
-    # Connect the lens to itself, since it may follow or preced itself.
+    # Connect the lens to itself, since it may follow or proceed itself.
     for last_lens in self.lens.get_last_lenses() :
       for first_lens in self.lens.get_first_lenses() :
         # Lens may connect to itself here (e.g. OM(Literal("A"))
         last_lens._connect_to(first_lens)
 
-
-
-    # TODO: Make use if these bounds
+    # TODO: Make use if these bounds are set
     assert(min_items >= 1)
     self.min_items, self.max_items = min_items, max_items
   
   def _get(self, concrete_input_reader) :
     
-    # TODO: Prepare appropriate type
+    # Create an apporiate collection for the type of this lens (e.g may be a simple list).
     token_collection = self._create_collection()
-    # Consume as many as possible until GET fails.
-    #XXX: What if pass empty lens
+    # Consume as many as possible, until GET fails or until we have min items should the lens consume
+    # none of the input string.
     no_GOT = 0
     while True:
       try :
-        self._store_token(self.lens.get(concrete_input_reader, postprocess_token=False), self.lens, token_collection)
+        start_position = concrete_input_reader.get_position_state()
+        token = self.lens.get(concrete_input_reader, postprocess_token=False)
+        self._store_token(token, self.lens, token_collection)
         no_GOT += 1
+        # If the lens did not consume from the concrete input and we now have min items, break out.
+        if start_position == concrete_input_reader.get_position_state() and no_GOT == self.min_items :
+          d("Got minimum items, so breaking out to avoid infinite loop")
+          break
       except LensException:
         break
     
+    # TODO: Bounds checking.
     lens_assert(no_GOT > 0, "Must GET at least one.")
     return token_collection
 
 
   def _put(self, abstract_data, concrete_input_reader) :
     
-    # TODO: Suppose the lens does not store tokens, we could create indefinitely.
-    # So we can check if it consumes tokens.
-    # Perhaps if we see that no tokens were consumed in a put, allow only one.
-
-    # We can accept the current abstract reader or a GenericCollection.
-    if isinstance(abstract_data, AbstractTokenReader) :
-      abstract_token_reader = abstract_data
-    elif isinstance(abstract_data, AbstractCollection) :
-      abstract_token_reader = AbstractTokenReader(abstract_data)
-    else :
-      raise LensException("Expected an AbstractTokenReader or AbstractCollection")
-
-    output = ""
-    num_output = 0
-
-    # Scenarios
+    # Algorithm Outline
     #  PUT:
     #   - PUT as many items as possible
     #   - CREATE remaining items, if any
@@ -1006,7 +1001,19 @@ class OneOrMore(CombinatorLens) :
     #  CREATE:
     #   - CREATE items, if any
     #  BUT:
-    #   - Suppose the lens does not store tokens, we could create indefinitely.
+    #   - Suppose the lens (or its sub-lenses) does not consume tokens, we could CREATE indefinitely, so we
+    #     check for token consumption with each iteration.
+
+    # We can accept the current abstract reader or a GenericCollection.
+    if isinstance(abstract_data, AbstractTokenReader) :
+      abstract_token_reader = abstract_data
+    elif isinstance(abstract_data, AbstractCollection) :
+      abstract_token_reader = AbstractTokenReader(abstract_data)
+    else :
+      raise LensException("Expected either an AbstractTokenReader or GenericCollection")
+
+    output = ""
+    num_output = 0
 
     # Try to PUT some
     if concrete_input_reader :
@@ -1017,19 +1024,17 @@ class OneOrMore(CombinatorLens) :
         except LensException:
           break
 
-    # Try to CREATE some.
+    # Try to CREATE some, being careful to monitor the non-consumption of tokens.
     while True :
       try :
+        # Store the start state, so we can track it the lens consumed any tokens,
+        # to avoid an infinite loop.
         start_state = abstract_token_reader.get_position_state()
         lens_output = self.lens.create(abstract_token_reader)
         end_state = abstract_token_reader.get_position_state()
-        
-        # If the lens consumed no tokens, be sure to avoid an infinite loop (e.g. if lens is an non-store lens)
-        if end_state == start_state :
-          # We will let one of these through to be consistend with OneOrMore definition: at least one.
-          if num_output == 0 :
-            output += lens_output
-            num_output += 1
+
+        # If no tokens were consumed and we already have >= min_items, break out.
+        if end_state == start_state and num_output >= self.min_items:
           break
         
         output += lens_output
@@ -1037,7 +1042,8 @@ class OneOrMore(CombinatorLens) :
       except LensException:
         break
 
-    # Try to GET some - so if we now have fewer abstract tokens than were in concrete input.
+    # Try to GET some - so if we now have fewer abstract tokens than were
+    # represented in concrete input.
     if concrete_input_reader :
       while True :
         try :
@@ -1045,10 +1051,11 @@ class OneOrMore(CombinatorLens) :
         except LensException:
           break
 
-    lens_assert(num_output > 0, "Should process at least one item.") 
+    lens_assert(num_output >= self.min_items, "Should process at least %d items." % self.min_items) 
 
     return output
 
+  # TODO: Perhaps only override these for special cases, since most lenses will do the same.
   def get_first_lenses(self):
     return self.lens.get_first_lenses()
   def get_last_lenses(self):
@@ -1094,6 +1101,18 @@ class OneOrMore(CombinatorLens) :
     assert isinstance(token, list)
     output = lens.put(['x','y','z'], "m1x3_p6")
     d(output)
+
+    # Check we avoid infinite loop
+    d("Empty CREATE test")
+    lens = OneOrMore(Empty())
+    d("Do we loop indefinitely here?...")
+    output = lens.create([])
+    d("No, we do not, which is good.")
+
+    d("Empty GET test")
+    d("Do we loop indefinitely here?...")
+    lens.get("abc", check_fully_consumed=False)
+    d("No, we do not, which is good.")
 
 
 class Recurse(CombinatorLens):
