@@ -1304,14 +1304,19 @@ class Group(Lens) :
 
 class CombineChars(Lens) :
   """
-  Combines seperate character tokens into strings in both directions.  This is
+  Combines separate character tokens into strings in both directions.  This is
   extended by lenses such as Word and Literal.
   """
  
-  # TODO: Should this be a lens at all, or somehting more fundamental, perhaps
+  # XXX: Should this be a lens at all, or something more fundamental, perhaps
   # relating to a collection? Since how do we handle if sub lens is optionally
   # a store or non-store? perhaps we can set the type of a lens to string?
-  # e.g. Word(alpha) -> OneOrMore(AnyOf(alpha), type=str)
+  # e.g. Word(alpha) -> OneOrMore(AnyOf(alpha), type=str).
+  # Hmmm, but then we still have a problem that combinators get merged.
+  # XXX: Will need to think about this some more, since currently we cannot support
+  # nesting of these (e.g. CombineChars(AnyOf(alpha), Literal("xyz")), which is why it
+  # might be better if the string was fused at the edge of the API, as the types
+  # are - but then sometimes we don't want this ????
 
   def __init__(self, lens, **kargs):
     super(CombineChars, self).__init__(**kargs)
@@ -1326,14 +1331,14 @@ class CombineChars(Lens) :
 
     token = self.lens.get(concrete_reader)
   
-    # If we are a non-store lens, regardless of the child lens, return nothing
-    # here so that we save needless processing.
-    if not self.store :
+    # If token is None or if we are a non-store lens, regardless of the child
+    # lens, return nothing here so that we save needless processing.
+    if token == None or not self.store :
       return None
 
     # If the sub-lens GOT a string ...
     if isinstance(token, str) :
-      # We will allow it through only if it is a single char.
+      # We will allow it through only if it is a single char or the empty string.
       lens_assert(len(token) <= 1, "Expected a single char string or empty.")
       return token
 
@@ -1351,7 +1356,7 @@ class CombineChars(Lens) :
       string_value += sub_token
 
     # XXX: Hmmm, is there any good reason why we cannot allow the empty string?
-    lens_assert(string_value != "", "Expected at least one char token.")
+    #lens_assert(string_value, "Expected at least one char token.")
 
     return string_value
 
@@ -1399,11 +1404,11 @@ class CombineChars(Lens) :
 
 class Until(Lens) :
   """
-  Match anything up until the specified lens.
-  This is useful, but not the be overused (e.g. chaining can be bad: Until("X") + Until("Y")!).
+  Match anything up until the specified lens.  This is useful for lazy parsing,
+  but not the be overused (e.g. chaining can be bad: Until("X") + Until("Y")!).
   """
+  
   def __init__(self, lens, **kargs):
-    """Use negate flag to exclude characters."""
     super(Until, self).__init__(**kargs)
     self.lens = self._preprocess_lens(lens)
 
@@ -1432,6 +1437,7 @@ class Until(Lens) :
   def _put(self, abstract_token, concrete_input_reader) :
     # If this is PUT (vs CREATE) then consume input.
     # TODO: Could do with some better checking here, to make sure output cannot be parsed by the lens.
+    # Perhaps to verify that we cannot parse the lense within this string.
     lens_assert(isinstance(abstract_token, str)) # Simple check
     if concrete_input_reader :
       self.get(concrete_input_reader)
@@ -1444,7 +1450,7 @@ class Until(Lens) :
     d("Testing")
     concrete_reader = ConcreteInputReader("(in the middle)")
     lens = "("+Until(")", store=True) + ")"
-    token = lens.get(concrete_reader)
+    token = lens.get(concrete_reader, "(in the middle)")
     d(token)
     assert concrete_reader.is_fully_consumed()
     assert token[0] == "in the middle"
@@ -1456,6 +1462,7 @@ class Until(Lens) :
       output = lens.put(atr, cr)
       d(output)
       assert output == "(monkey)"
+
 
 class Recurse(CombinatorLens):
   """
@@ -1512,6 +1519,7 @@ class Recurse(CombinatorLens):
 
   @staticmethod
   def TESTS() :
+    # TODO: Need to freeze recursion after local variable binding.
     lens = ("[" + (Recurse() | Word(alphas, store=True)) + "]")
     token = lens.get("[[hello]]")
     d(token)
@@ -1519,6 +1527,7 @@ class Recurse(CombinatorLens):
     output = lens.put(["monkey"], "[[hello]]")
     d(output)
     assert output == "[[monkey]]"
+
 
 ##################################################
 # Useful lenses
@@ -1541,6 +1550,7 @@ class List(And) :
     assert output == "one,two"
 
 class NewLine(Or) :
+  """Matches a newline char or the end of text, so extends the Or lens."""
   def __init__(self, **kargs) :
     super(NewLine, self).__init__(Literal("\n", **kargs), Empty(mode=Empty.END_OF_TEXT))
 
@@ -1563,6 +1573,7 @@ class NewLine(Or) :
     assert output == "\n"
 
 class Optional(Or) :
+  """Wraps an Or with Empty."""
   def __init__(self, lens, **kargs) :
     super(Optional, self).__init__(Empty(), lens, **kargs)
  
@@ -1608,6 +1619,7 @@ class Optional(Or) :
         assert(output == "") # Uses default value of Empty(), the first sub-lens
 
 class ZeroOrMore(Optional) :
+  """Simply wraps Optional(OneOrMore(...))"""
   def __init__(self, lens, **kargs):
     super(ZeroOrMore, self).__init__(OneOrMore(lens), **kargs)
 
@@ -1621,7 +1633,9 @@ class ZeroOrMore(Optional) :
 
 
 class Literal(CombineChars) :
-  """A lens that deals with a constant string, usually that will not be stored."""
+  """
+  A lens that deals with a constant string, usually that will not be stored.
+  """
 
   def __init__(self, literal_string, **kargs):
     """We create this from CombineChars(AnyOf() + ...) for consistency rather than for efficiency."""
@@ -1664,12 +1678,15 @@ class Literal(CombineChars) :
       d(output)
       assert(output == "hello")
 
-    # Test literal as string concatenation - will faile without correct operator overloading.
+    # Test literal as string concatenation - will fail without correct operator overloading.
     lens = AnyOf("X") + "my_literal"
     lens = "my_literal" + AnyOf("X")  # Uses Lens.__radd__()
 
+
 class Word(CombineChars) :
-  
+  """
+  Useful for handling keywords of a specific char range.
+  """
   def __init__(self, body_chars, init_chars=None, negate=False, **kargs):
     super(Word, self).__init__(None, **kargs)
      
@@ -1705,20 +1722,28 @@ class Word(CombineChars) :
     assert lens.get("3456") == 3456
     assert lens.put(98765, "123") == "98765"
 
+
 class Whitespace(CombineChars) :
-  """Whitespace helper lens, that knows how to handle continued lines with '\\n' or that preclude an indent."""
+  """
+  Whitespace helper lens, that knows how to handle continued lines with '\\n'
+  or that preclude an indent.
+  """
   
   def __init__(self, default=" ", space_chars=" \t", slash_continuation=False, indent_continuation=False, **kargs):
+    # Ensure default gets passed up to parent class - we use default to
+    # determine if this lens is optional
     kargs["default"] = default
     super(Whitespace, self).__init__(None, **kargs)
       
+    # Set-up a lens the literally matches space.
     spaces = OneOrMore(AnyOf(space_chars, store=self.store))
-    self.lens = spaces   \
-                | (Optional(spaces) + "\\\n" + Optional(spaces)) \
-                | (Optional(spaces) + "\n" + spaces)  
     self.lens = spaces
+    
+    # Optionally, augment with a slash continuation lens.
     if slash_continuation :
       self.lens |= Optional(spaces) + "\\\n" + Optional(spaces)
+    
+    # Optionally, augment with a indent continuation lens.
     if indent_continuation :
       self.lens |= Optional(spaces) + "\n" + spaces 
     
@@ -1730,7 +1755,15 @@ class Whitespace(CombineChars) :
   def TESTS() :
     lens = Whitespace(" ", store=True) + Word(alphanums, store=True)
     token = lens.get("  \thello")
-    d(token)
+    assert token[1] == "hello"
+    
+    lens = Whitespace(" ", store=True, slash_continuation=True) + Word(alphanums, store=True)
+    token = lens.get("  \t\\\n  hello")
+    assert token[1] == "hello"
+    
+    lens = Whitespace(" ", store=True, indent_continuation=True) + Word(alphanums, store=True)
+    token = lens.get("   \n hello")
+    assert token[1] == "hello"
 
 
 ####################################
@@ -1739,6 +1772,10 @@ class Whitespace(CombineChars) :
 
 
 def lens_assert(condition, message=None) :
+  """
+  Useful for assertion within lenses that should raise LensException, such that
+  higher-level parsing may be resume, perhaps on an alternate branch.
+  """
   if not condition :
     raise LensException(message)
 
@@ -1754,7 +1791,7 @@ nums      = string.digits
 hexnums   = nums + "ABCDEFabcdef"
 alphanums = alphas + nums
 
-# Some lens abreviations
+# Some lens abbreviations
 ZM  = ZeroOrMore
 OM  = OneOrMore
 O   = Optional
@@ -1775,12 +1812,18 @@ def put(lens, *args, **kargs) :
   return lens.put(*args, **kargs)
 create = put
 
+# TODO: Add a high-level test here.
+
 ###########################
 # Debugging stuff.
 #
 
+# TODO: Move this out to a debug module.
+
 def debug_indent_function() :
- 
+  """
+  Nicely indents the debug messages according to the hierarchy of lenses.
+  """ 
   import inspect 
 
   # Create a list of all function names in the trace.
@@ -1820,7 +1863,7 @@ def auto_name_lenses(local_variables) :
 #
 
 def main() :
-  # This can be useful for testing.
+  # This can be useful for quick testing.
   d("Testing")
 
 if __name__ == "__main__":
