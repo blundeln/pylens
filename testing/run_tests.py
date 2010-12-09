@@ -78,7 +78,9 @@ def unit_tests(args=None) :
     test_suite.addTest(testcase)
   
   runner = unittest.TextTestRunner()
-  runner.run(test_suite)
+  test_result = runner.run(test_suite)
+  if not test_result.wasSuccessful() :
+    sys.exit(1)
 
 
 

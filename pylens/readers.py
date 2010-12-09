@@ -100,8 +100,6 @@ class ConcreteInputReader(Reader):
   def is_fully_consumed(self):
     """
     Return whether the string was fully consumed
-
-    @return: True if the string was read to the last byte, False otherwise
     """
     return self.get_remaining() == ""
 
@@ -328,6 +326,3 @@ class reader_rollback:
     # The exception in the with statement should cause readers to rollback
     assert abstract_token_reader.get_next_token() == "sausages"
     assert concrete_input_reader.get_next_char() == "l"
-
-
-
