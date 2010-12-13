@@ -171,7 +171,6 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
       else :
         d("%s CREATE: State -> (%s: %s)" % (self, type_of_data, str(abstract_data)))
    
-
     #
     # First off, the easy case: if we are a combinator lens, pass
     # abstract_data, whether a token or a reader, straight through to PUT
@@ -197,7 +196,9 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
       # A non-store lens is not allowed to be passed a token to PUT. 
       if not self.store:
         raise LensException("Not a store lens: cannot put a token.")
-      
+     
+      d("Putting a single token: %s" % token)
+
       # Call the specific lens' PUT function with the token, rolling back
       # reader state if lens fails to put (e.g. if it doesn't match the parsing
       # branch).
@@ -269,12 +270,15 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
       # Must roll this back once we have found the label, so we can shortly
       # call put() (which again calls get()).  XXX This may be inefficient, but for
       # now it seems to offer a clean design.
+      d("Looking for a label of the next token via GET.")
       start_position = concrete_input_reader.get_position_state()
-      original_token = self.get(concrete_input_reader) # get() will rollback if failed.
+      # Must be sure not to loose information (i.e. of group label) by
+      # post-processing the token
+      original_token = self.get(concrete_input_reader, postprocess_token=False) # get() will rollback if failed.
       concrete_input_reader.set_position_state(start_position)
       
-      # If GEt abstracted a collection, use its label (which could also be None).
-      if isinstance(original_token, GenericCollection) :
+      # If GET gave us a collection, use its label (which could also be None).
+      if isinstance(original_token, AbstractCollection) :
         candidate_labels = [original_token.get_label_token()]
       # Otherwise, we know that this piece of concrete input is unlabelled.
       else:
@@ -294,7 +298,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
         candidate_labels.remove(AbstractTokenReader.LABEL_TOKEN)
 
     # Show the candidate labels of next-tokens that this lens may attempt to PUT.
-    d("candidate labels %s" % candidate_labels)
+    d("Candidate labels %s" % candidate_labels)
 
     #
     # Now try to PUT tokens with these labels, and go with the most favourable PUT.
@@ -494,9 +498,15 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
   # flexible coercion.
   @staticmethod
   def coerce_to_lens(lens_operand):
-    """Intelligently convert a type to a lens (e.g. string instance to a Literal lens) to ease lens definition."""
+    """
+    Intelligently converts a type to a lens (e.g. string instance to a Literal
+    lens) to ease lens definition; or a class or instance.
+    """
+    # Coerce string to Literal
     if isinstance(lens_operand, str) :
       lens_operand = Literal(lens_operand)
+    # Coerce class to its internally defined lens, such that the lens will GET
+    # and PUT instances of that class.
     elif inspect.isclass(lens_operand) and hasattr(lens_operand, "__lens__") :   
       lens_operand = Group(lens_operand.__lens__, type=lens_operand)
     
@@ -1652,7 +1662,7 @@ class Literal(CombineChars) :
         self.lens += AnyOf(char, store=self.store)
     
     self.literal_string = literal_string
-    self.name = self.name or truncate(literal_string)
+    self.name = self.name or "'%s'" % truncate(literal_string)
 
     if not self.default :
       self.default = literal_string
@@ -1807,12 +1817,52 @@ def get(lens, *args, **kargs) :
   lens = BaseLens.coerce_to_lens(lens)
   return lens.get(*args, **kargs)
 
-def put(lens, *args, **kargs) :
-  lens = BaseLens.coerce_to_lens(lens)
+def put(lens_or_instance, *args, **kargs) :
+  
+  # If we have an instance of a class which defines its own lens...
+  if hasattr(lens_or_instance, "__lens__") :
+    # Might as well still coerce the lens, just in case.
+    lens = BaseLens.coerce_to_lens(lens_or_instance.__lens__)
+    instance = lens_or_instance # For clarity.
+    return lens.put(instance, *args, **kargs)
+  
+  # Otherwise...
+  lens = BaseLens.coerce_to_lens(lens_or_instance)
   return lens.put(*args, **kargs)
+
 create = put
 
-# TODO: Add a high-level test here.
+class HighLevelAPITest:
+  @staticmethod
+  def TESTS() :
+    CONCRETE_STRING = "Person:name=albert;surname=camus"
+    class Person:
+      __lens__ = "Person" + ":" + List(Group(Word(alphas, is_label=True) + "=" + Word(alphas, store=True), type=auto_list), ";")
+
+      # TODO: Make use of __new__ to initialise for serialisation.
+      #def __init__(self, name, surname) :
+      #  self.name, self.surname = name, surname
+
+      def __str__(self) :
+        return "Person: name -> %s, surname -> %s" % (self.name, self.surname)
+
+    d("GET")
+    person = get(Person, CONCRETE_STRING)
+    d(person)
+    assert(person.name == "albert" and person.surname == "camus")
+
+    d("PUT")
+    person.name = "nick"
+    person.surname = "blundell"
+    output = put(person, CONCRETE_STRING)
+    d(output)
+    assert(output == "Person:name=nick;surname=blundell")
+
+    d("CREATE")
+    
+    #fred = Person("fred", "flintstone")
+    #output = create(fred)
+    d(output)
 
 ###########################
 # Debugging stuff.
