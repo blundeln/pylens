@@ -1,14 +1,16 @@
 TODO
 ----
 target: 1.0.0a1
+  - Fix up user model class casting.
+    - Support of __new__ for de-serialisation.
   - Check through all code and improve comments and structure
+    - Collection stuff
   - Complete Recurse Lens
    - Freeze recursion
-  - Fixed tests, since dict order is not predictable when checking output.
   - Add installation script
   - Improve basic docs
   - encapsulate debug routines for optional inclusion
-    - especially formatting of debug messages which can add a significant overhead.
+    - especially the formatting of debug messages which can add a significant overhead.
 
 target: future
   - Should CombineChars be replaced by type=str or something, a more fundamental approach?

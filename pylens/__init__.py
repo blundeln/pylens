@@ -390,7 +390,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
   def _create_collection(self) :
     """Creates a new collection for storing tokens based on this lens' type."""
-    collection_class = TokenTypeFactory.get_collection_class(self.type)
+    collection_class = TokenTypeFactory.get_appropriate_collection_class(self.type)
     return collection_class()
 
   def _get_label_of_token(self, token, origin_lens) :
@@ -421,7 +421,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     
     # Roll the label into a AbstractCollection, for lenses that parse labels to be able to PUT back.
     if label and isinstance(token, AbstractCollection) :
-      token.set_label_token(label, overwrite=True) # If label exists from GET token, overwrite it.
+      token.set_label_token(label, allow_overwrite=True) # If label exists from GET token, overwrite it.
     
     return token
 
@@ -1849,6 +1849,7 @@ class HighLevelAPITest:
     d("GET")
     person = get(Person, CONCRETE_STRING)
     d(person)
+    return
     assert(person.name == "albert" and person.surname == "camus")
 
     d("PUT")
@@ -1858,10 +1859,10 @@ class HighLevelAPITest:
     d(output)
     assert(output == "Person:name=nick;surname=blundell")
 
+    return
     d("CREATE")
-    
-    #fred = Person("fred", "flintstone")
-    #output = create(fred)
+    fred = Person("fred", "flintstone")
+    output = create(fred)
     d(output)
 
 ###########################
