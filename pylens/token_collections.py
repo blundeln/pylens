@@ -293,6 +293,10 @@ class ObjectAttributeCollection(DictCollection) :
   # Would also be good to allow hooks if we know class type.
 
   def __init__(self, obj) :
+    # This allows the object's attributes to be manipulated by our parent class.
+    # XXX: This may well hinder flexibility, if we would like some possibility
+    # of hooking attribute access (e.g. to allow some processing to occur in
+    # the model class if desired).
     super(ObjectAttributeCollection, self).__init__(obj.__dict__)
     self.obj = obj
   
@@ -434,7 +438,12 @@ class TokenTypeFactory:
       # First, create a new collection appropriate for the target type,
       # wrapping an empty instance of target_type.
       # TODO: Distinguish user model classes
-      new_token = target_type_collection_class(target_type())
+      # http://docs.python.org/reference/datamodel.html#newstyle
+      try :
+        new_instance = target_type.__new__(target_type)
+      except AttributeError:
+        raise Exception("Cannot create instance of %s with __new__() (i.e.  without calling init()), check the class is a new-style class (i.e. extends object)" % target_type)
+      new_token = target_type_collection_class(new_instance)
       # The merge in data from the original token (collection)
       new_token.merge(token)
       # Now unwrap it to give us the desired python collection type.
@@ -447,39 +456,6 @@ class TokenTypeFactory:
       #      Would need to consider also in the PUT direction.
 
     return token
-
-    # Now we assume we are dealing with a target type that is class from the
-    # user's model and so we expect we have a collection class of ObjectAttributeCollection
-
-    # Should not get here.
-    raise Exception("Do not know how to cast %s to %s" % (token, target_type))
-   
-    ######################################
-
-
-    # If the target_type is a collection type or is a class
-    if (target_type in TokenTypeFactory.BASIC_COLLECTION_TYPES or inspect.isclass(target_type)) and isinstance(token, AbstractCollection) :
-      type_collection_class = TokenTypeFactory.get_appropriate_collection_class(target_type)
-      
-      if type_collection_class == token.__class__ :
-        token = token.unwrap()
-      else : 
-        # Effectively casts one AbstractCollection to another - will fail if merge not possible
-        # TODO: Need to think about how to create objs without __init__ (e.g. default args).
-        new_token = type_collection_class(target_type())
-        new_token.merge(token)
-        token = new_token.unwrap()
-
-      # Handle auto_list
-      if target_type == auto_list :
-        assert(type(token) == list)
-        if len(token) == 1 :
-          token = token[0]
-        # XXX: Should we do anything with empty list: return None?
-
-      return token
-
-    raise Exception("Do not know how to cast %s to %s" % (token, target_type))
      
 
   @staticmethod
@@ -497,5 +473,3 @@ class TokenTypeFactory:
     assert TokenTypeFactory.normalise_incoming_token(3) == "3"
     assert isinstance(TokenTypeFactory.normalise_incoming_token([1, 2, 3]), ListCollection)
     assert isinstance(TokenTypeFactory.normalise_incoming_token(ListCollection([2,3])), ListCollection)
-
-    # TODO: Test class converstion.

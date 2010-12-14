@@ -212,7 +212,7 @@ auto eth1 eth2
   comment = "#" + Until(WS("") + NewLine(), store=False)+ WS("") + NewLine()
   nl = WS("") + (NewLine() | comment) # Can end a line with a comment.
   
-  class Interface:
+  class Interface(object):
     __lens__ = "iface" + ws + label + ws + with_label("address_family") + ws + with_label("method") + nl\
     + ZM(indent + G(label + ws + Until(nl, store=True), type=auto_list)+nl)
 

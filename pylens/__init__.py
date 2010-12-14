@@ -1836,20 +1836,19 @@ class HighLevelAPITest:
   @staticmethod
   def TESTS() :
     CONCRETE_STRING = "Person:name=albert;surname=camus"
-    class Person:
+    class Person(object): # Must be new-style class
       __lens__ = "Person" + ":" + List(Group(Word(alphas, is_label=True) + "=" + Word(alphas, store=True), type=auto_list), ";")
 
-      # TODO: Make use of __new__ to initialise for serialisation.
-      #def __init__(self, name, surname) :
-      #  self.name, self.surname = name, surname
+      def __init__(self, name, surname) :
+        self.name, self.surname = name, surname
 
       def __str__(self) :
         return "Person: name -> %s, surname -> %s" % (self.name, self.surname)
 
     d("GET")
     person = get(Person, CONCRETE_STRING)
+    assert (type(person) == Person)
     d(person)
-    return
     assert(person.name == "albert" and person.surname == "camus")
 
     d("PUT")
@@ -1859,11 +1858,12 @@ class HighLevelAPITest:
     d(output)
     assert(output == "Person:name=nick;surname=blundell")
 
-    return
     d("CREATE")
     fred = Person("fred", "flintstone")
     output = create(fred)
     d(output)
+    assert(output == "Person:name=fred;surname=flintstone" or output == "Person:surname=flintstone;name=fred")
+
 
 ###########################
 # Debugging stuff.

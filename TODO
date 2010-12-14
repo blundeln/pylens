@@ -1,12 +1,9 @@
 TODO
 ----
 target: 1.0.0a1
-  - Fix up user model class casting.
-    - Support of __new__ for de-serialisation.
-  - Check through all code and improve comments and structure
-    - Collection stuff
   - Complete Recurse Lens
    - Freeze recursion
+  - Improve examples in long_tests.py
   - Add installation script
   - Improve basic docs
   - encapsulate debug routines for optional inclusion
