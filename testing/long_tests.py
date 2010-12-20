@@ -31,12 +31,13 @@
 # 
 # Description:
 #  Longer tests, which must have suffix '_test' to be picked up for automated
-#  testing.
+#  testing.  Some of these are based on tricky config file examples given in the Augeas system
+#  Note that these lenses may not be completely accurate but are an aid to testing. 
 # 
 
 from pylens import *
 
-def deb_xxxtest() :
+def deb_test() :
 
   INPUT = """Build-Depends: debhelper (>= 7.0.0),
                  perl-modules (>= 5.10) | libmodule-build-perl,
@@ -45,16 +46,20 @@ def deb_xxxtest() :
                  libconfig-tiny-perl, libexception-class-perl | someapp | someotherapp (> 1.2),
                  libparse-recdescent-perl ( >= 1.90.0),
                  liblog-log4perl-perl (>= 1.11)  [i386]"""
-  # In this case, a space is also a space followed by a newline followed by an indent
+  # In this case, a space effectively is also a space followed by a newline followed by an indent
   
 
+  # Whitespace wrapper
   def ws(default_output) :
     return WS(default_output, slash_continuation=True, indent_continuation=True)
 
+  # A lens that stores something between two lenses.
   def Between(lens_1, lens_2, label=None):
     return lens_1 + Until(lens_2, store=True, label=label) + lens_2
 
   keyword_chars = alphanums + "-"
+  
+  # Shortcut lens generators.
   with_label = lambda label: Word(keyword_chars, store=True, label=label)
   label = Word(keyword_chars, store=True, is_label=True)
   
@@ -82,12 +87,14 @@ def deb_xxxtest() :
     output = lens.put(token, cr)
     if cr :
       assert output == INPUT
-    print(output)
+    d(output)
+    # TODO: Verify output
 
   # Change some things
   del token.dict[None][5]
   output = lens.put(token, INPUT)
-  print(output)
+  d(output)
+  # TODO: Verify output
   
   """
     What can we say about the general structure of the file:
@@ -216,8 +223,7 @@ auto eth1 eth2
     __lens__ = "iface" + ws + label + ws + with_label("address_family") + ws + with_label("method") + nl\
     + ZM(indent + G(label + ws + Until(nl, store=True), type=auto_list)+nl)
 
-  lens = Group(Interface.__lens__, type=Interface)
-  interface = lens.get(INPUT, check_fully_consumed=False)
+  interface = get(Interface, INPUT, check_fully_consumed=False)
   d(interface.__dict__)
 
   assert interface.address_family == "inet"
@@ -226,10 +232,11 @@ auto eth1 eth2
   interface.address_family = "fam"
   interface.gateway = "127.0.0.1"
 
-  output = lens.put(interface, INPUT, label="wlan2")
+  output = put(interface, INPUT, label="wlan2")
   d(output)
-  output = lens.create(interface, label="wlan2")
+  output = create(interface, label="wlan2")
   d(output)
+  # TODO: Verify outputs. 
   return
 
   auto = "auto" + ws + Until(nl, store=True, label="auto") + nl
