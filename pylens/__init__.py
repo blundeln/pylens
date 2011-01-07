@@ -791,6 +791,9 @@ class Or(CombinatorLens) :
     #   - BUT, if all PUTs fail, try cross-PUTting: GET left lense then CREATE RL, then GET RL CREATE LL - could put this with the CREATE -
     #     since we may have change the abstract from one token type to the other.
     # TODO: Should put longest, perhaps first-most more intuitive for lens designers, so they have some control.
+    # TODO: Need to think about recursive lenses, defined with Forward.
+    #        Cold process Forward lenses last, but what if we have two forward
+    #        lenses?
     
     # Set variable appropriately if we have a token reader (as opposed to a single token).
     if isinstance(abstract_data, AbstractTokenReader) :
@@ -826,6 +829,7 @@ class Or(CombinatorLens) :
         if not best_PUT or (lens_consumed_tokens and not best_PUT[2]) : 
           best_PUT = [output, end_state, lens_consumed_tokens]
           d("BEST straight put: %s" % best_PUT)
+          # TODO: Hmmm, but we didn't try the other lens?
           if lens_consumed_tokens : break # We have what we want.
       except LensException:
         pass
@@ -1543,9 +1547,10 @@ class Forward(CombinatorLens):
   Allows forward declaration of a lens, which may be bound later, primarily to
   allow for lens recursion.  Based on the idea used in pyparsing.
   """
-  def __init__(self, **kargs):
+  def __init__(self, recursion_limit=100, **kargs):
     super(Forward, self).__init__(**kargs)
     d("Creating")
+    self.recursion_limit = recursion_limit
     self._bound_lens = None
   
   def bind_lens(self, lens) :
@@ -1559,7 +1564,21 @@ class Forward(CombinatorLens):
 
   def _put(self, abstract_data, concrete_input_reader) :
     assert self._bound_lens, "Recurse was unable to bind to a lens."
-    return self._bound_lens._put(abstract_data, concrete_input_reader)
+    original_limit = sys.getrecursionlimit()
+
+    if self.recursion_limit :
+      sys.setrecursionlimit(self.recursion_limit)
+    
+    try :
+      output = self._bound_lens._put(abstract_data, concrete_input_reader)
+    except RuntimeError:
+      raise LensException("Infinite recursion of lens.")
+    finally :
+      #d("Setting recursion limit back to %s" % original_limit)
+      sys.setrecursionlimit(original_limit)
+    
+    return output
+
  
   # TODO: When Recurse binds, it could replace the links with touching lenses.
   # Or perhaps we override get_next_lenses - perhaps not a problem when it comes to getting char sets
@@ -1581,19 +1600,22 @@ class Forward(CombinatorLens):
     # Now define the lens (must use '<<' rather than '=', since cannot easily
     # override '=').
     lens << ("[" + (lens | Word(alphas, store=True)) + "]")
-
-    d("PUT")
+    #lens << ("[" + (Word(alphas, store=True) | lens) + "]")
     token = lens.get("[[hello]]")
     d(token)
     assert_match(str(token), "...['hello']...")
+    
+    
+    d("PUT")
     output = lens.put(["monkey"], "[[hello]]")
     d(output)
     assert output == "[[monkey]]"
 
-    # FIXME: Infinitely recurses!
-    #d("CREATE")
-    #output = lens.create(["world"])
-    #d(output)
+    # TODO: Perhaps deal with recurion exception in OR, so that a non
+    # inifinitely recursive path will be discarded.
+    d("CREATE")
+    output = lens.create(["world"])
+    d(output)
 
 
 

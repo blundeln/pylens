@@ -1,14 +1,13 @@
 TODO
 ----
 target: 1.0.0a1
+  - Complete Recurse Lens
   - Improve examples in long_tests.py
   - Add installation script
   - Publish on freshmeat
   - Link Nick's site to github.
 
 target: 1.0.0a2
-  - Complete Recurse Lens
-   - Freeze recursion
   - Improve basic docs
   - encapsulate debug routines for optional inclusion
     - especially the formatting of debug messages which can add a significant overhead.
