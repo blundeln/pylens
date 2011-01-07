@@ -1529,7 +1529,6 @@ class Recurse(CombinatorLens):
 
   @staticmethod
   def TESTS() :
-    # TODO: Need to freeze recursion after local variable binding.
     lens = ("[" + (Recurse() | Word(alphas, store=True)) + "]")
     token = lens.get("[[hello]]")
     d(token)
@@ -1537,6 +1536,66 @@ class Recurse(CombinatorLens):
     output = lens.put(["monkey"], "[[hello]]")
     d(output)
     assert output == "[[monkey]]"
+
+
+class Forward(CombinatorLens):
+  """
+  Allows forward declaration of a lens, which may be bound later, primarily to
+  allow for lens recursion.  Based on the idea used in pyparsing.
+  """
+  def __init__(self, **kargs):
+    super(Forward, self).__init__(**kargs)
+    d("Creating")
+    self._bound_lens = None
+  
+  def bind_lens(self, lens) :
+    d("Binding to lens %s" % lens)
+    assert not self._bound_lens, "The lens cannot be re-bound."
+    self._bound_lens = lens
+  
+  def _get(self, concrete_input_reader) :
+    assert self._bound_lens, "Recurse was unable to bind to a lens."
+    return self._bound_lens._get(concrete_input_reader)
+
+  def _put(self, abstract_data, concrete_input_reader) :
+    assert self._bound_lens, "Recurse was unable to bind to a lens."
+    return self._bound_lens._put(abstract_data, concrete_input_reader)
+ 
+  # TODO: When Recurse binds, it could replace the links with touching lenses.
+  # Or perhaps we override get_next_lenses - perhaps not a problem when it comes to getting char sets
+  # since we will be bound by then.
+  def get_first_lenses(self):
+    return [self]
+  def get_last_lenses(self):
+    return [self]
+
+  # Use the lshift operator, as does pyparsing.
+  def __lshift__(self, other) :
+    assert isinstance(other, BaseLens)
+    self.bind_lens(other)
+
+  @staticmethod
+  def TESTS() :
+    d("GET")
+    lens = Forward()
+    # Now define the lens (must use '<<' rather than '=', since cannot easily
+    # override '=').
+    lens << ("[" + (lens | Word(alphas, store=True)) + "]")
+
+    d("PUT")
+    token = lens.get("[[hello]]")
+    d(token)
+    assert_match(str(token), "...['hello']...")
+    output = lens.put(["monkey"], "[[hello]]")
+    d(output)
+    assert output == "[[monkey]]"
+
+    # FIXME: Infinitely recurses!
+    #d("CREATE")
+    #output = lens.create(["world"])
+    #d(output)
+
+
 
 
 ##################################################
