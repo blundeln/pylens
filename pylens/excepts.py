@@ -42,7 +42,8 @@ class LensException(Exception):
 
   def __init__(self, msg=None):
     self.__msg = msg
-    d("Throwing: %s (from %s)" % (self.__msg, self.get_thrown_from()))
+    if IN_DEBUG_MODE :
+      d("Throwing: %s (from %s)" % (self.__msg, self.get_thrown_from()))
 
   def get_thrown_from(self) :
     
@@ -65,6 +66,9 @@ class LensException(Exception):
   def __str__(self):
       return "LensException: %s" % self.__msg
 
+
+class InfiniteRecursionException(Exception):
+  pass
 
 class EndOfStringException(LensException):
   pass

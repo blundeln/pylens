@@ -1572,7 +1572,8 @@ class Forward(CombinatorLens):
     try :
       output = self._bound_lens._put(abstract_data, concrete_input_reader)
     except RuntimeError:
-      raise LensException("Infinite recursion of lens.")
+      raise InfiniteRecursionException("You will need to alter your grammar, perhaps changing the order of Or lens operands")
+      raise# LensException("Infinite recursion of lens.")
     finally :
       #d("Setting recursion limit back to %s" % original_limit)
       sys.setrecursionlimit(original_limit)
@@ -1611,11 +1612,20 @@ class Forward(CombinatorLens):
     d(output)
     assert output == "[[monkey]]"
 
-    # TODO: Perhaps deal with recurion exception in OR, so that a non
-    # inifinitely recursive path will be discarded.
+    # Note that this lens results in infinite recursion upon CREATE.
     d("CREATE")
-    output = lens.create(["world"])
+    try :
+      output = lens.create(["world"])
+      assert False # should not get here.
+    except InfiniteRecursionException:
+      pass
     d(output)
+    
+    # If we alter the grammar slightly, we can overcome this.
+    lens = Forward()
+    lens << ("[" + (Word(alphas, store=True) | lens) + "]")
+    output = lens.create(["world"])
+    assert output == "[world]"
 
 
 
