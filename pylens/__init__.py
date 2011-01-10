@@ -62,6 +62,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     
     # Used for passing up references to a child recurse lens, so that may at
     # some point be bound to the top-level lens.
+    # XXX: Deprecated
     self._recurse_lens = None
 
     # For connecting lenses, for ambiguity checks.
@@ -441,6 +442,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
 
     d(str(lens))
 
+    #XXX: Deprecated.
     recurse_lens = isinstance(lens, Recurse) and lens or lens._recurse_lens
     if recurse_lens :
       recurse_lens.bind_lens(self)
@@ -648,7 +650,8 @@ class And(CombinatorLens) :
       next_lens = self.lenses[i+1]
       for last_lens in lens.get_last_lenses() :
         for first_lens in next_lens.get_first_lenses() :
-          assert first_lens != last_lens, "Should never happen!"
+          # XXX: The next line is wrong, since a repeated lens may by adjacent to itself without problems.
+          #assert first_lens != last_lens, "Should never happen!"
           last_lens._connect_to(first_lens)
 
 
@@ -1274,7 +1277,7 @@ class Group(Lens) :
       kargs["store"] = True
     
     super(Group, self).__init__(**kargs)
-    self.lens = lens
+    self.lens = self.coerce_to_lens(lens)
 
   def _get(self, concrete_input_reader) :
     return self.lens.get(concrete_input_reader)
@@ -1478,6 +1481,7 @@ class Until(Lens) :
       assert output == "(monkey)"
 
 
+# XXX: Depricated
 class Recurse(CombinatorLens):
   """
   During construction, lenses pass up references to Recurse so that it may bind to
@@ -1545,7 +1549,9 @@ class Recurse(CombinatorLens):
 class Forward(CombinatorLens):
   """
   Allows forward declaration of a lens, which may be bound later, primarily to
-  allow for lens recursion.  Based on the idea used in pyparsing.
+  allow for lens recursion.  Based on the idea used in pyparsing, since we must
+  define variables before we use them, unless we use some python interpreter
+  pre-processing.
   """
   def __init__(self, recursion_limit=100, **kargs):
     super(Forward, self).__init__(**kargs)
@@ -1573,9 +1579,7 @@ class Forward(CombinatorLens):
       output = self._bound_lens._put(abstract_data, concrete_input_reader)
     except RuntimeError:
       raise InfiniteRecursionException("You will need to alter your grammar, perhaps changing the order of Or lens operands")
-      raise# LensException("Infinite recursion of lens.")
     finally :
-      #d("Setting recursion limit back to %s" % original_limit)
       sys.setrecursionlimit(original_limit)
     
     return output
@@ -1589,10 +1593,11 @@ class Forward(CombinatorLens):
   def get_last_lenses(self):
     return [self]
 
-  # Use the lshift operator, as does pyparsing.
+  # Use the lshift operator, as does pyparsing, since we cannot easily override (re-)assignment.
   def __lshift__(self, other) :
     assert isinstance(other, BaseLens)
     self.bind_lens(other)
+
 
   @staticmethod
   def TESTS() :
@@ -1601,7 +1606,6 @@ class Forward(CombinatorLens):
     # Now define the lens (must use '<<' rather than '=', since cannot easily
     # override '=').
     lens << ("[" + (lens | Word(alphas, store=True)) + "]")
-    #lens << ("[" + (Word(alphas, store=True) | lens) + "]")
     token = lens.get("[[hello]]")
     d(token)
     assert_match(str(token), "...['hello']...")
@@ -1626,7 +1630,6 @@ class Forward(CombinatorLens):
     lens << ("[" + (Word(alphas, store=True) | lens) + "]")
     output = lens.create(["world"])
     assert output == "[world]"
-
 
 
 
@@ -1866,6 +1869,21 @@ class Whitespace(CombineChars) :
     token = lens.get("   \n hello")
     assert token[1] == "hello"
 
+
+####################################
+# Debugging Lenses
+#
+
+
+class NullLens(Lens) :
+  """
+  When writing new lenses, particularly in a top-down fashion, this lens is
+  useful for filling in lens branches that are yet to be completed.
+  """
+  def _get(self, concrete_input_reader) :
+    raise LensException("NullLens always fails, and is useful as a filler for the incremental writing of lenses.")
+  def _put(self, abstract_token, concrete_input_reader) :
+    raise LensException("NullLens always fails, and is useful as a filler for the incremental writing of lenses.")
 
 ####################################
 # Utility functions

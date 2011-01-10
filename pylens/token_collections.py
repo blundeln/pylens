@@ -53,7 +53,9 @@ class AbstractCollection(object) :
     current_label_token = self.get_label_token()
     if current_label_token :
       if not allow_overwrite :
-        raise LensException("Label token already set on %s" % self)
+        # XXX: Should this be a show stopper?
+        raise Exception("Label token already set on %s" % self)
+        #raise LensException("Label token already set on %s" % self)
    
     self.label_token = token
       

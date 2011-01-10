@@ -63,7 +63,7 @@ class ConcreteInputReader(Reader):
   def set_position_state(self, state) :
     self.set_pos(state)
 
-  def get_consumed_string(self, start_pos) :
+  def get_consumed_string(self, start_pos=0) :
     return self.string[start_pos:self.position]
 
   def get_pos(self):

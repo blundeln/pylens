@@ -149,43 +149,56 @@ def touching_lens_test() :
   # Now check we are at the end of a chain
   assert lens._get_next_lenses() == []
 
-  # TODO: Dare we try with Recurse lens!!!
+  # TODO: Dare we try with Recurse lens yet!!!
 
 
 
 def apache_test() :
  
-  # This will be a milestone.
+  # http://httpd.apache.org/docs/2.2/configuring.html
 
-  INPUT = """<VirtualHost *:80>
-	ServerName wikidbasedemo.nickblundell.org.uk
-  ServerAlias sb2.nickblundell.org.uk
-	<Location />
-    SetHandler python-program
-    PythonHandler django.core.handlers.modpython
-    PythonDebug On
-    PythonAutoReload On
-    #PythonPath "['/home/server/websites/django/wikidbasedemos'] + sys.path"
-    #SetEnv DJANGO_SETTINGS_MODULE wbdemo
-    PythonPath "['/home/server/websites/wikidbases/wbdemo1'] + sys.path"
-    SetEnv DJANGO_SETTINGS_MODULE settings
-	</Location>
+  INPUT = open("testing/resources/vhost_sample.conf").read()
+
+  comment, blank_line, directive = [NullLens()] * 3
   
-  #Alias /admin_media "/usr/lib/python2.4/site-packages/Django-0.95-py2.4.egg/django/contrib/admin/media"
-  Alias /admin_media "/usr/lib/python2.5/site-packages/django/contrib/admin/media"
-  <Location "/admin_media/">
-  SetHandler None
-  </Location>
+  nl = NewLine()
+  comment = "#" + Until(nl) + nl
+ 
+  # Whitespace wrapper
+  def ws(default_output) :
+    return Whitespace(default_output, slash_continuation=True)
+  blank_line = ws("") + nl
+
+  simple_directive, clause_directive = [NullLens()] * 2
   
-  Alias /media "/home/blundeln/working/wikidbase/wikidbase/media"
-  <Location "/media/">
-  SetHandler None
-  </Location>
+  directive_name = Word(alphanums, init_chars=alphas, label="name")
+  directive_args = ws(" ") + List(Until(ws(" ")|nl|">", store=True), ws(" "))
+  simple_directive = Group(
+    directive_name + directive_args + nl
+  )
 
-</VirtualHost>"""
+  entries = Forward()
 
-  keyword_chars = alphas
-  section = "<" + Word(keyword_chars, is_label=True) + Until(">", label="args") + ">"
+  clause_directive = Group(
+    "<" + ws("") + directive_name + directive_args + ws("") + ">" + ws("") + nl + entries
+  )
+
+
+  directive = ws("") + (simple_directive | clause_directive)
+
+
+  entry = (comment | blank_line | directive)
+  entries << Group(ZeroOrMore(entry))
+  lens = entries
+
+  #keyword_chars = alphas
+  #section = "<" + Word(keyword_chars, is_label=True) + Until(">", label="args") + ">"
+  input_reader = ConcreteInputReader(INPUT)
+  abstract_data = lens.get(input_reader, check_fully_consumed=False)
+  d("\n\n{{{%s}}}\n\n" % abstract_data)
+  d("\n\n>>>%s<<<\n\n" % input_reader.get_consumed_string())
+
+
 
 def iface_test() :
   """Put the module through its paces."""
