@@ -160,27 +160,36 @@ def apache_test() :
   INPUT = open("testing/resources/vhost_sample.conf").read()
 
   comment, blank_line, directive = [NullLens()] * 3
-  
-  nl = NewLine()
-  comment = "#" + Until(nl) + nl
- 
+
+  # XXX:
+  import sys
+
+  sys.setrecursionlimit(200)
+
   # Whitespace wrapper
   def ws(default_output) :
     return Whitespace(default_output, slash_continuation=True)
+
+  nl = NewLine()
+  comment = ws("") + "#" + Until(nl) + nl
+ 
   blank_line = ws("") + nl
 
   simple_directive, clause_directive = [NullLens()] * 2
   
   directive_name = Word(alphanums, init_chars=alphas, label="name")
+  directive_name_close = Word(alphanums, init_chars=alphas)
   directive_args = ws(" ") + List(Until(ws(" ")|nl|">", store=True), ws(" "))
   simple_directive = Group(
     directive_name + directive_args + nl
   )
 
-  entries = Forward()
+  entries = Forward(recursion_limit=200)
 
   clause_directive = Group(
-    "<" + ws("") + directive_name + directive_args + ws("") + ">" + ws("") + nl + entries
+    "<" + ws("") + directive_name + directive_args + ws("") + ">" + ws("") + nl + \
+    entries + \
+    ws("") + "</" + ws("") + directive_name_close + ws("") + ">" + ws("") + nl
   )
 
 
@@ -191,9 +200,12 @@ def apache_test() :
   entries << Group(ZeroOrMore(entry))
   lens = entries
 
+  auto_name_lenses(locals())
+
   #keyword_chars = alphas
   #section = "<" + Word(keyword_chars, is_label=True) + Until(">", label="args") + ">"
   input_reader = ConcreteInputReader(INPUT)
+  return
   abstract_data = lens.get(input_reader, check_fully_consumed=False)
   d("\n\n{{{%s}}}\n\n" % abstract_data)
   d("\n\n>>>%s<<<\n\n" % input_reader.get_consumed_string())

@@ -37,7 +37,7 @@ def escape_for_display(s) :
     return s
   if len(s) == 0 :
     return "[EMPTY]"
-  return s.replace("\n","<NL>").replace("\t","<TAB>").replace(" ","<SP>") # Escape newlines so not to confuse debug output.
+  return s.replace("\n","[NL]").replace("\t","[TAB]") #.replace(" ","[SP]") # Escape newlines so not to confuse debug output.
 
 def truncate(s, max_len=10) :
   """Truncates a long string so is suitable for display."""

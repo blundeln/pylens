@@ -90,6 +90,7 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     # Now call 'get' proper to consume the input and parse a token, whether a
     # store or not, and if there is a parsing exception, we rollback the
     # reader state.
+    start_position = concrete_input_reader.get_pos()
     with reader_rollback(concrete_input_reader) :
       abstract_data = self._get(concrete_input_reader)
 
@@ -101,8 +102,14 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
         assert abstract_data != None, "Should have got something here from our lens."
       else :
         return None
+    
+    if IN_DEBUG_MODE :
+      consumed_input = concrete_input_reader.get_consumed_string(start_position)
+      if abstract_data :
+        abstract_data_string = isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data
+        if consumed_input :
+          d("GOT '%s' -> %s" % (escape_for_display(consumed_input), abstract_data_string))
 
-    d("Successfully GOT: %s" % (isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data))
 
     # If we expect full consuption of the conrete input, flag what has been
     # left un-consumed.
@@ -1565,13 +1572,13 @@ class Forward(CombinatorLens):
     self._bound_lens = lens
   
   def _get(self, concrete_input_reader) :
-    assert self._bound_lens, "Recurse was unable to bind to a lens."
+    assert self._bound_lens, "Unable to bind to a lens."
     return self._bound_lens._get(concrete_input_reader)
 
   def _put(self, abstract_data, concrete_input_reader) :
-    assert self._bound_lens, "Recurse was unable to bind to a lens."
+    assert self._bound_lens, "Unable to bind to a lens."
+    
     original_limit = sys.getrecursionlimit()
-
     if self.recursion_limit :
       sys.setrecursionlimit(self.recursion_limit)
     
