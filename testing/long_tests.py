@@ -197,6 +197,7 @@ def apache_test() :
 
 
   entry = (comment | blank_line | directive)
+  # XXX: Entries get merged, so should be correctly grouped.
   entries << Group(ZeroOrMore(entry))
   lens = entries
 
@@ -204,8 +205,8 @@ def apache_test() :
 
   #keyword_chars = alphas
   #section = "<" + Word(keyword_chars, is_label=True) + Until(">", label="args") + ">"
+  # XXX: It seems this actually works, but doesn't seem to stop when the input is consumed!
   input_reader = ConcreteInputReader(INPUT)
-  return
   abstract_data = lens.get(input_reader, check_fully_consumed=False)
   d("\n\n{{{%s}}}\n\n" % abstract_data)
   d("\n\n>>>%s<<<\n\n" % input_reader.get_consumed_string())

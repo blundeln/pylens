@@ -107,8 +107,9 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
       consumed_input = concrete_input_reader.get_consumed_string(start_position)
       if abstract_data :
         abstract_data_string = isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data
-        if consumed_input :
-          d("GOT '%s' -> %s" % (escape_for_display(consumed_input), abstract_data_string))
+      else :
+        abstract_data_string = "[NOTHING]"
+      d("GOT '%s' -> %s" % (escape_for_display(consumed_input), abstract_data_string))
 
 
     # If we expect full consuption of the conrete input, flag what has been
@@ -500,6 +501,10 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     # Bolt on the class name, to ease debugging.
     return "%s(%s)" % (self.__class__.__name__, self._display_id())
   __repr__ = __str__
+
+  def __instance_name__(self) :
+    """Used by nbdebug module to display a custom debug message context string."""
+    return self.name or self.__class__.__name__
 
 
   # XXX: I don't really like these forward declarations, but for now this does
@@ -1004,7 +1009,7 @@ class OneOrMore(CombinatorLens) :
         self._store_token(token, self.lens, token_collection)
         no_GOT += 1
         # If the lens did not consume from the concrete input and we now have min items, break out.
-        if start_position == concrete_input_reader.get_position_state() and no_GOT == self.min_items :
+        if start_position == concrete_input_reader.get_position_state() and no_GOT >= self.min_items :
           d("Got minimum items, so breaking out to avoid infinite loop")
           break
       except LensException:

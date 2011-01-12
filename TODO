@@ -23,8 +23,8 @@ target: future
   - Need a way of accurately testing performance, since currently many tests require (slow) debug strings
     to validate output
   - DynamicLens - pass a function which creates a lens when it is called with
-    context params (e.g. current collection)
-  - Ambiguity check.
+    context params (e.g. current collection) e.g. <X> .... </X>
+  - Ambiguity checking.
   - Add API docs to code.
   - Implement PutGet check for sanity checking lenses.
   - Implement full lenses for deb conf and interfaces.

@@ -86,7 +86,6 @@ class ConcreteInputReader(Reader):
     self.position += length
     return self.string[start:self.position]
 
-
   def get_next_char(self):
     """
     Consume and return the next char from input.
