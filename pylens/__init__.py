@@ -1574,7 +1574,7 @@ class Forward(CombinatorLens):
   def bind_lens(self, lens) :
     d("Binding to lens %s" % lens)
     assert not self._bound_lens, "The lens cannot be re-bound."
-    self._bound_lens = lens
+    self._bound_lens = self.coerce_to_lens(lens)
   
   def _get(self, concrete_input_reader) :
     assert self._bound_lens, "Unable to bind to a lens."

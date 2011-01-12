@@ -164,8 +164,6 @@ def apache_test() :
   # XXX:
   import sys
 
-  sys.setrecursionlimit(200)
-
   # Whitespace wrapper
   def ws(default_output) :
     return Whitespace(default_output, slash_continuation=True)
@@ -177,40 +175,71 @@ def apache_test() :
 
   simple_directive, clause_directive = [NullLens()] * 2
   
-  directive_name = Word(alphanums, init_chars=alphas, label="name")
+  directive_name = Word(alphanums, init_chars=alphas, label="directive_name")
   directive_name_close = Word(alphanums, init_chars=alphas)
-  directive_args = ws(" ") + List(Until(ws(" ")|nl|">", store=True), ws(" "))
+  # TODO: arg could include spaces if wrapped in quotes.
+  quoted_arg = "\"" + Until("\"", store=True) + "\""
+  directive_args = ws(" ") + List(quoted_arg | (Until(ws(" ")|nl|">", store=True)), ws(" "))
   simple_directive = Group(
-    directive_name + directive_args + nl
+    directive_name + directive_args + ws("") + nl,
+    #type=auto_list
   )
 
-  entries = Forward(recursion_limit=200)
-
+  entries = Forward()
+  """
   clause_directive = Group(
     "<" + ws("") + directive_name + directive_args + ws("") + ">" + ws("") + nl + \
     entries + \
     ws("") + "</" + ws("") + directive_name_close + ws("") + ">" + ws("") + nl
-  )
+  )"""
 
+  class ClauseDirective(object) :
+    __lens__ =  "<" + ws("") + directive_name + directive_args + ws("") + ">" + ws("") + nl + \
+                Group(entries, label="directives") + \
+                ws("") + "</" + ws("") + directive_name_close + ws("") + ">" + ws("") + nl
+  
+  directive = ws("") + (simple_directive | ClauseDirective)
 
-  directive = ws("") + (simple_directive | clause_directive)
 
 
   entry = (comment | blank_line | directive)
   # XXX: Entries get merged, so should be correctly grouped.
-  entries << Group(ZeroOrMore(entry))
+  entries << (ZeroOrMore(entry))
   lens = entries
 
   auto_name_lenses(locals())
 
+  INPUT = """<VirtualHost *:80>
+  ServerName wikidbasedemo.nickblundell.org.uk
+  ServerAlias sb2.nickblundell.org.uk
+</VirtualHost>
+"""	
+  
+  input_reader = ConcreteInputReader(INPUT)
+  abstract_data = get(ClauseDirective, input_reader)
+  d(abstract_data)
+
+  return
+
+  INPUT = """PythonHandler "something with a space" django.core.handlers.modpython"""
+  input_reader = ConcreteInputReader(INPUT)
+  abstract_data = simple_directive.get(input_reader)
+  abstract_data[1] = "monkey"
+  print(abstract_data)
+  d("CREATE")
+  print(simple_directive.create(abstract_data, label = "NewDirective"))
+  print(simple_directive.put(abstract_data, INPUT, label = "NewDirective"))
+
+  return
+
   #keyword_chars = alphas
   #section = "<" + Word(keyword_chars, is_label=True) + Until(">", label="args") + ">"
   # XXX: It seems this actually works, but doesn't seem to stop when the input is consumed!
-  input_reader = ConcreteInputReader(INPUT)
-  abstract_data = lens.get(input_reader, check_fully_consumed=False)
-  d("\n\n{{{%s}}}\n\n" % abstract_data)
-  d("\n\n>>>%s<<<\n\n" % input_reader.get_consumed_string())
+  abstract_data = lens.get(input_reader, check_fully_consumed=True)
+  print("\n\n>>>%s<<<\n\n" % input_reader.get_consumed_string())
+  print("\n\n{{{%s}}}\n\n" % abstract_data)
 
+  #output = lens.put(abstract_data, INPUT)
 
 
 def iface_test() :

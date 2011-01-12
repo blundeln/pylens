@@ -3,9 +3,8 @@ TODO
 target: 1.0.0a1
   - Complete Recurse Lens
     - Reconsider exhaustive Or lens checking to avoid recursion problem
-    - How to simplify debugging lenses.
-      - How to allow debugging context labels to be changed (e.g. comment.get(): rather than And.get())
   - Improve examples in long_tests.py
+    - Need to have a good think about how to create richer models
   - Add installation script
   - Publish on freshmeat
   - Link Nick's site to github.
@@ -16,6 +15,7 @@ target: 1.0.0a2
     - especially the formatting of debug messages which can add a significant overhead.
 
 target: future
+  - How to handle default indentation in recursive grammars.
   - Should CombineChars be replaced by type=str or something, a more fundamental approach?
   - Shorter syntax for differentiating between store and non-store lenses so parsers less cluttered
     - e.g. Word(...) vs S(Word(...)), or something
