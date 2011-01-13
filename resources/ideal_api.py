@@ -140,3 +140,14 @@ new_config = configuration.put()
 # the original input plus any changes.
 
 # Additionally, we could drive the applications with the objects
+
+#
+# Apache Example
+#
+
+apache_config = [GET from config file]
+new_virtual_host = VirtualHost(name="www.somesite.com", aliases=["x","y","z"])
+apache_config.add(new_virtual_host)
+
+another_vhost = apache_config.get("www.another.com") # Praps get is some sort of simple query function.
+another_vhost.add()  # And add is some kind of insert.
