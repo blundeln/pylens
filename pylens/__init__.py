@@ -717,7 +717,9 @@ class And(CombinatorLens) :
     d("GET")
     lens = AnyOf(alphas, store=True) + AnyOf(nums, store=True, label="2nd_char") + AnyOf(alphas, store=True, is_label=True) + AnyOf(nums, store=True)
     token = lens.get("m1x3p6", check_fully_consumed=False)
-    assert_match(str(token), "...<x> -> {'2nd_char': ['1'], None: ['m', '3']}")
+    assert_match(str(token), "...<x> ->...")
+    assert_match(str(token), "...'2nd_char': ['1']...")
+    assert_match(str(token), "...None: ['m', '3']...")
 
     d("PUT")
     tokens = GenericCollection(["n", "8"])
@@ -927,7 +929,8 @@ class Or(CombinatorLens) :
     lens = AnyOf(nums, store=store, default="4") | AnyOf(alphas, store=store, default="B") | (AnyOf(alphanums, label="l", store=store, default="3") + AnyOf(alphas, store=store, default="x"))
     token = lens.get("2m_x3p6", check_fully_consumed=False)
     d(token)
-    assert_match(str(token), "...{'l': ['2'], None: ['m']}...")
+    assert_match(str(token), "...'l': ['2']...")
+    assert_match(str(token), "...None: ['m']...")
     
     d("PUT")
     token["l"] = '8'

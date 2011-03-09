@@ -209,23 +209,26 @@ def apache_test() :
 
   auto_name_lenses(locals())
 
-  INPUT = """<VirtualHost *:80>
+  """
+  INPUT = ""<VirtualHost *:80>
   ServerName wikidbasedemo.nickblundell.org.uk
   ServerAlias sb2.nickblundell.org.uk
 </VirtualHost>
-"""	
+""	
   
   input_reader = ConcreteInputReader(INPUT)
   abstract_data = get(ClauseDirective, input_reader)
   d(abstract_data)
 
   return
+"""
 
   INPUT = """PythonHandler "something with a space" django.core.handlers.modpython"""
   input_reader = ConcreteInputReader(INPUT)
   abstract_data = simple_directive.get(input_reader)
+  #print(abstract_data)
+  return
   abstract_data[1] = "monkey"
-  print(abstract_data)
   d("CREATE")
   print(simple_directive.create(abstract_data, label = "NewDirective"))
   print(simple_directive.put(abstract_data, INPUT, label = "NewDirective"))

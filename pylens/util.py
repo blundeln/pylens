@@ -70,7 +70,7 @@ def assert_match(input_string, template) :
 
   # Hmmm, does this disgregard python comments?
   match = doctest._ellipsis_match(template, input_string)
-  assert match, "Did not expect '%s'" % input_string
+  assert match, "Did not expect '%s'; expected: %s" % (input_string, template)
 
 
 
