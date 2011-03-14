@@ -62,14 +62,14 @@ def unit_tests(args=None) :
     elif hasattr(item, "TESTS"):
       TESTS[item.__name__] = item.TESTS
 
+  if "commit_tests" in args :
+    # Disable commit testing, for experimentation.
+    exit(0)
+
   # Determine if a specific test was specified to be run.
   test_name = args[-1]
-  if test_name == "test" :
+  if test_name in ["test", "commit_tests"] :
     test_name = None
-
-  # XXX: Whilst experimenting. 
-  if not test_name :
-    exit(0)
 
   if test_name and test_name not in TESTS :
     raise Exception("There is no test called: %s" % test_name)

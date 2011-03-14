@@ -141,6 +141,72 @@ class automatic_rollback:
     assert(o_3.y == [3,4])
 
 
+
+class AbstractContainer(Rollbackable) :
+  """
+  Base class for all objects that store abstract items with GET and from which
+  such may be retrieved for PUT.  Meta data from the lens may be used to aid
+  storage and retrieval of items in the container (e.g. labels, keys, concrete
+  residue).
+  """
+
+  def store_item(self, item, meta_data) :
+    raise NotImplementedError()
+
+  def consume_item(self, meta_data) :
+    raise NotImplementedError()
+
+  def unwrap(self) :
+    """Unwrap to native python type where appropriate: e.g. for list and dict.""" 
+    return self
+    
+
+
+class ListContainer(AbstractContainer) :
+  """Simply stores items in a list, making no use of meta data."""
+
+  def __init__(self, value=None) :
+    # Use list if passed; otherwise create a new list.
+    if value :
+      assert isinstance(value, list)
+      self.list = value
+    else :
+      self.list = []
+
+  def store_item(self, item, meta_data=None) :
+    self.list.append(item)
+
+  def consume_item(self, meta_data=None) :
+    try :
+      return self.list.pop(0)
+    except IndexError:
+      raise NoTokenToConsumeException()
+
+  def unwrap(self):
+    return self.list
+
+  def __str__(self) :
+    return str(self.list)
+
+  @staticmethod
+  def TESTS() :
+    list_container = ListContainer([1,2,3])
+    list_container.store_item(4)
+    assert(list_container.unwrap() == [1,2,3,4])
+    assert(list_container.consume_item(None) == 1)
+    assert(list_container.unwrap() == [2,3,4])
+    list_container.consume_item(None)
+    list_container.consume_item(None)
+    list_container.consume_item(None)
+    try :
+      list_container.consume_item(None)
+      assert(False) # Should not get here
+    except NoTokenToConsumeException:
+      pass
+
+
+
+
 # OLD STUFF ===================================================
 
 class AbstractCollection(object) :

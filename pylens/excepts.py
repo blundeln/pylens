@@ -37,6 +37,10 @@ from nbdebug import *
 # Thrown when tentative object state should be rolled back.
 class RollbackException(Exception): pass
 
+# Thrown when an abstract token collection cannot find an appropriate token in the
+# PUT direction.
+class NoTokenToConsumeException(RollbackException): pass
+
 class LensException(RollbackException):
   """
   Thrown when parsing or creating lenses to trigger rollback, such that parsing
