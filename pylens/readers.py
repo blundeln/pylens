@@ -35,6 +35,111 @@ from excepts import *
 from util import *
 from token_collections import *
 
+
+class ConcreteInputReader(Rollbackable):
+  """Stateful reader of the concrete input string."""
+
+  def __init__(self, string):
+    self.position  = 0
+    self.string    = string
+
+  def reset(self) :
+    self.set_pos(0)
+
+  def _get_state(self) :
+    return self.get_pos()
+
+  def _set_state(self, state) :
+    self.set_pos(state)
+
+  def get_consumed_string(self, start_pos=0) :
+    return self.string[start_pos:self.position]
+
+  def get_pos(self):
+    return self.position
+
+  def set_pos(self, pos) :
+    self.position = pos
+
+  def get_remaining(self) :
+    """Return the text that remains to be parsed - useful for debugging."""
+    return self.string[self.position:]
+
+  # XXX: Note used yet - perhaps not needed at all.
+  def consume_string(self,length):
+    """
+    Consume the next string of specified length from the input.
+    """
+    if self.position+length > len(self.string):
+      raise EndOfStringException()
+    start = self.position
+    self.position += length
+    return self.string[start:self.position]
+  get_string = consume_string # Deprecated.
+
+
+  def consume_next_char(self):
+    """
+    Consume and return the next char from input.
+    """
+    if self.position == len(self.string):
+      raise EndOfStringException()
+    char = self.string[self.position]
+    self.position += 1
+    return char
+  get_next_char = consume_next_char # Deprecated
+
+
+  def is_fully_consumed(self):
+    """
+    Return whether the string was fully consumed
+    """
+    return self.get_remaining() == ""
+
+  def __str__(self) :
+    # Return a string representation of this reader, to help debugging.
+    if self.is_fully_consumed() :
+      return "END_OF_STRING"
+
+    display_string = self.string[self.position:]
+    return truncate(display_string)
+  __repr__ = __str__
+
+  @staticmethod
+  def TESTS() :
+    concrete_reader = ConcreteInputReader("ABCD")
+    output = ""
+    for i in range(0,2) :
+      output += concrete_reader.consume_next_char()
+    assert not concrete_reader.is_fully_consumed()
+    assert concrete_reader.get_remaining() == "CD"
+    assert concrete_reader.get_consumed_string(0) == "AB"
+    
+    for i in range(0,2) :
+      output += concrete_reader.consume_next_char()
+    assert output == "ABCD"
+    assert concrete_reader.is_fully_consumed()
+    
+    concrete_reader = ConcreteInputReader("ABCD")
+
+    # Now test with rollback.
+    concrete_reader = ConcreteInputReader("ABCD")
+    try :
+      with automatic_rollback(concrete_reader):
+        concrete_reader.consume_next_char()
+        assert concrete_reader.get_remaining() == "BCD"
+        raise LensException()
+    except LensException:
+      pass # Don't want to stop tests.
+
+    assert concrete_reader.get_remaining() == "ABCD"
+
+
+
+
+
+# OLD STUFF ===============================
+
 class Reader :
   """Interface of a Reader with position state, so it can be rolled back"""
   def get_position_state(self) :
@@ -47,7 +152,7 @@ class Reader :
     raise NotImplementedError()
 
 
-class ConcreteInputReader(Reader):
+class OldConcreteInputReader(Reader):
   """Stateful reader of the concrete input string."""
 
   def __init__(self, string):

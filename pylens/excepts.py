@@ -34,7 +34,10 @@
 #
 from nbdebug import *
 
-class LensException(Exception):
+# Thrown when tentative object state should be rolled back.
+class RollbackException(Exception): pass
+
+class LensException(RollbackException):
   """
   Thrown when parsing or creating lenses to trigger rollback, such that parsing
   may resume at a higher level (e.g. to try another lens path), if possible.

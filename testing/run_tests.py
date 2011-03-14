@@ -67,8 +67,14 @@ def unit_tests(args=None) :
   if test_name == "test" :
     test_name = None
 
+  # XXX: Whilst experimenting. 
+  if not test_name :
+    exit(0)
+
   if test_name and test_name not in TESTS :
-    raise Exception("There is not test called: %s" % test_name)
+    raise Exception("There is no test called: %s" % test_name)
+
+
 
   test_suite = unittest.TestSuite()
   for name, test_function in TESTS.iteritems() :
