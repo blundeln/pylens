@@ -813,7 +813,7 @@ class And(Lens) :
     # These tests flex the use of labels.
 
     d("GET")
-    lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str), type=list)
+    lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str) )
     assert(lens.get("monkey", check_fully_consumed=False) == ["m", "o"])
     return
 
