@@ -341,3 +341,9 @@ auto eth1 eth2
 """)
 
 
+def experimental_test() :
+  d("Started")
+
+  lens = AnyOf(alphas, store=True)
+  output = lens.get("hello123", check_fully_consumed=False)
+  d(locals())

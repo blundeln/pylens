@@ -15,6 +15,7 @@ target: 1.0.0a2
     - especially the formatting of debug messages which can add a significant overhead.
 
 target: future
+  - Store residue of get for more flexible matching.
   - Allow datatypes to be specified similarly to keys.
   - Allow hierarchical keys, like this: lens = X(..., is_label=1) for primary key, ... is_label=2 ... for secondary key
   - How to handle default indentation in recursive grammars.

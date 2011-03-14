@@ -604,20 +604,20 @@ class CombinatorLens(BaseLens) :
     d("Storing token %s" % token)
 
     # Useful variables
-    is_combinator = isinstance(lens, CombinatorLens)
-    is_token_collection = isinstance(token, AbstractCollection)
+    lens_is_combinator = isinstance(lens, CombinatorLens)
+    token_is_collection = isinstance(token, AbstractCollection)
     
     # Check if this token (if a collection itself) should be merged (e.g. for
     # nested Ands, OneOrMore, etc.).  Note that a CombinatorLens may not
     # necessarily return a GenericCollection (e.g. Or)
-    if is_combinator and is_token_collection :
+    if lens_is_combinator and token_is_collection :
       token_collection.merge(token)
       return
       
     # Handle the case where the token itself is a label for the current
     # collection.  We check for non-combinator, since a non-combinator will
     # have an is_label attribute.
-    if not is_combinator and lens.is_label :
+    if not lens_is_combinator and lens.is_label :
       token_collection.set_label_token(token)
       return
 
