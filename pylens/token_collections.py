@@ -205,6 +205,16 @@ class ListContainer(AbstractContainer) :
       pass
 
 
+class ContainerFactor:
+  """Creates appropriate containers for native python types."""
+  
+  @staticmethod
+  def create_container(container_type) :
+    
+    if container_type == list :
+      return ListContainer()
+
+    return None # If we cannot create such a container.
 
 
 # OLD STUFF ===================================================
