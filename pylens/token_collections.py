@@ -165,11 +165,11 @@ class AbstractContainer(Rollbackable) :
 class ListContainer(AbstractContainer) :
   """Simply stores items in a list, making no use of meta data."""
 
-  def __init__(self, value=None) :
+  def __init__(self, initial_list=None) :
     # Use list if passed; otherwise create a new list.
-    if value :
-      assert isinstance(value, list)
-      self.list = value
+    if initial_list != None :
+      assert isinstance(initial_list, list)
+      self.list = initial_list
     else :
       self.list = []
 
@@ -205,17 +205,48 @@ class ListContainer(AbstractContainer) :
       pass
 
 
-class ContainerFactor:
+class ContainerFactory:
   """Creates appropriate containers for native python types."""
-  
+ 
+
+  @staticmethod
+  def get_container_class(incoming_type) :
+    if incoming_type == None:
+      return None
+
+    if issubclass(incoming_type, AbstractContainer) :
+      return incoming_type
+
+    if incoming_type == list :
+      return ListContainer
+    
+    return None
+
+
   @staticmethod
   def create_container(container_type) :
     
-    if container_type == list :
-      return ListContainer()
+    container_class = ContainerFactory.get_container_class(container_type)
+    
+    if container_class == None:
+      return None
 
-    return None # If we cannot create such a container.
+    return container_class()
 
+  @staticmethod
+  def wrap_container(incoming_object) :
+    """Wraps a container if possible."""
+    d("Wrapping %s" % incoming_object)
+    if incoming_object == None or issubclass(type(incoming_object), AbstractContainer) :
+      return incoming_object
+    
+    container_class = ContainerFactory.get_container_class(type(incoming_object))
+    if container_class == None :
+      return None
+
+    return container_class(incoming_object)
+    
+    
 
 # OLD STUFF ===================================================
 

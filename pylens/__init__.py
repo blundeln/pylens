@@ -59,6 +59,9 @@ class Lens(object) :
         # not need to check for full input string consumption
         check_fully_consumed = False
 
+      # If we are passed the current container, ensure it is wrapped as an AbstractContainer
+      current_container = ContainerFactory.wrap_container(current_container)
+
       # Show what we are doing.
       d("%s GET: CR -> '%s'" % (self, str(concrete_input_reader)))
        
@@ -770,7 +773,8 @@ class And(Lens) :
     ANDed lenses.
     """
     # Create a collect, of type appropriate for this lens (e.g. dict, list, hybrid, etc.)
-    container = ContainerFactor.create_container(self.type) or current_container
+    container = ContainerFactory.create_container(self.type) or current_container
+    assert(container != None)
     # Store tokens for each lens.
     for lens in self.lenses :
       abstract_token = lens.get(concrete_input_reader, current_container=container)
@@ -813,7 +817,8 @@ class And(Lens) :
     # These tests flex the use of labels.
 
     d("GET")
-    lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str) )
+    lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str), type=list)
+    current_container = []
     assert(lens.get("monkey", check_fully_consumed=False) == ["m", "o"])
     return
 
