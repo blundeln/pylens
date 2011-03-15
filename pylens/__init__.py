@@ -218,14 +218,16 @@ class Lens(object) :
     retrieved.
     """
 
+    # Create some basic meta data to help with storing the item.
     meta_data = {
       Meta.LENS: lens,
       Meta.START_POS: concrete_input_reader.get_pos(),
     }
-    abstract_token = lens.get(concrete_input_reader, current_container=container)
-    if abstract_token :
-      # TODO: When we store a token, need to ensure meta is set.
-      container.store_item(abstract_token, meta_data)
+    abstract_item = lens.get(concrete_input_reader, current_container=container)
+    if lens.is_store_lens() :
+      # Expect to get some data from a store lens.
+      assert(abstract_item != None)
+      container.store_item(abstract_item, meta_data)
 
   #-------------------------
   # For debugging
@@ -886,7 +888,27 @@ class And(Lens) :
     return current_container
 
 
-  def _put(self, abstract_data, concrete_input_reader) :
+  def _put(self, abstract_item, concrete_input_reader, current_container) :
+    
+    # Simply concatenate output from the sub-lenses.
+    output = ""
+    for lens in self.lenses :
+      # If lens is a store lens, get an abstract item to put
+      if lens.is_store_lens() :
+        consumed_item = current_container.consume_item({})
+      else :
+        consumed_item = None
+      
+      # Call put
+      output += lens.put(consumed_item, concrete_input_reader, current_container)
+
+    return output
+    
+   
+
+
+
+
     
     # If we already have a token reader, AND will pass that directly on to its
     # sub-lenses, since collections are flattened on lens construction (i.e. we
@@ -919,8 +941,11 @@ class And(Lens) :
 
     d("GET")
     lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str), type=list)
-    current_container = []
     assert(lens.get("monkey") == ["m", "o"])
+    
+    
+    d("PUT")
+    assert(lens.put(["d", "o"], "monkey") == "do")
     return
 
 
