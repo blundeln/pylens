@@ -175,6 +175,7 @@ class ListContainer(AbstractContainer) :
       self.list = []
 
   def store_item(self, item, meta_data=None) :
+    d(meta_data)
     self.list.append(item)
 
   def consume_item(self, meta_data=None) :

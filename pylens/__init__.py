@@ -35,37 +35,36 @@ from token_collections import *
 from readers import *
 
 
+# Perhaps can simply be a class.
 class Meta:
   LENS = "LENS"
   CONCRETE_INPUT_READER = "CONCRETE_READER"
 
+
+#########################################################
+# Base Lens
+#
+
 class Lens(object) :
   
-  def __init__(self, type=None, name=None, default=None, **keywords) :
+  def __init__(self, type=None, name=None, default=None, **kargs) :
     # Set python type of lense data and a name, for debugging.
     self.type = type
     self.name = name
     if has_value(type) and has_value(default) :
       raise Exception("Cannot set a default value on a lens with a type.")
     self.default = default
-    self.keywords = keywords
+
+    # Composite lenses will store their sub-lenses in here.
+    self.lenses = []
+
+    # Allow arbitrary arguments to be set which can aid flexible storage and
+    # retrival of items from a container.
+    self.kargs = kargs
 
   def has_type(self) :
     """Determines if this lens will GET and PUT a variable - a STORE lens."""
     return self.type != None
-
-  def _normalise_concrete_input(self, concrete_input) :
-    # If input a string, wrap in a stateful string reader.
-    if concrete_input == None:
-      return None
-    if isinstance(concrete_input, str) :
-      return ConcreteInputReader(concrete_input)
-    else :
-      return concrete_input
-
-  def _get_container_class(self) :
-    # Try to get a container class appropriate for this lens' type, which may be None
-    return ContainerFactory.get_container_class(self.type)
 
 
   def get(self, concrete_input, current_container=None) :
@@ -175,6 +174,19 @@ class Lens(object) :
   def create(self, item=None, current_container=None) :
     return self.put(item, None, current_container)
 
+  def _normalise_concrete_input(self, concrete_input) :
+    # If input a string, wrap in a stateful string reader.
+    if concrete_input == None:
+      return None
+    if isinstance(concrete_input, str) :
+      return ConcreteInputReader(concrete_input)
+    else :
+      return concrete_input
+
+  def _get_container_class(self) :
+    # Try to get a container class appropriate for this lens' type, which may be None
+    return ContainerFactory.get_container_class(self.type)
+
   def _get_storage_meta_data(self, concrete_input_reader) :
      # Create some basic meta data to help with storing and retrieving the item.
     meta_data = {
@@ -196,494 +208,12 @@ class Lens(object) :
     if has_value(item) :
       container.store_item(item, storage_meta_data)
 
-  #-------------------------
-  # For debugging
-  #
-  
-  def _display_id(self) :
-    """Useful for identifying specific lenses when debugging."""
-    if self.name :
-      return self.name
-    # If no name, a hash gives us a reasonably easy way to distinguish lenses in debug traces.
-    return str(hash(self) % 256)
-
-  # String representation.
-  def __str__(self) :
-    # Bolt on the class name, to ease debugging.
-    return "%s(%s)" % (self.__class__.__name__, self._display_id())
-  __repr__ = __str__
-
-  def __instance_name__(self) :
-    """Used by nbdebug module to display a custom debug message context string."""
-    return self.name or self.__class__.__name__
-
-
-
-
-
-#########################################################
-# Base Lenses
-#
-
-class BaseLens(object): # object, important to use new-style classes, for inheritance, etc.
-  """
-  Base lens, which should be extended by all lenses, and which encapsulates
-  much of the complexity of the framework.
-
-  The get and put methods of this base class wrap the get and put methods of
-  the child class (_get, _put), ensuring any normalisation and handling
-  rollback on Exceptions.
-
-  Also, by encapsulating this complexity in a base lens, descendant
-  non-combinator lenses can be written without worrying about how their tokens
-  get plucked from the token reader - they just handle how to PUT the token.
-  """
-  
-  def __init__(self, type=None, name=None) :
-    # Set python type of lense data and a name, for debugging.
-    self.type = type
-    self.name = name
-    
-    # For connecting lenses, for ambiguity checks.
-    self._next_lenses = []
-    self._previous_lenses = []
- 
-
-  def get(self, concrete_input, check_fully_consumed=True, postprocess_token=True) :
-    """
-    If a parent lens plans to store a token, then it will retain more information (specifically on the tokens label)
-    if it postprocesses the token immediately prior to storing it.
-    """
-    # If input a string, wrap in a stateful string reader.
-    if isinstance(concrete_input, str) :
-      concrete_input_reader = ConcreteInputReader(concrete_input)
-    else :
-      concrete_input_reader = concrete_input
-      # If we already have a reader, then we are not the top-level lens, so do
-      # not need to check for full input string consumption
-      check_fully_consumed = False
-
-    # Show what we are doing.
-    d("%s GET: CR -> '%s'" % (self, str(concrete_input_reader)))
-    
-    # Now call 'get' proper to consume the input and parse a token, whether a
-    # store or not, and if there is a parsing exception, we rollback the
-    # reader state.
-    start_position = concrete_input_reader.get_pos()
-    with reader_rollback(concrete_input_reader) :
-      abstract_data = self._get(concrete_input_reader)
-
-    # Return nothing if this lens is not a STORE lens, since it extracts no
-    # abstract data type.  However, if we have a combinator, we always return what it returns (e.g. an empty
-    # container, a token from a sub-lens).
-    if isinstance(self, Lens) :
-      if self.store :
-        assert abstract_data != None, "Should have got something here from our lens."
-      else :
-        return None
-    
-    if IN_DEBUG_MODE :
-      consumed_input = concrete_input_reader.get_consumed_string(start_position)
-      if abstract_data :
-        abstract_data_string = isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data
-      else :
-        abstract_data_string = "[NOTHING]"
-      d("GOT '%s' -> %s" % (escape_for_display(consumed_input), abstract_data_string))
-
-
-    # If we expect full consuption of the conrete input, flag what has been
-    # left un-consumed.
-    if check_fully_consumed and not concrete_input_reader.is_fully_consumed() :
-      raise Exception("Concrete string not fully consumed: remaining: %s" % concrete_input_reader.get_remaining())
-    
-   
-    # All lenses internally deal with tokens, since a token can hold the data
-    # and any meta-data, such as the token's label.  At the API level, the
-    # user will be concerned only with the native abstract data (e.g. a class,
-    # an int, etc.), so we allow optional postprocessing before the data is
-    # returned.
-    if postprocess_token :
-      return self._postprocess_outgoing_token(abstract_data)
-    else :
-      return abstract_data
-
-
-  def put(self, abstract_data, concrete_input=None, check_fully_consumed=True, label=None) :
-    """
-    We handle a lot of the complexity of reader rollback and labelled tokens
-    here, so that specific lenses do not need to worry about this stuff.  Since
-    some lenses may return contents and a key/label, label lets us specify
-    this when putting a token directly.
-    """
-    # TODO: implement check_fully_consumed appropriately for concrete and abstract readers.
-
-    # If a combinator lens, pass to _put (which takes a token or reader)
-    # Now assume standard lens
-    # If not AR
-       # Normalise token.
-       # If not a store lens, raise exception - cannot put a token into non-store lens.
-       # pass to Lens._put (which takes a token, never a reader)
-    # Assume AR
-    #  If non-store
-    #    return non_store_value -> consumed string or default.
-    #  Else 
-    #    We must try several normalised tokens
-  
-    assert abstract_data != None, "Must have some kind of abstract data to PUT."
-   
-    # Note that there are two kinds of things we can be putting here: a single
-    # token, or a collection of tokens held within a stateful reader, from
-    # which our child lenses will put individual items (which themselves could
-    # be tokens or collections). So here we decide if we have been passed a
-    # token or a stateful token reader and set variables as such.
-    if isinstance(abstract_data, AbstractTokenReader) :
-      abstract_token_reader = abstract_data
-      token = None
-    else :
-      abstract_token_reader = None
-      # Set the token, making sure to normalise it if a token collection (especially, to include the specified label token)
-      abstract_data = self._preprocess_incoming_token(abstract_data, label=label)
-      token = abstract_data
-
-    # Again, as with get(), normalise the concrete input into a stateful reader.
-    if concrete_input :
-      concrete_input_reader = isinstance(concrete_input, str) and ConcreteInputReader(concrete_input) or concrete_input
-    else :
-      concrete_input_reader = None
-   
-    # Display what we are doing.
-    if IN_DEBUG_MODE :
-      type_of_data = abstract_token_reader and "ATR" or "Token"
-      if concrete_input_reader :
-        d("%s PUT: State -> (%s: %s, CR: '%s')" % (self, type_of_data, str(abstract_data), str(concrete_input_reader)))
-      else :
-        d("%s CREATE: State -> (%s: %s)" % (self, type_of_data, str(abstract_data)))
-   
-    #
-    # First off, the easy case: if we are a combinator lens, pass
-    # abstract_data, whether a token or a reader, straight through to PUT
-    # proper, since a combinator can handle a reader directly (i.e. *it* can
-    # decide how to consume the tokens from that reader).
-    #
-    if isinstance(self, CombinatorLens) :
-      with reader_rollback(abstract_data, concrete_input_reader) :
-        output = self._put(abstract_data, concrete_input_reader)
-        d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
-        return output
-
-    #
-    # Now we can assume we are dealing with a standard (non-combinator) lens,
-    # which will process a token, either directly or the next one read from a
-    # token reader.
-    #
-
-    #
-    # First handle the easy case, where we have a single token to PUT.
-    #
-    if token != None :  # None, since other valid values may evaluate to False
-      # A non-store lens is not allowed to be passed a token to PUT. 
-      if not self.store:
-        raise LensException("Not a store lens: cannot put a token.")
-     
-      d("Putting a single token: %s" % token)
-
-      # Call the specific lens' PUT function with the token, rolling back
-      # reader state if lens fails to put (e.g. if it doesn't match the parsing
-      # branch).
-      with reader_rollback(concrete_input_reader) :
-        output = self._put(token, concrete_input_reader)
-        d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
-        return output
-
-    #
-    # Now we can assume we are working with a standard (non-combinator) lens
-    # that has been passed an abstract token reader.
-    # 
-    assert(abstract_token_reader)
-
-    #
-    # If we are a non-store lens, we need either to output and consume the
-    # original concrete input or to output the default value of this lens if we
-    # are doing CREATE.
-    #
-    if not self.store :
-      # If PUT ...
-      if concrete_input_reader :
-        # Get the concrete text that this lens consumes with GET, by remembering the initial state.
-        start_position = concrete_input_reader.get_position_state()
-        self.get(concrete_input_reader) # Note, get() (i.e. BaseLens.get()) handles rollback for us.
-        output = concrete_input_reader.get_consumed_string(start_position)
-      # If CREATE ...
-      else :
-        if self.default == None :
-          # Note, if we used a plain Exception here, then an Or lens, say,
-          # could fail if not all lenses had a default, and so LensException
-          # allows the parent lens potentially to try several lenses until one
-          # of them has a default.
-          raise LensException("A default value must be set on this lens: %s." % (self))
-        output = self.default
-        
-      d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
-      return output
-   
-    #
-    # Now we assume that we are a STORE lens, and that we need potentially to
-    # try to PUT one of several next-tokens from the reader, due to possibility
-    # of having labelled tokens (i.e. parallel channels of next-tokens), and in
-    # some cases we do not know the label of the next token to be PUT (i.e.
-    # when we CREATE).
-    #
-    
-    #
-    # Find an appropriate set of candidate labels of next-tokens that may be
-    # PUT from the token reader.
-    #
-
-    # If our lens is itself a label (i.e. it STORES a label of some concrete
-    # container), we want only the label token of the container/collection
-    # represented by the token reader.
-    if self.is_label :
-      candidate_labels = [AbstractTokenReader.LABEL_TOKEN]
-    
-    # If our lens has a label with which to store a token, use this to
-    # retrieve the token.
-    elif self.label : 
-      candidate_labels = [self.label]
-    
-    # Now, supposing the token we are looking for does not have an explicit
-    # label (as in the case immediately above) but that this lens is a container of
-    # an is_label lens, such that we need to determine, by calling GET on the
-    # concrete input, the label of the token that we are to PUT back.
-    elif concrete_input_reader :
-      # Must roll this back once we have found the label, so we can shortly
-      # call put() (which again calls get()).  XXX This may be inefficient, but for
-      # now it seems to offer a clean design.
-      d("Looking for a label of the next token via GET.")
-      start_position = concrete_input_reader.get_position_state()
-      # Must be sure not to loose information (i.e. of group label) by
-      # post-processing the token
-      original_token = self.get(concrete_input_reader, postprocess_token=False) # get() will rollback if failed.
-      concrete_input_reader.set_position_state(start_position)
-      
-      # If GET gave us a collection, use its label (which could also be None).
-      if isinstance(original_token, AbstractCollection) :
-        candidate_labels = [original_token.get_label_token()]
-      # Otherwise, we know that this piece of concrete input is unlabelled.
-      else:
-        candidate_labels = [None]
-   
-    # So now, for the case of being a CREATE lens, we have more flexibility in
-    # which token to PUT, so we add several labels and so can soon have a
-    # tie-breaker to decide which to actually go with after some tentative
-    # attempts - for now, that tie-breaker is to favour the lens that generates
-    # the longest concrete output.
-    else :
-      # Candidates are any label (including None) in the abstract reader,
-      # excluding the LABEL_TOKEN, since we would have already handled this
-      # case when checking if our lens has is_label set.
-      candidate_labels = abstract_token_reader.position_state.keys()
-      if AbstractTokenReader.LABEL_TOKEN in candidate_labels :
-        candidate_labels.remove(AbstractTokenReader.LABEL_TOKEN)
-
-    # Show the candidate labels of next-tokens that this lens may attempt to PUT.
-    d("Candidate labels %s" % candidate_labels)
-
-    #
-    # Now try to PUT tokens with these labels, and go with the most favourable PUT.
-    #
-
-    # Remember the readers' state, before we start trying to PUT tokens, since
-    # we'll not commit until we've tried all the candidate tokens.
-    start_reader_state = get_readers_state(abstract_token_reader, concrete_input_reader)
-    best_output = None   # Will be a tuple -> (output, end_state)
-
-    #
-    # TODO: Since now non-store lenses are not considered here, it doesn't matter
-    # which lens, since all use a token, so just down to preference.
-    #
-
-    # For each candidate token label (which may also contain the None label).
-    for candidate_label in candidate_labels :
-      # Try to GET the token from the token reader, and continue to the next
-      # label if tokens with the current label have all been consumed from the
-      # reader.
-      d("Trying candidate label '%s'" % candidate_label)
-      try :
-        candidate_token = abstract_token_reader.get_next_token(label=candidate_label)
-      except LensException:
-        d("No tokens with candidate label '%s'" % candidate_label)
-        continue
-     
-      # Try to PUT the token; if fail, continue with next candidate label
-      try :
-        # Try to put the token, with the label which points to it, which could
-        # have been altered if, say, the token was moved in the abstract
-        # structure.
-        output = self.put(candidate_token, concrete_input_reader, label=candidate_label)
-        # Store this end-state if it generates more favourable concrete output, to break ties.
-        # XXX: This favouring could be configurable.
-        if not best_output or len(output) > best_output[0] :
-          best_output = (output, get_readers_state(abstract_token_reader, concrete_input_reader))
-      except LensException:
-        # Failed to put token, so record nothing.
-        pass
-      
-      # Then restore the initial state, for the next candidate label PUT attempt.
-      set_readers_state(start_reader_state, abstract_token_reader, concrete_input_reader)
-
-    # Choose the best output and use the state it left us in.
-    if best_output :
-      set_readers_state(best_output[1], abstract_token_reader, concrete_input_reader)
-      output = best_output[0]
-      d("Successfully %s: %s" % (concrete_input_reader and "PUT" or "CREATED", escape_for_display(output)))
-      return output
-    
-    # If we have no successful put, raise exception - this will happen when all tokens have been consumed.
-    raise LensException("%s store lens %s failed to put a token." % (concrete_input_reader and "PUT" or "CREATE", self))
-
-
-  
-  def create(self, abstract_data, label=None, check_fully_consumed=True) :
-    """Basically, this is PUT with no concrete input."""
-    return self.put(abstract_data, None, label=label, check_fully_consumed=check_fully_consumed)
-
-
-  #-------------------------
-  # For overriding
-  #
-  
-  def _get(self, concrete_input_reader) :
-    """This is where a sub-lense will do its GET work."""
-    raise NotImplementedError("in class %s" % self.__class__)
-
-  def _put(self, abstract_data, concrete_input_reader) :
-    """This is where a sub-lense will do its PUT work."""
-    raise NotImplementedError("in class %s" % self.__class__)
-  
-
-  #-------------------------
-  # operator overloads
-  #
-  
-  def __add__(self, other_lens): return And(self, self._preprocess_lens(other_lens))
-  def __or__(self, other_lens): return Or(self, self._preprocess_lens(other_lens))
-
-  # Reflected operators, so we can write: lens = "a string" + <some_lens>
-  def __radd__(self, other_lens): return And(self._preprocess_lens(other_lens), self)
-  def __ror__(self, other_lens): return Or(self._preprocess_lens(other_lens), self)
-
-  #-------------------------
-  # (Effectively) Private
-  #-------------------------
-
-  def _create_collection(self) :
-    """Creates a new collection for storing tokens based on this lens' type."""
-    collection_class = TokenTypeFactory.get_appropriate_collection_class(self.type)
-    return collection_class()
-
-  def _get_label_of_token(self, token, origin_lens) :
-    
-    """
-    Helper function.  Gets the label by which to store the specified token, which can come
-    from the token itself or from the lens.
-    """
-    
-    # If this token has a token label, use that, else check if the lens has a token.
-    label = None
-    if isinstance(token, AbstractCollection) :
-      label = token.get_label_token()
-    if not label and isinstance(origin_lens, Lens) :
-      label = origin_lens.label
-
-    return label
-  
-  #
-  # Pre- and post-processing functions to ensure internally tokens are
-  # normalised to strings or AbstractCollections, whilst allowing the user to
-  # use other types (e.g. int, float, list, dict, classes).
-  #
-
-  def _preprocess_incoming_token(self, token, label=None) :
-    """Normalise the token before it is PUT by the lens."""
-    token = TokenTypeFactory.normalise_incoming_token(token, self.type)
-    
-    # Roll the label into a AbstractCollection, for lenses that parse labels to be able to PUT back.
-    if label and isinstance(token, AbstractCollection) :
-      token.set_label_token(label, allow_overwrite=True) # If label exists from GET token, overwrite it.
-    
-    return token
-
-
-  def _postprocess_outgoing_token(self, abstract_data) :
-    """If this lens has an explicit type, try to coerce the abstract_data into that type."""
-    # Note that the data may be a single value or some collection of values.
-    return TokenTypeFactory.cast_outgoing_token(abstract_data, self.type) 
-
-
-  def _preprocess_lens(self, lens) :
-    """
-    Preprocesses a lens to ensure any type-to-lens conversion and for the
-    binding of recursive lenses.  This will be called before processing lens arguments.
-    """
-    lens = BaseLens.coerce_to_lens(lens)
-
-    d(str(lens))
-    return lens
-
-  #-------------------------
-  # For ambiguity checking.
-  # XXX: Work in progress
-  #
-
-  """These allow us to compute lenses that touch in the tree by returning the possible first leaf lenses under this lens."""
-  def get_first_lenses(self):
-    raise NotImplementedError("in class %s" % self.__class__)
-  def get_last_lenses(self):
-    raise NotImplementedError("in class %s" % self.__class__)
-
-  def _connect_to(self, other_lens) :
-    # Note, ignore duplicate, which can be cause by flattening Ands
-    if other_lens not in self._next_lenses :
-      d("Linking %s to %s" % (self, other_lens))
-      self._next_lenses.append(other_lens)
-      assert self not in other_lens._previous_lenses
-      other_lens._previous_lenses.append(self)
-
-  def _get_next_lenses(self) :
-    """Gets the set of possible next leaf lenses (i.e. the lenses that touch this lens)"""
-    return self._next_lenses
-  def _get_previous_lenses(self) :
-    """Gets the set of possible previous leaf lenses (i.e. the lenses that touch this lens)"""
-    return self._previous_lenses
-
-    
-  #-------------------------
-  # For debugging
-  #
-  
-  def _display_id(self) :
-    """Useful for identifying specific lenses when debugging."""
-    if self.name :
-      return self.name
-    # If no name, a hash gives us a reasonably easy way to distinguish lenses in debug traces.
-    return str(hash(self) % 256)
-
-  # String representation.
-  def __str__(self) :
-    # Bolt on the class name, to ease debugging.
-    return "%s(%s)" % (self.__class__.__name__, self._display_id())
-  __repr__ = __str__
-
-  def __instance_name__(self) :
-    """Used by nbdebug module to display a custom debug message context string."""
-    return self.name or self.__class__.__name__
-
 
   # XXX: I don't really like these forward declarations, but for now this does
   # the job.  Perhaps lenses can be registered with the framework for more
   # flexible coercion.
   @staticmethod
-  def coerce_to_lens(lens_operand):
+  def _coerce_to_lens(lens_operand):
     """
     Intelligently converts a type to a lens (e.g. string instance to a Literal
     lens) to ease lens definition; or a class or instance.
@@ -696,112 +226,56 @@ class BaseLens(object): # object, important to use new-style classes, for inheri
     elif inspect.isclass(lens_operand) and hasattr(lens_operand, "__lens__") :   
       lens_operand = Group(lens_operand.__lens__, type=lens_operand)
     
-    assert isinstance(lens_operand, BaseLens), "Unable to coerce %s to a lens" % lens_operand
+    assert isinstance(lens_operand, Lens), "Unable to coerce %s to a lens" % lens_operand
     return lens_operand
 
-
-
-class OldLens(BaseLens) :
-  """Base class of standard lenses, that can GET and PUT an abstract token."""
-  def __init__(self, store=None, label=None, is_label=False, default=None, name=None, **kargs) :
-    super(Lens, self).__init__(**kargs)
-
-    # If store is not set and we have or are a label, assume store=True; else False
-    if store == None: 
-      if is_label or label:
-        store = True
-      else:
-        store = False
-
-    self.store    = store     # Controls whether or not this lens returns or consumes a token in GET, PUT respectively.
-    self.label    = label     # Allows this lens to use a labelled token, for storage and retrival.
-    self.is_label = is_label  # If set, this lens' token will be used as a label for the current container.
-    self.default  = default   # Default output for CREATE, should this lens be acting as a non-store lens.
-    self.name     = name      # Specific name for this lens - useful only for debugging.
-
-
-  def _put(self, abstract_token, concrete_input_reader) :
+  def _preprocess_lens(self, lens) :
     """
-    Note that this lens expects to put an individual token, not a reader as
-    with CombinatorLens, which is the reason for redeclaring it here with the
-    arg now named abstract_token.
+    Preprocesses a lens to ensure any type-to-lens conversion and for the
+    binding of recursive lenses.  This will be called before processing lens arguments.
     """
-    raise NotImplementedError("in class %s" % self.__class__)
-
-  def get_first_lenses(self):
-    return [self]
-  def get_last_lenses(self):
-    return [self]
+    lens = Lens._coerce_to_lens(lens)
+    return lens
 
 
-class CombinatorLens(BaseLens) :
-  """
-  Base class of lenses that combine other lenses in some way and that may
-  choose how to consume tokens from a token reader
-  """
+
+  #-------------------------
+  # operator overloads
+  #
   
-  def _put(self, abstract_data, concrete_input_reader) :
-    """Note that this lens expects to be passed either an individual token or a reader."""
-    raise NotImplementedError("in class %s" % self.__class__)
+  def __add__(self, other_lens): return And(self, self._preprocess_lens(other_lens))
+  def __or__(self, other_lens): return Or(self, self._preprocess_lens(other_lens))
 
-  def _store_token(self, token, lens, token_collection):
-    """
-    Helper function which stores the given token, generated by the given lens,
-    appropriately (e.g. based on label, etc.) in the token collection.  The
-    reason for the complexity here is that we wish to avoid excessive nesting of
-    the abstract data structures, which would result from the natural nesting
-    of the grammar.
-
-    Note that we opt here to preserve such nesting only when explicitly
-    expressed through the Group lens, which basically can wrap a combinator
-    lens in a non-combinator lens.
-    """
-
-    # Do nothing with a None token.
-    if token == None :
-      return
-   
-    # Algorithm Outline
-    #  - We are about to add a token to our current collection
-    #  - The token may or may not be a collection itself
-    #  - The token-generating lens may or may not be a CombinatorLens
-    #  - Special case 1: If we have a combinator lens and this is a collection
-    #    - merge it into the current collection (to avoid by default excessive nesting)
-    #  - Special case 2: if a non-combinator lens and has is_label set, store as label token
-    #  - Otherwise, the token is going to be added with a label, which may be None:
-    #     So we need to decide the label:
-    #      - If GenericCollection, set label to key token or None
-    #      - else, set to lens label
-
-    d("Storing token %s" % token)
-
-    # Useful variables
-    lens_is_combinator = isinstance(lens, CombinatorLens)
-    token_is_collection = isinstance(token, AbstractCollection)
-    
-    # Check if this token (if a collection itself) should be merged (e.g. for
-    # nested Ands, OneOrMore, etc.).  Note that a CombinatorLens may not
-    # necessarily return a GenericCollection (e.g. Or)
-    if lens_is_combinator and token_is_collection :
-      token_collection.merge(token)
-      return
-      
-    # Handle the case where the token itself is a label for the current
-    # collection.  We check for non-combinator, since a non-combinator will
-    # have an is_label attribute.
-    if not lens_is_combinator and lens.is_label :
-      token_collection.set_label_token(token)
-      return
-
-    # Now look to see if the token has a label by which to store it.
-    label = self._get_label_of_token(token, lens)
-
-    # Now add the label to the collection - postprocessing the token, to make
-    # it easier for user manipulation (e.g. if the lens has type int, the user
-    # will see an int stored in their structure, etc.).
-    token_collection.add_token(lens._postprocess_outgoing_token(token), label)
+  # Reflected operators, so we can write: lens = "a string" + <some_lens>
+  def __radd__(self, other_lens): return And(self._preprocess_lens(other_lens), self)
+  def __ror__(self, other_lens): return Or(self._preprocess_lens(other_lens), self)
 
 
+
+  #-------------------------
+  # For debugging
+  #
+  
+  def _display_id(self) :
+    """Useful for identifying specific lenses when debugging."""
+    if self.name :
+      return self.name
+    # If no name, a hash gives us a reasonably easy way to distinguish lenses in debug traces.
+    return str(hash(self) % 256)
+
+  # String representation.
+  def __str__(self) :
+    # Bolt on the class name, to ease debugging.
+    return "%s(%s)" % (self.__class__.__name__, self._display_id())
+  __repr__ = __str__
+
+  def __instance_name__(self) :
+    """Used by nbdebug module to display a custom debug message context string."""
+    return self.name or self.__class__.__name__
+
+
+# XXX: Filler until we rmeove refs to it
+class CombinatorLens: pass
 
 
 ##################################################
@@ -814,12 +288,6 @@ class And(Lens) :
   def __init__(self, left_lens, right_lens, **kargs):
    
     super(And, self).__init__(**kargs)
-    self.lenses = []
-
-    # Preprocess lenses
-    # TODO
-    #left_lens = self._preprocess_lens(left_lens)
-    #right_lens = self._preprocess_lens(right_lens)
 
     # Flatten sub-lenses that are also Ands, so we don't have too much nesting,
     # which makes debugging lenses a nightmare.
@@ -828,19 +296,6 @@ class And(Lens) :
         self.lenses.extend(lens.lenses)
       else :
         self.lenses.append(lens)
-
-    return
-    
-    # ------------------------------------------- 
-    # Link the edge lenses to help with ambiguity checking.
-    for i in range(len(self.lenses)-1) :
-      lens = self.lenses[i]
-      next_lens = self.lenses[i+1]
-      for last_lens in lens.get_last_lenses() :
-        for first_lens in next_lens.get_first_lenses() :
-          # XXX: The next line is wrong, since a repeated lens may by adjacent to itself without problems.
-          #assert first_lens != last_lens, "Should never happen!"
-          last_lens._connect_to(first_lens)
 
 
   def _get(self, concrete_input_reader, current_container) :
@@ -868,7 +323,7 @@ class And(Lens) :
     # These tests flex the use of labels.
 
     d("GET")
-    lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str), type=list)
+    lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str), type=list, somearg="someval")
     got = lens.get("monkey")
     d(got)
     assert(got == ["m", "o"])
@@ -1451,16 +906,10 @@ class AnyOf(Lens) :
 
 class Group(Lens) :
   """
-  A lens that thinly wraps any lens as a non-combinator lens, for preserving
-  token groupings in the abstract structure
+  A convenience lens that thinly wraps any lens to set a type.
   """
 
   def __init__(self, lens, **kargs):
-    # There is little point in using a group if it is not to be stored, so
-    # automatically set it here.
-    if "store" not in kargs :
-      kargs["store"] = True
-    
     super(Group, self).__init__(**kargs)
     self.lens = self.coerce_to_lens(lens)
 
@@ -1473,6 +922,7 @@ class Group(Lens) :
   @staticmethod
   def TESTS() :
     
+    return
     d("GET")
     CONCRETE_STRING = "x=3;z=7;"
     assignment = AnyOf(alphas, is_label=True, store=True) + AnyOf("=", default="=") + AnyOf(nums, store=True) + AnyOf(";", default=";")
