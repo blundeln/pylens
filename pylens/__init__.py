@@ -335,36 +335,9 @@ class And(Lens) :
     d("CREATE")
     assert(lens.create(["d", "o"]) == "do")
  
-    return
-
-
-    d("GET")
-    lens = AnyOf(alphas, store=True) + AnyOf(nums, store=True, label="2nd_char") + AnyOf(alphas, store=True, is_label=True) + AnyOf(nums, store=True)
-    token = lens.get("m1x3p6", check_fully_consumed=False)
-    assert_match(str(token), "...<x> ->...")
-    assert_match(str(token), "...'2nd_char': ['1']...")
-    assert_match(str(token), "...None: ['m', '3']...")
-
-    d("PUT")
-    tokens = GenericCollection(["n", "8"])
-    tokens["2nd_char"] = "4"
-    output = lens.put(tokens, "p2w3z5", check_fully_consumed=False, label="g")
-    d(output)
-    assert output == "n4g8"
-
-    # CREATE
-    d("CREATE")
-    d(str(tokens))
-    output = lens.create(tokens, label="g")
-    assert output == "n4g8"
-    
-    d("TEST TYPE CASTING")
-    lens = And(AnyOf(alphas, store=True) + AnyOf(nums, store=True, type=int), AnyOf(alphas, store=True), type=list)
-    assert lens.get("m1x") == ["m", 1, "x"]
-    assert lens.put(["n", 4, "d"], "m1x") == "n4d"
     
 
-class Or(CombinatorLens) :
+class Or(Lens) :
   """
   This is the OR of two lenses.
 
@@ -598,7 +571,39 @@ class Or(CombinatorLens) :
     # We expect 'B', since reader does not force tokens on lens and the first AnyOf has no default, the next does,
     # which is 'B'
     assert output == "B"
-    
+   
+
+class Group(Lens) :
+  """
+  A convenience lens that thinly wraps any lens to set a type.
+  """
+
+  def __init__(self, lens, **kargs):
+    super(Group, self).__init__(**kargs)
+    self.lenses = [self._coerce_to_lens(lens)]
+
+  def _get(self, concrete_input_reader, current_container) :
+    return self.lenses[0].get(concrete_input_reader, current_container)
+
+  def _put(self, item, concrete_input_reader, current_container) :
+    return self.lenses[0].put(item, concrete_input_reader, current_container)
+
+  @staticmethod
+  def TESTS() :
+   
+    d("GET")
+    lens = Group(AnyOf(alphas,type=str) + AnyOf(nums, type=int), type=list)
+    got = lens.get("a2b3")
+    d(got)
+    assert(got == ["a", 2])
+
+    d("PUT")
+    assert(lens.put(["x", 4], "a2b3") == "x4")
+
+    d("CREATE")
+    assert(lens.put(["x", 4]) == "x4")
+
+
 
 class OneOrMore(CombinatorLens) :
   """Allows a lens to be repeated, indefinitely."""
@@ -903,55 +908,6 @@ class AnyOf(Lens) :
     assert lens.get("3") == 3
     assert lens.put(8, "3") == "8"
 
-
-class Group(Lens) :
-  """
-  A convenience lens that thinly wraps any lens to set a type.
-  """
-
-  def __init__(self, lens, **kargs):
-    super(Group, self).__init__(**kargs)
-    self.lens = self.coerce_to_lens(lens)
-
-  def _get(self, concrete_input_reader) :
-    return self.lens.get(concrete_input_reader)
-
-  def _put(self, abstract_token, concrete_input_reader) :
-    return self.lens.put(abstract_token, concrete_input_reader)
-
-  @staticmethod
-  def TESTS() :
-    
-    return
-    d("GET")
-    CONCRETE_STRING = "x=3;z=7;"
-    assignment = AnyOf(alphas, is_label=True, store=True) + AnyOf("=", default="=") + AnyOf(nums, store=True) + AnyOf(";", default=";")
-    lens = OneOrMore(Group(assignment, store=True))
-    token = lens.get(CONCRETE_STRING, check_fully_consumed=False)
-    assert token["x"][0] == "3" and token["z"][0] == "7"
-
-    d("PUT")
-    token["x"] = ["2"]
-    output = lens.put(token, CONCRETE_STRING)
-    d(output)
-    assert output == "x=2;z=7;"
-
-    d("CREATE")
-    output = lens.create(token)
-    assert output == "x=2;z=7;"
-  
-    d("TYPE CASTING TEST")
-    values = List(AnyOf(nums, store=True, type=int), ",")
-    assign = Group(AnyOf(alphas, is_label=True) + "=" + values + ";", type=list)
-    lens = OneOrMore(assign, type=dict)
-    token = lens.get("x=1,2,3,4,5;y=2,4,6,8;")
-    d(token)
-    assert token == {"x":[1,2,3,4,5], "y":[2,4,6,8]}
-
-    output = lens.create({"o":[1,3,5], "e":[2,4,6]})
-    d(output)
-    # Will be one way around or the other, but some probably find a more deterministic way.
-    assert output == "o=1,3,5;e=2,4,6;" or output == "e=2,4,6;o=1,3,5;"
 
 
 class CombineChars(Lens) :
