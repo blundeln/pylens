@@ -1,8 +1,5 @@
-NOTES
- - When does an aggregate lens need to distinguish itself as a store lens, if at all?
-  - Or is interesting
-  - in BaseLens.get() store is checked to decide whether or not to store the token if there is a token
-    - Thus, Or should be store if at least one lens is a store to ensure it gets stored.
+RESEARCH NOTES
+  - Find solution to efficient object rollback, avoiding blanket deepcopy - use aspects, perhaps?
 
 Links
 -----

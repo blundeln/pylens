@@ -154,6 +154,7 @@ class AbstractContainer(Rollbackable) :
     raise NotImplementedError()
 
   def consume_item(self, meta_data) :
+    # Must consume something, else raise NoTokenToConsumeException.
     raise NotImplementedError()
 
   def unwrap(self) :
@@ -236,10 +237,10 @@ class ContainerFactory:
   @staticmethod
   def wrap_container(incoming_object) :
     """Wraps a container if possible."""
-    d("Wrapping %s" % incoming_object)
     if incoming_object == None or issubclass(type(incoming_object), AbstractContainer) :
       return incoming_object
     
+    d("Wrapping %s" % incoming_object)
     container_class = ContainerFactory.get_container_class(type(incoming_object))
     if container_class == None :
       return None

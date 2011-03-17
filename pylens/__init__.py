@@ -37,16 +37,21 @@ from readers import *
 
 class Meta:
   LENS = "LENS"
-  START_POS = "START_POS"
+  CONCRETE_INPUT_READER = "CONCRETE_READER"
 
 class Lens(object) :
   
-  def __init__(self, type=None, name=None) :
+  def __init__(self, type=None, name=None, default=None, **keywords) :
     # Set python type of lense data and a name, for debugging.
     self.type = type
     self.name = name
+    if has_value(type) and has_value(default) :
+      raise Exception("Cannot set a default value on a lens with a type.")
+    self.default = default
+    self.keywords = keywords
 
   def has_type(self) :
+    """Determines if this lens will GET and PUT a variable - a STORE lens."""
     return self.type != None
 
   def _normalise_concrete_input(self, concrete_input) :
@@ -58,153 +63,126 @@ class Lens(object) :
     else :
       return concrete_input
 
+  def _get_container_class(self) :
+    # Try to get a container class appropriate for this lens' type, which may be None
+    return ContainerFactory.get_container_class(self.type)
+
 
   def get(self, concrete_input, current_container=None) :
       """
       """
-      # Algorithm
-      #
-      # If we are a store lens
-      #   if we have a type with an associated container
-      #     Replace the current container with a new one of our type
-      #   else
-      #     set current container to None, to avoid mistakes.
-      #
-      # Call get proper (_get) for this particular lens.
-      #
-      # If not a store lens, return no abstract item (though sub-lenses may have
-      # stored abstract items in the current container)
-      #
-      # Return the post-processed abstract_item based on lens type
-      #   e.g. int, float, list, dict.
-
-
+      
       # Ensure we have a ConcreteInputReader
       concrete_input_reader = self._normalise_concrete_input(concrete_input)
-      assert(concrete_input_reader != None)
-
-      # If we are passed the current container, ensure it is wrapped as an AbstractContainer
-      current_container = ContainerFactory.wrap_container(current_container)
-
-      # Show what we are doing.
-      d("%s GET: CR -> '%s'" % (self, str(concrete_input_reader)))
-     
-
-      # Try to get a container class appropriate for this lens' type.
-      container_class = ContainerFactory.get_container_class(self.type)
-
-      if self.has_type() :
-        # We are a store lens, so will either discard the current container or
-        # create our own container, depending on the type of our lens.
-        if container_class == None :
-          current_container = None
-        else :
-          current_container = container_class()
-
-      # Now call 'get' proper to consume the input and parse a token, whether a
-      # store or not.
-      abstract_item = self._get(concrete_input_reader, current_container=current_container)
-     
-      # If we are not a (direct) store lens, return nothing to our caller.
-      if not self.has_type() :
-        return None
-
-      d(abstract_item)
-
-      if hasattr(abstract_item, "unwrap") :
-        return abstract_item.unwrap()
-      else:
-        # TODO: Must also allow simple type conversion.
-        return abstract_item
-    
-
-
-
-      # OLD =============================================
-      start_position = concrete_input_reader.get_pos()
-      with reader_rollback(concrete_input_reader) :
-        abstract_data = self._get(concrete_input_reader)
-
-      # Return nothing if this lens is not a STORE lens, since it extracts no
-      # abstract data type.  However, if we have a combinator, we always return what it returns (e.g. an empty
-      # container, a token from a sub-lens).
-      if isinstance(self, Lens) :
-        if self.store :
-          assert abstract_data != None, "Should have got something here from our lens."
-        else :
-          return None
+      assert(has_value(concrete_input_reader))
       
-      if IN_DEBUG_MODE :
-        consumed_input = concrete_input_reader.get_consumed_string(start_position)
-        if abstract_data :
-          abstract_data_string = isinstance(abstract_data, str) and escape_for_display(abstract_data) or abstract_data
-        else :
-          abstract_data_string = "[NOTHING]"
-        d("GOT '%s' -> %s" % (escape_for_display(consumed_input), abstract_data_string))
+      # The abstract item we will extract from the concret input.
+      item = None
 
+      # Get the appropriate container class for our lens, if there is one.
+      container_class = self._get_container_class()
 
-      # If we expect full consuption of the conrete input, flag what has been
-      # left un-consumed.
-      if check_fully_consumed and not concrete_input_reader.is_fully_consumed() :
-        raise Exception("Concrete string not fully consumed: remaining: %s" % concrete_input_reader.get_remaining())
-      
-     
-      # All lenses internally deal with tokens, since a token can hold the data
-      # and any meta-data, such as the token's label.  At the API level, the
-      # user will be concerned only with the native abstract data (e.g. a class,
-      # an int, etc.), so we allow optional postprocessing before the data is
-      # returned.
-      if postprocess_token :
-        return self._postprocess_outgoing_token(t_data)
+      # If we are a container type (e.g. a list or some other AbstractContainer)...
+      if container_class :
+        # Replace the current container of sub-lenses with our own.
+        new_container = container_class()
+
+        # Call get proper, though a container lens' GET proper should not return
+        # an item, since its sub-lenses may add items to the current_container.
+        assert(self._get(concrete_input_reader, new_container) == None)
+
+        # Since we created the container, we will return it as our item,
+        # checking it has the corrent type.
+        item = new_container.unwrap()
+        assert(type(item) == self.type)
+
       else :
-        return abstract_data
+        # Call GET proper with the current container.
+        item = self._get(concrete_input_reader, current_container)
 
-  def put(self, abstract_item=None, concrete_input=None, current_container=None) :
+        # Any lens may return an item, though a lens with a type MUST return an
+        # item of its specified type.
+        if self.has_type() :
+          assert(has_value(item))
+          # Cast the type (e.g. to an int, float).
+          item = self.type(item)
+        
+      return item
+      
+
+  def put(self, item=None, concrete_input=None, current_container=None) :
+    
     # Algorithm
     #
-    # Normalise input.
+    # We will be passed either an item to PUT or a container from which to PUT
+    # an item directly or by some descendant lens.
     #
-    # If we are a store lens
-    #   (Expect to be passed abstract_item)
-    #   if we are a container type lens
-    #     expect to replace current container with wrapped abstract_item
-    #     set abstract_item to None to avoid mistakes
-    #   else
-    #     set current container to None to avoid mistakes.
-    # else
-    #   assert abstract_item == False and current_container != None
+    # If we are a typed lens (i.e. a STORE lens) we will expect to put an item
+    # into our PUT proper function (_put) and discared the current container
+    # from that branch.
+    #   To simplify specific lens definition, we can pluck an item from the
+    #   container and pass it to _put
+    #   Though if we are a container lens (e.g. list, dict, etc.), we can wrap
+    #   the item as a AbstractContainer and replace the current_container.
     #
-    # now call put proper (_put) and return the output
+    # If we are not a typed lens, we have nothing special to do, so simply pass
+    # on the arguments to our PUT proper function
 
-    # Ensure we have a ConcreteInputReader
+    # If there is no concrete input (i.e. for CREATE) and we have a default value, return it.
+    if concrete_input == None and has_value(self.default) :
+      return str(self.default)
+
+    # Ensure we have a ConcreteInputReader, otherwise None (for CREATE mode).
     concrete_input_reader = self._normalise_concrete_input(concrete_input)
-    assert(concrete_input_reader != None)
 
-
-    # Show what we are doing.
-    #d("%s GET: CR -> '%s'" % (self, str(concrete_input_reader)))
-   
-    # Try to get a container class appropriate for this lens' type.
-    container_class = ContainerFactory.get_container_class(self.type)
+    output = None
     
+    # If we are a typed lens, we will expect to PUT an item.
     if self.has_type() :
-      # If we are a store lens, we should be passed an item to PUT.  If we are a
-      # container-type lens, then we will ensure this is wrapped in an
-      # AbstractContainer.
-      assert(abstract_item != None)
-      if container_class == None :
-        current_container = None    # To avoid mistakes.
-      else :
-        current_container = ContainerFactory.wrap_container(abstract_item)
-        abstract_item = None        # To avoid mistakes.
-    else:
-      assert(abstract_item == None and current_container != None)
-      # If we are passed the current container, ensure it is wrapped as an AbstractContainer
-      current_container = ContainerFactory.wrap_container(current_container)
+      # To simplify _put definition, if we were not passed an item, try to pluck
+      # one from the current container.
+      if not has_value(item) :
+        storage_meta_data = self._get_storage_meta_data(concrete_input_reader)
+        item = current_container.consume_item(storage_meta_data)
 
-    # Now call PUT proper.
-    return self._put(abstract_item, concrete_input_reader, current_container)
+      # We should now have an item suitable for PUTing with our lens.
+      assert(has_value(item))
+      assert(type(item) == self.type)
+
+      # Now, the item could be a container (e.g. a list, dict, or some other
+      # AbstractContainer), so to save the _put definition from having to wrap
+      # it for stateful consumption of items, let's do it here.
+      item_as_container = ContainerFactory.wrap_container(item)
+      if item_as_container :
+        # The item is now represted as a consumable container.
+        item = None
+        current_container = item_as_container
+      else :
+        # When PUTing a non-container item, should cast to string (e.g. if int
+        # passed) and discard current container.
+        item = str(item)
+        current_container = None
+
+    # Now call PUT proper on our lens.
+    output = self._put(item, concrete_input_reader, current_container)
+      
+
+    # Return the output, checking it is a string.
+    assert(type(output) == str)
+    return output
     
+
+  def create(self, item=None, current_container=None) :
+    return self.put(item, None, current_container)
+
+  def _get_storage_meta_data(self, concrete_input_reader) :
+     # Create some basic meta data to help with storing and retrieving the item.
+    meta_data = {
+      Meta.LENS: self, # Container can use attributes of lens.
+      Meta.CONCRETE_INPUT_READER: concrete_input_reader, # For flexible matching.
+    }
+    return meta_data
+
 
   def _get_and_store_item(self, lens, concrete_input_reader, container) :
     """
@@ -213,16 +191,10 @@ class Lens(object) :
     retrieved.
     """
 
-    # Create some basic meta data to help with storing the item.
-    meta_data = {
-      Meta.LENS: lens,
-      Meta.START_POS: concrete_input_reader.get_pos(),
-    }
-    abstract_item = lens.get(concrete_input_reader, current_container=container)
-    if lens.has_type() :
-      # Expect to get some data from a store lens.
-      assert(abstract_item != None)
-      container.store_item(abstract_item, meta_data)
+    storage_meta_data = lens._get_storage_meta_data(concrete_input_reader)
+    item = lens.get(concrete_input_reader, current_container=container)
+    if has_value(item) :
+      container.store_item(item, storage_meta_data)
 
   #-------------------------
   # For debugging
@@ -873,64 +845,23 @@ class And(Lens) :
 
   def _get(self, concrete_input_reader, current_container) :
     """
-    Returns a collection of tokens obtained by sequentially looping through the
-    ANDed lenses.
+    Sequential GET on each lens.
     """
-    # Store tokens for each lens.
     for lens in self.lenses :
       self._get_and_store_item(lens, concrete_input_reader, current_container)
-    
-    return current_container
+
+    # Should not return anything, since we work on the container!
 
 
-  def _put(self, abstract_item, concrete_input_reader, current_container) :
+  def _put(self, item, concrete_input_reader, current_container) :
     
     # Simply concatenate output from the sub-lenses.
     output = ""
     for lens in self.lenses :
-      # If lens is a store lens, get an abstract item to put
-      if lens.has_type() :
-        # TODO: Need to build up meta data
-        meta_data = self._get_meta_data(lens)
-        consumed_item = current_container.consume_item({})
-      else :
-        consumed_item = None
-      
-      # Call put
-      output += lens.put(consumed_item, concrete_input_reader, current_container)
+      output += lens.put(item, concrete_input_reader, current_container)
 
     return output
     
-   
-
-
-
-
-    
-    # If we already have a token reader, AND will pass that directly on to its
-    # sub-lenses, since collections are flattened on lens construction (i.e. we
-    # do not by default have collections of collections).
-    if isinstance(abstract_data, AbstractTokenReader) :
-      abstract_token_reader = abstract_data
-    elif isinstance(abstract_data, AbstractCollection) :
-      abstract_token_reader = AbstractTokenReader(abstract_data)
-    else :
-      raise LensException("Expected a collection token or a token reader.")
-
-    # Simply concatenate output from the sub-lenses.
-    output = ""
-    for lens in self.lenses :
-      output += lens.put(abstract_token_reader, concrete_input_reader)
-
-    return output
-
-
-  def get_first_lenses(self):
-    return self.lenses[0].get_first_lenses()
-
-  def get_last_lenses(self):
-    return self.lenses[-1].get_last_lenses()
-
 
   @staticmethod
   def TESTS() :
@@ -938,11 +869,17 @@ class And(Lens) :
 
     d("GET")
     lens = And( AnyOf(alphas, type=str), AnyOf(alphas, type=str), type=list)
-    assert(lens.get("monkey") == ["m", "o"])
-    
+    got = lens.get("monkey")
+    d(got)
+    assert(got == ["m", "o"])
     
     d("PUT")
     assert(lens.put(["d", "o"], "monkey") == "do")
+ 
+ 
+    d("CREATE")
+    assert(lens.create(["d", "o"]) == "do")
+ 
     return
 
 
@@ -1463,12 +1400,12 @@ class AnyOf(Lens) :
     return char
 
 
-  def _put(self, abstract_item, concrete_input_reader, current_container) :
+  def _put(self, item, concrete_input_reader, current_container) :
     # If this is PUT (vs CREATE) then first consume input.
     if concrete_input_reader :
       self.get(concrete_input_reader)
-    lens_assert(isinstance(abstract_item, str) and len(abstract_item) == 1 and self._is_valid_char(abstract_item), "Invalid abstract_item '%s', expected %s." % (abstract_item, self._display_id()))
-    return abstract_item
+    lens_assert(isinstance(item, str) and len(item) == 1 and self._is_valid_char(item), "Invalid item '%s', expected %s." % (item, self._display_id()))
+    return item
 
 
   def _is_valid_char(self, char) :
@@ -1499,15 +1436,15 @@ class AnyOf(Lens) :
     output = lens.put("d", "monkey")
     d(output)
     assert output == "d"
-    return
     
     d("CREATE")
+    lens = AnyOf(alphas, default="x")
     output = lens.create("x")
     d(output)
     assert output == "x"
 
     d("TEST type coercion")
-    lens = AnyOf(nums, store=True, type=int)
+    lens = AnyOf(nums, type=int)
     assert lens.get("3") == 3
     assert lens.put(8, "3") == "8"
 
