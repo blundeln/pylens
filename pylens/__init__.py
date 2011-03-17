@@ -46,7 +46,7 @@ class Lens(object) :
     self.type = type
     self.name = name
 
-  def is_store_lens(self) :
+  def has_type(self) :
     return self.type != None
 
   def _normalise_concrete_input(self, concrete_input) :
@@ -93,7 +93,7 @@ class Lens(object) :
       # Try to get a container class appropriate for this lens' type.
       container_class = ContainerFactory.get_container_class(self.type)
 
-      if self.is_store_lens() :
+      if self.has_type() :
         # We are a store lens, so will either discard the current container or
         # create our own container, depending on the type of our lens.
         if container_class == None :
@@ -102,13 +102,11 @@ class Lens(object) :
           current_container = container_class()
 
       # Now call 'get' proper to consume the input and parse a token, whether a
-      # store or not, and if there is a parsing exception, we rollback the
-      # reader state.
-      with automatic_rollback(concrete_input_reader) :
-        abstract_item = self._get(concrete_input_reader, current_container=current_container)
+      # store or not.
+      abstract_item = self._get(concrete_input_reader, current_container=current_container)
      
       # If we are not a (direct) store lens, return nothing to our caller.
-      if not self.is_store_lens() :
+      if not self.has_type() :
         return None
 
       d(abstract_item)
@@ -189,7 +187,7 @@ class Lens(object) :
     # Try to get a container class appropriate for this lens' type.
     container_class = ContainerFactory.get_container_class(self.type)
     
-    if self.is_store_lens() :
+    if self.has_type() :
       # If we are a store lens, we should be passed an item to PUT.  If we are a
       # container-type lens, then we will ensure this is wrapped in an
       # AbstractContainer.
@@ -205,12 +203,9 @@ class Lens(object) :
       current_container = ContainerFactory.wrap_container(current_container)
 
     # Now call PUT proper.
-    with automatic_rollback(concrete_input_reader, current_container) :
-      return self._put(abstract_item, concrete_input_reader, current_container)
+    return self._put(abstract_item, concrete_input_reader, current_container)
     
 
-
-  # TODO: Perhaps this can go in a specialised class for lenses that work on containers.
   def _get_and_store_item(self, lens, concrete_input_reader, container) :
     """
     Common function for storing an item in a container with useful meta data
@@ -224,7 +219,7 @@ class Lens(object) :
       Meta.START_POS: concrete_input_reader.get_pos(),
     }
     abstract_item = lens.get(concrete_input_reader, current_container=container)
-    if lens.is_store_lens() :
+    if lens.has_type() :
       # Expect to get some data from a store lens.
       assert(abstract_item != None)
       container.store_item(abstract_item, meta_data)
@@ -894,7 +889,9 @@ class And(Lens) :
     output = ""
     for lens in self.lenses :
       # If lens is a store lens, get an abstract item to put
-      if lens.is_store_lens() :
+      if lens.has_type() :
+        # TODO: Need to build up meta data
+        meta_data = self._get_meta_data(lens)
         consumed_item = current_container.consume_item({})
       else :
         consumed_item = None

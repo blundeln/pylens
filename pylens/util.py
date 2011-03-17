@@ -56,7 +56,10 @@ def range_truncate(s, max_len=10) :
     return s
   if len(s) > max_len :
     return s[0:3] + "..." + s[-3:]
-  
+
+def has_value(var) :
+  """To avoid possible comparison bugs with empty values vs None."""
+  return var != None
 
 def assert_match(input_string, template) :
   """Flexible check to see if a string matches a template containing ellipses, for debugging."""
