@@ -30,7 +30,8 @@
 # Description:
 #   Stateful string reader classes (i.e. that can be rolled back for tentative parsing)
 #
-from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
+#from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
+from debug import *
 from exceptions import *
 from util import *
 from containers import *

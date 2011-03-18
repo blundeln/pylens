@@ -30,7 +30,7 @@
 # Description:
 #   Utilities of global use.
 #
-from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
+from debug import *
 
 def escape_for_display(s) :
   if not IN_DEBUG_MODE :

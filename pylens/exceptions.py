@@ -32,7 +32,7 @@
 # Description:
 # 
 #
-from nbdebug import *
+from debug import *
 
 # Thrown when tentative object state should be rolled back.
 class RollbackException(Exception): pass

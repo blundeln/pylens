@@ -36,15 +36,10 @@ from readers import *
 from util import *
 from charsets import *
 
-# Perhaps can simply be a class.
-class Meta:
-  LENS = "LENS"
-  CONCRETE_INPUT_READER = "CONCRETE_READER"
-
 
 #########################################################
 # Base Lens
-#
+#########################################################
 
 class Lens(object) :
   
@@ -276,10 +271,9 @@ class Lens(object) :
     return self.name or self.__class__.__name__
 
 
-
-##################################################
+#########################################################
 # Core lenses
-#
+#########################################################
     
 class And(Lens) :
   """A lens that is formed from the ANDing of two sub-lenses."""
@@ -333,8 +327,7 @@ class And(Lens) :
  
     d("CREATE")
     assert(lens.create(["d", "o"]) == "do")
- 
-    
+
 
 class Or(Lens) :
   """
@@ -449,38 +442,6 @@ class Or(Lens) :
     d("CREATE")
     assert(lens.create(5) == "5")
     assert(lens.create("a") == "a")
-    
-   
-
-class Group(Lens) :
-  """
-  A convenience lens that thinly wraps any lens to set a type.
-  """
-
-  def __init__(self, lens, **kargs):
-    super(Group, self).__init__(**kargs)
-    self.lenses = [self._coerce_to_lens(lens)]
-
-  def _get(self, concrete_input_reader, current_container) :
-    return self.lenses[0].get(concrete_input_reader, current_container)
-
-  def _put(self, item, concrete_input_reader, current_container) :
-    return self.lenses[0].put(item, concrete_input_reader, current_container)
-
-  @staticmethod
-  def TESTS() :
-   
-    d("GET")
-    lens = Group(AnyOf(alphas,type=str) + AnyOf(nums, type=int), type=list)
-    got = lens.get("a2b3")
-    d(got)
-    assert(got == ["a", 2])
-
-    d("PUT")
-    assert(lens.put(["x", 4], "a2b3") == "x4")
-
-    d("CREATE")
-    assert(lens.put(["x", 4]) == "x4")
 
 
 class AnyOf(Lens) :
@@ -552,3 +513,34 @@ class AnyOf(Lens) :
     lens = AnyOf(nums, type=int)
     assert lens.get("3") == 3
     assert lens.put(8, "3") == "8"
+
+
+class Group(Lens) :
+  """
+  A convenience lens that thinly wraps any lens to set a type.
+  """
+
+  def __init__(self, lens, **kargs):
+    super(Group, self).__init__(**kargs)
+    self.lenses = [self._coerce_to_lens(lens)]
+
+  def _get(self, concrete_input_reader, current_container) :
+    return self.lenses[0].get(concrete_input_reader, current_container)
+
+  def _put(self, item, concrete_input_reader, current_container) :
+    return self.lenses[0].put(item, concrete_input_reader, current_container)
+
+  @staticmethod
+  def TESTS() :
+   
+    d("GET")
+    lens = Group(AnyOf(alphas,type=str) + AnyOf(nums, type=int), type=list)
+    got = lens.get("a2b3")
+    d(got)
+    assert(got == ["a", 2])
+
+    d("PUT")
+    assert(lens.put(["x", 4], "a2b3") == "x4")
+
+    d("CREATE")
+    assert(lens.put(["x", 4]) == "x4")

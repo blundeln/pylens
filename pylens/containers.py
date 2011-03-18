@@ -34,8 +34,15 @@
 #
 import inspect
 import copy
-from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
+from debug import *
 from exceptions import *
+
+
+# Perhaps can simply be a class.
+class Meta:
+  LENS = "LENS"
+  CONCRETE_INPUT_READER = "CONCRETE_READER"
+
 
 
 class Rollbackable(object) :
