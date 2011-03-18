@@ -45,6 +45,10 @@ class Rollbackable(object) :
   solutions later (e.g. copy-before-modify).
   """
 
+
+  # XXX: Do we always need to copy on get AND set? Have to careful that original state is not set.
+  # Basically need to make sure that original state cannot be modified
+  # Perhaps add copy-flag
   def _get_state(self) :
     return copy.deepcopy(self.__dict__)
 

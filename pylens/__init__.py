@@ -146,7 +146,8 @@ class Lens(object) :
 
       # We should now have an item suitable for PUTing with our lens.
       assert(has_value(item))
-      assert(type(item) == self.type)
+      if type(item) != self.type :
+        raise LensException("This lens cannot PUT and item of that type")
 
       # Now, the item could be a container (e.g. a list, dict, or some other
       # AbstractContainer), so to save the _put definition from having to wrap
@@ -348,7 +349,6 @@ class Or(Lens) :
   
   def __init__(self, left_lens, right_lens, **kargs):
     super(Or, self).__init__(**kargs)
-    self.lenses = []
     left_lens = self._preprocess_lens(left_lens)
     right_lens = self._preprocess_lens(right_lens)
 
@@ -360,217 +360,98 @@ class Or(Lens) :
         self.lenses.append(lens)
 
 
-  def _get(self, concrete_input_reader) :
-  
-    # Algorithm Outline
-    #  - More than one lens may match
-    #    - Consider AnyOf(alpha) | Empty() -> Empty() will always match
-    #    - So test all, and return longest match (i.e. progresses the concrete input the furthest) if several match
-    #    - If matches are same length, return firstmost match.
-    #  - Note that we must be careful to differentiate between failing to get a token and getting a None token (e.g from Empty())
-    # XXX: Perhaps could toggle greedy/non-greedy (i.e. order priority) GET per Or() instance.
-
-    # Remember the starting state (position) of the concrete reader.
-    concrete_start_state = concrete_input_reader.get_position_state()
+  def _get(self, concrete_input_reader, current_container) :
     
-    # Try all lenses and store token and end_state
-    best_match = None
+    # Try each lens until the firstmost succeeds.
     for lens in self.lenses :
       try :
-        token = lens.get(concrete_input_reader)
-        end_state = concrete_input_reader.get_position_state()
-        # Check if this is the best match so far, favouring firstmost lenses if equal lengthed parse.
-        if not best_match or end_state > best_match[1] :
-          best_match = [token, end_state]
+        with automatic_rollback(concrete_input_reader, current_container) :
+          return lens.get(concrete_input_reader, current_container)
       except LensException:
         pass
-      
-      # Ensure the reader is at the start state for each lens to parse afresh.
-      concrete_input_reader.set_position_state(concrete_start_state)
-
-    lens_assert(best_match != None, "Or should match at least one of the lenses")
-
-    # Restore the end state of the best match and return the token.
-    concrete_input_reader.set_position_state(best_match[1])
-    return best_match[0]
-
-  def _put(self, abstract_data, concrete_input_reader) :
- 
-    # Algorithm Outline
-    #   We may be passed a Token or an AbstractTokenReader
-    #   PUT and CREATE:
-    #   - Try to (straight) PUT all the lenses and use the firstmost success, favouring lenses that consume abstract tokens.
-    #   - Do this first, since we prefer to weave abstract data back into their concrete structure.
-    #   PUT
-    #   - BUT, if all PUTs fail, try cross-PUTting: GET left lense then CREATE RL, then GET RL CREATE LL - could put this with the CREATE -
-    #     since we may have change the abstract from one token type to the other.
-    # TODO: Should put longest, perhaps first-most more intuitive for lens designers, so they have some control.
-    # TODO: Need to think about recursive lenses, defined with Forward.
-    #        Cold process Forward lenses last, but what if we have two forward
-    #        lenses?
-    
-    # Set variable appropriately if we have a token reader (as opposed to a single token).
-    if isinstance(abstract_data, AbstractTokenReader) :
-      abstract_token_reader = abstract_data
-    else :
-      abstract_token_reader = None
-
-    # Remember the starting state of the readers - note, conveniently this does nothing if readers are None.
-    start_readers_state = get_readers_state(abstract_token_reader, concrete_input_reader)
-
-    d("Trying STRAIGHT PUT.")
-    # Try all lenses and store reader and end_state of the longest PUT
-    # This handles straight PUTs (vs. cross PUTs) and CREATE (when concrete_input_reader == None)
-    best_PUT = None
-    lens_consumed_tokens = False # Records if a certain lens consumed a token.
-    for lens in self.lenses :
-
-      try :
-        # Try PUT on the lens and upon success record the end state.
-        output = lens.put(abstract_data, concrete_input_reader)
-        end_state = get_readers_state(abstract_token_reader, concrete_input_reader)
         
-        # If we are dealing with an AbstractTokenReader, then check to see if
-        # the lens consumed any tokens.  otherwise, we assume that it did,
-        # since otherwise the PUT (of a specific token) would fail before we
-        # got here.
-        if abstract_token_reader :
-          lens_consumed_tokens = start_readers_state[0] != end_state[0]
-        else :
-          lens_consumed_tokens = True
+    raise LensException("We should have GOT one of the lenses.")
 
-        # Update the best action: we prefer the first-most lens that consumes tokens.
-        if not best_PUT or (lens_consumed_tokens and not best_PUT[2]) : 
-          best_PUT = [output, end_state, lens_consumed_tokens]
-          d("BEST straight put: %s" % best_PUT)
-          # TODO: Hmmm, but we didn't try the other lens?
-          if lens_consumed_tokens : break # We have what we want.
+
+  def _put(self, item, concrete_input_reader, current_container) :
+    
+    # First we try a straight PUT (i.e. the lens both consumes from input and puts from the container)
+    for lens in self.lenses :
+      try :
+        with automatic_rollback(concrete_input_reader, current_container) :
+          return lens.put(item, concrete_input_reader, current_container)
+      except LensException:
+        pass
+
+    # Failing a straight PUT we need to do a GET with one lens then CREATE with another.
+    # Note that, though we will not use any items from the GET it must be allowed to modify a copy of current_container.
+    # This means that the successful GET may consume from the concrete input, though must have its changes to the container
+    # discarded.
+
+
+    # Now, if we fail a straight put, we must GET with one lens (to consume
+    # input, not to store any items), then CREATE with another; so we must make
+    # sure to revert the container after a successful GET.  It is tempting here
+    # to create a dummy container rather than copying it, but we might later
+    # define lenses that can alter their behaviour based on the current state of
+    # the container.
+    if has_value(current_container): container_start_state = current_container._get_state()
+    input_start_state = concrete_input_reader._get_state()
+    GET_succeeded = False
+    for lens in self.lenses :
+      try :
+        lens.get(concrete_input_reader, current_container)
+        # If we got here, get succeeded, so revert container - though keep the
+        # input reader as it is: with some input consumed by this lens.
+        if has_value(current_container) : current_container._set_state(container_start_state)
+        GET_succeeded = True
+        break
       except LensException:
         pass
       
-      # For each lens, ensure the readers state is reset back to the start state.
-      set_readers_state(start_readers_state, abstract_token_reader, concrete_input_reader)
-      
-    # If already we have a PUT that consumed a token, go with those results.
-    if best_PUT and best_PUT[2]:
-      # Commit to the best end-state.
-      set_readers_state(best_PUT[1], abstract_token_reader, concrete_input_reader)
-      return best_PUT[0]
+      # Revert the container AND input reader, ready to try the next lens.
+      if has_value(current_container) : current_container._set_state(container_start_state)
+      concrete_input_reader._set_state(input_start_state)
 
-    # Handle cross PUTs, which GET (consume) from one lens and CREATE with another.
-    if concrete_input_reader :
-      d("Trying CROSS PUT.")
-      for GET_lens in self.lenses:
-        for CREATE_lens in self.lenses :
-          if CREATE_lens == GET_lens :
-            continue # Already tried straight PUTs
-          
-          try :
-            # Consume with the GET lens, discarding any tokens.
-            GET_lens.get(concrete_input_reader)
-            # CREATE with the CREATE lens.
-            output = CREATE_lens.create(abstract_data)
-            # Record the end state, if successful.
-            end_state = get_readers_state(abstract_token_reader, concrete_input_reader)
-            
-            # Again, when we have a reader, check if tokens were consumed, so that we might prioritise.
-            if abstract_token_reader :
-              lens_consumed_tokens = start_readers_state[0] != end_state[0]
-            else :
-              lens_consumed_tokens = True
-            
-            # Update the best action: we prefer the first-most lens that consumes tokens.
-            if not best_PUT or (lens_consumed_tokens and not best_PUT[2]) : 
-              best_PUT = [output, end_state, lens_consumed_tokens]
-            
-          except LensException:
-            pass
-          
-          # For new attempt, ensure the readers' state is reset back to the start state.
-          set_readers_state(start_readers_state, abstract_token_reader, concrete_input_reader)
-          
-          if lens_consumed_tokens : break # We have what we want.
-        if lens_consumed_tokens : break # Break works only on immediate loop - one of the few justifications for a goto!
+    if not GET_succeeded:
+      raise LensException("Cross-put GET failed.")
 
-    # Now go with our best output.
-    if best_PUT :
-      set_readers_state(best_PUT[1], abstract_token_reader, concrete_input_reader)
-      return best_PUT[0]
+    # Now we must CREATE with one of the lenses.
+    for lens in self.lenses :
+      try :
+        with automatic_rollback(current_container) :
+          return lens.create(item, current_container)
+      except LensException:
+        pass
 
-    lens_assert(False, "Or should PUT (or CREATE-GET) at least one of the lenses")
-     
+    raise LensException("We should have PUT one of the lenses.")
+    
 
   def _display_id(self) :
     """For debugging clarity."""
     return " | ".join([str(lens) for lens in self.lenses])
 
-  def get_first_lenses(self):
-    """Return list of possible first lenses."""
-    first_lenses = []
-    for lens in self.lenses :
-      first_lenses.extend(lens.get_first_lenses())
-    return first_lenses
-
-  def get_last_lenses(self):
-    """Return list of possible last lenses."""
-    last_lenses = []
-    for lens in self.lenses :
-      last_lenses.extend(lens.get_last_lenses())
-    return last_lenses
-
 
   @staticmethod
   def TESTS() :
-    d("GET")
-    store = True
-    lens = AnyOf(nums, store=store, default="4") | AnyOf(alphas, store=store, default="B") | (AnyOf(alphanums, label="l", store=store, default="3") + AnyOf(alphas, store=store, default="x"))
-    token = lens.get("2m_x3p6", check_fully_consumed=False)
-    d(token)
-    assert_match(str(token), "...'l': ['2']...")
-    assert_match(str(token), "...None: ['m']...")
     
-    d("PUT")
-    token["l"] = '8'
-    token[0] = 'p'
-    output = lens.put(token, "2m_x3p6", check_fully_consumed=False)
-    d(output)
-    assert output == "8p"
-    
-    d("CREATE")
-    token["l"] = '8'
-    token[0] = 'p'
-    output = lens.create(token, check_fully_consumed=False)
-    d(output)
-    assert output == "8p"
-   
-
-    # Now see what happens with a non-store lens.
-    d("NON-STORE")
-    store = False
-    lens = AnyOf(nums, store=store) | AnyOf(alphas, store=store, default="B") | (AnyOf(alphanums, label="l", store=store, default="3") + AnyOf(alphas, store=store, default="x"))
-
     d("GET")
-    token = lens.get("2m_x3p6", check_fully_consumed=False)
-    d(str(token))
-    # This should give us an empty GenericCollection
-    assert isinstance(token, GenericCollection) and not token.dict
+    lens = AnyOf(alphas, type=str) | AnyOf(nums, type=int)
+    got = lens.get("abc")
+    assert(got == "a")
+    got = lens.get("123")
+    assert(got == 1)
 
     d("PUT")
-    output = lens.put(token, "2m_x3p6")
-    assert output == "2m"
-    d(output)
+    assert(lens.put(5, "123") == "5")
+    assert(lens.put("z", "abc") == "z")
+    assert(lens.put(5, "abc") == "5")
+    assert(lens.put("z", "123") == "z")
     
     d("CREATE")
-    output = lens.create(token)  # Note that token is an empty GenericCollection
-    d(output)
-    # We expect '3x' (defaults with And's AnyOfs, since the AnyOf lenses reject being passed a token.
-    assert output == "3x"
+    assert(lens.create(5) == "5")
+    assert(lens.create("a") == "a")
     
-    output = lens.create(AbstractTokenReader(token))
-    d(output)
-    # We expect 'B', since reader does not force tokens on lens and the first AnyOf has no default, the next does,
-    # which is 'B'
-    assert output == "B"
    
 
 class Group(Lens) :

@@ -1,8 +1,6 @@
 RESEARCH NOTES
-  - Use common sub-lens attribute - self._lenses to aid interigation
-    - Example: check if a lens or its sublenses may consume items.
+  - Add simple tracing messages
   - Find solution to efficient object rollback, avoiding blanket deepcopy - use aspects, perhaps?
-  - Or go with first to succeed and allow lens author to set order.
 
 Links
 -----

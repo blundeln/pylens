@@ -1,13 +1,5 @@
 TODO
 ----
-Experiemtal Containers
-  - Meta to context data
-  - Note: excessive use of rollback - use only for Or?
-  - Store lens keywords for use in meta
-  - Implement AnyOf and And + with CREATE
-  - Implement for simple ListContainer
-  - Then do for general cases.
-
 target: 1.0.0a1
   - Complete Recursion
     - Need to test works correctly in both directions.
