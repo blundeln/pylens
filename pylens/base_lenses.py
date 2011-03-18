@@ -29,11 +29,11 @@
 # 
 #
 import inspect
+from debug import *
 from exceptions import *
 from containers import *
 from readers import *
 from util import *
-from debug import *
 from charsets import *
 
 # Perhaps can simply be a class.
