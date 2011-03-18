@@ -35,7 +35,7 @@
 import inspect
 import copy
 from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
-from excepts import *
+from exceptions import *
 
 
 class Rollbackable(object) :

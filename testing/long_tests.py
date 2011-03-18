@@ -341,6 +341,40 @@ auto eth1 eth2
 """)
 
 
+def api_test():
+  
+  CONCRETE_STRING = "Person:name=albert;surname=camus"
+  class Person(object): # Must be new-style class
+    __lens__ = "Person" + ":" + List(Group(Word(alphas, is_label=True) + "=" + Word(alphas, store=True), type=auto_list), ";")
+
+    def __init__(self, name, surname) :
+      self.name, self.surname = name, surname
+
+    def __str__(self) :
+      return "Person: name -> %s, surname -> %s" % (self.name, self.surname)
+
+  d("GET")
+  person = get(Person, CONCRETE_STRING)
+  assert (type(person) == Person)
+  d(person)
+  assert(person.name == "albert" and person.surname == "camus")
+
+  d("PUT")
+  person.name = "nick"
+  person.surname = "blundell"
+  output = put(person, CONCRETE_STRING)
+  d(output)
+  assert(output == "Person:name=nick;surname=blundell")
+
+  d("CREATE")
+  fred = Person("fred", "flintstone")
+  output = create(fred)
+  d(output)
+  assert(output == "Person:name=fred;surname=flintstone" or output == "Person:surname=flintstone;name=fred")
+
+
+
+
 def experimental_test() :
   d("Started")
 
