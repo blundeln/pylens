@@ -34,9 +34,41 @@ def lens_assert(condition, message=None) :
   """
   Useful for assertion within lenses that should raise LensException, such that
   higher-level parsing may be resume, perhaps on an alternate branch.
+  XXX: This might create confusing code though - perhaps best to thorw the exception
+  XXX: Also we can loose the exceptions import.
   """
   if not condition :
     raise LensException(message)
+
+class assert_raises:
+  """A cleaner way to assert that an exception is thrown from some code."""
+  
+  def __init__(self, exception_class) :
+    self.exception_class = exception_class
+  
+  def __enter__(self) :
+    pass
+  
+  def __exit__(self, type, exception, traceback) :
+    # Returning True means 'suppress exception', which we do if the exception of
+    # of the type we expected.
+    return isinstance(exception, self.exception_class)
+
+  @staticmethod
+  def TESTS() :
+    d("Testing")
+    
+    # Assert the ZeroDivisionError is thrown 
+    with assert_raises(ZeroDivisionError) :
+      x = 1 / 0
+
+    # My most beautiful test!
+    with assert_raises(IndexError) :
+      # The inner block will not suppress an exception it is not expecting.
+      with assert_raises(ZeroDivisionError) :
+        # This code raises a different exception than expected.
+        x = []
+        x[0] = 2
 
 
 

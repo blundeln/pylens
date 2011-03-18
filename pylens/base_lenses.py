@@ -515,6 +515,71 @@ class AnyOf(Lens) :
     assert lens.put(8, "3") == "8"
 
 
+class Repeat(Lens) :
+  """
+  Applies a repetition of the givien lens (i.e. kleene-star).
+  """
+
+  def __init__(self, lens, min_count=1, max_count=None, **kargs):
+    super(Repeat, self).__init__(**kargs)
+    self.min_count, self.max_count = min_count, max_count
+    self.lenses = [self._coerce_to_lens(lens)]
+
+  def _get(self, concrete_input_reader, current_container) :
+    
+    # Basically, we want to succeed with as many GETs as possible or as required
+    # by max_count, but not continue indefinitely if a PUT consumes no input.
+    # For example, consider repeating the lens: AnyOf(alphas) | Empty(), where
+    # the Empty() component could succeed until the cows come home!
+
+    # For brevity.
+    lens = self.lenses[0]
+    
+    # We store the starting state of each iteration not only so we can roll back
+    # if we fail but so we can check if any input was consumed by the last
+    # successful iteration.
+    previous_state = get_rollbackables_state(concrete_input_reader, current_container)
+    no_succeeded = 0
+    while(True) :
+      try :
+        self._get_and_store_item(lens, concrete_input_reader, current_container)
+        no_succeeded += 1
+      except LensException:
+        # We didn't succeed this time, so rollback the state.
+        set_rollbackables_state(previous_state, concrete_input_reader, current_container)
+        break
+
+      # If we succeeded without consuming any of the input, we may go on for
+      # ever, so break out and declare we succeeded with min_count - there's no
+      # need to actually do that.
+      if previous_state[0] == concrete_input_reader._get_state() :
+        no_succeeded = max(no_succeeded, self.min_count)
+        break
+
+      # The current state will be the previous of the next iteration.
+      previous_state = get_rollbackables_state(concrete_input_reader, current_container)
+
+
+    # Somehting with algorthm has gone wrong if this fails.
+    assert(no_succeeded <= self.max_count)
+
+    if no_succeeded < self.min_count :
+      raise LensException("Expected at least %s successful GETs" % (self.min_count))
+
+
+  #def _put(self, item, concrete_input_reader, current_container) :
+  #  return self.lenses[0].put(item, concrete_input_reader, current_container)
+
+
+  @staticmethod
+  def TESTS() :
+    
+    lens = Repeat(AnyOf(nums, type=int), min_count=3, max_count=5, type=list)
+    d("GET")
+    assert(lens.get("1234") == [1,2,3,4])
+    with assert_raises(LensException) :
+      lens.get("12")
+
 class Group(Lens) :
   """
   A convenience lens that thinly wraps any lens to set a type.

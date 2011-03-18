@@ -10,6 +10,8 @@ RESEARCH NOTES
         dirty flag?
   - If any kargs set on a lens, assume is a store using default type of str
   - Use of keys and labels: lens can set kargs: key (of next lens with label=current_key) or container_key
+    - Think about how best to handle setting a key on a item that was passed
+      from user which does not contain its key.
   - Think about how to best implement auto list idea
 
 Links
