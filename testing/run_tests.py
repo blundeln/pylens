@@ -96,6 +96,16 @@ def unit_tests(args=None) :
 
 def main() :
   # This can be useful for testing.
+  print("Arbitrary tests")
+  class X:
+    def __eq__(self, other):
+      return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
+
+  x_1 = X()
+  x_1.a = "b"
+  x_2 = X()
+  x_2.a = "b"
+  print(x_1 == x_2)
   pass
 
 if __name__ == "__main__":

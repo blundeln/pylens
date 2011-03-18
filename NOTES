@@ -1,6 +1,16 @@
 RESEARCH NOTES
-  - Add simple tracing messages
+  - Repeat lens: each iteration must progress state, otherwise assume reached
+    min count and break out.
+  - Add back full test coverage for refactored code.
+  - Find nice way to add simple tracing messages so we can see what's going on
   - Find solution to efficient object rollback, avoiding blanket deepcopy - use aspects, perhaps?
+    - Also for chekcing when an arbitrary container has been modified by a lens
+      for infinity problem
+      - should be easier by restricting modifications to container interface -
+        dirty flag?
+  - If any kargs set on a lens, assume is a store using default type of str
+  - Use of keys and labels: lens can set kargs: key (of next lens with label=current_key) or container_key
+  - Think about how to best implement auto list idea
 
 Links
 -----

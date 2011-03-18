@@ -8,11 +8,13 @@ target: 1.0.0a1
   - Add installation script
   - Publish on freshmeat
   - Link Nick's site to github.
+  - Make compatible with python 3
 
 target: 1.0.0a2
   - Improve basic docs
   - encapsulate debug routines for optional inclusion
     - especially the formatting of debug messages which can add a significant overhead.
+
 
 target: future
   - Store residue of get for more flexible matching.

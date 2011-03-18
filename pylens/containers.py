@@ -52,15 +52,21 @@ class Rollbackable(object) :
   solutions later (e.g. copy-before-modify).
   """
 
-
   # XXX: Do we always need to copy on get AND set? Have to careful that original state is not set.
-  # Basically need to make sure that original state cannot be modified
-  # Perhaps add copy-flag
+  # XXX: Basically need to make sure that original state cannot be modified
+  # XXX: Perhaps add copy-flag
   def _get_state(self) :
     return copy.deepcopy(self.__dict__)
 
   def _set_state(self, state) :
     self.__dict__ = copy.deepcopy(state)
+
+
+  def __eq__(self, other):
+    """So we can easily compare if two objects have state of equal value."""
+    # TODO: To use this is expensive and should be replaced by a more efficient
+    # TODO:   dirty-flag scheme.
+    return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
 
   @staticmethod
   def TESTS():
@@ -79,6 +85,15 @@ class Rollbackable(object) :
     o._set_state(state1)
     assert(o.x == 1)
     assert(o.y == [3,4])
+
+    # Test value comparision.
+    o1 = SomeClass(1, [3,4])
+    o2 = SomeClass(1, [3,4])
+    assert(o1 == o2)
+    o2.y[1] = 9
+    assert(o1 != o2)
+    o2.y[1] = 4
+    assert(o1 == o2)
 
 
 
