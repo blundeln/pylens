@@ -27,6 +27,7 @@
 # Author: Nick Blundell <blundeln@gmail.com>
 # Organisation: www.nickblundell.org.uk
 #
+from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
 from exceptions import *
 
 def lens_assert(condition, message=None) :

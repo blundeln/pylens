@@ -23,54 +23,15 @@
 # ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# 
 #
-# Author: Nick Blundell <blundeln@gmail.com>
+# Author: Nick Blundell <blundeln [AT] gmail [DOT] com>
 # Organisation: www.nickblundell.org.uk
-#
+# 
+import string
 
-#from base_lenses import *
-#from core_lenses import *
-from util_lenses import *
-
-
-# Some lens abbreviations, for short-hand lens definitions.
-ZM  = ZeroOrMore
-OM  = OneOrMore
-O   = Optional
-G   = Group
-WS  = Whitespace
-
-
-##################################
-# Main API functions
-##################################
-
-def get(lens, *args, **kargs) :
-  lens = BaseLens.coerce_to_lens(lens)
-  return lens.get(*args, **kargs)
-
-def put(lens_or_instance, *args, **kargs) :
-  
-  # If we have an instance of a class which defines its own lens...
-  if hasattr(lens_or_instance, "__lens__") :
-    # Might as well still coerce the lens, just in case.
-    lens = BaseLens.coerce_to_lens(lens_or_instance.__lens__)
-    instance = lens_or_instance # For clarity.
-    return lens.put(instance, *args, **kargs)
-  
-  # Otherwise...
-  lens = BaseLens.coerce_to_lens(lens_or_instance)
-  return lens.put(*args, **kargs)
-
-create = put
-
-###########################
-# Main.
-#
-
-def main() :
-  # This can be useful for quick testing.
-  d("Testing")
-
-if __name__ == "__main__":
-  main()
+# Some useful character sets.
+alphas    = string.lowercase + string.uppercase
+nums      = string.digits
+hexnums   = nums + "ABCDEFabcdef"
+alphanums = alphas + nums
