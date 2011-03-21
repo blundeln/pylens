@@ -5,6 +5,7 @@ RESEARCH NOTES
       with lens.
     - By lens laws if put is infinity, then so may get and create, I think.
   - Add back full test coverage for refactored code.
+  - What does it mean to pass a None item to put on an non-typed lens
   - Find nice way to add simple tracing messages so we can see what's going on
   - If any kargs set on a lens, assume is a store using default type of str
   - Use of keys and labels: lens can set kargs: key (of next lens with label=current_key) or container_key

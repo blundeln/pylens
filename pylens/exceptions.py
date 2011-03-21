@@ -37,9 +37,10 @@ from debug import *
 # Thrown when tentative object state should be rolled back.
 class RollbackException(Exception): pass
 
-# Thrown when an abstract token collection cannot find an appropriate token in the
-# PUT direction.
-class NoTokenToConsumeException(RollbackException): pass
+# Thrown when it looks like a lens may iterate infinitely, and so should be
+# re-designed.
+class InfiniteIterationException(Exception) : pass
+
 
 class LensException(RollbackException):
   """
@@ -73,6 +74,9 @@ class LensException(RollbackException):
   def __str__(self):
       return "LensException: %s" % self.__msg
 
+# Thrown when an abstract token collection cannot find an appropriate token in the
+# PUT direction.
+class NoTokenToConsumeException(LensException): pass
 
 class InfiniteRecursionException(Exception):
   pass

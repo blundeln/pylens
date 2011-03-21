@@ -528,43 +528,25 @@ class Repeat(Lens) :
 
   def _get(self, concrete_input_reader, current_container) :
     
-    # Basically, we want to succeed with as many GETs as possible or as required
-    # by max_count, but not continue indefinitely if a PUT consumes no input.
-    # For example, consider repeating the lens: AnyOf(alphas) | Empty(), where
-    # the Empty() component could succeed until the cows come home!
-
     # For brevity.
     lens = self.lenses[0]
     
-    # We store the starting state of each iteration not only so we can roll back
-    # if we fail but so we can check if any input was consumed by the last
-    # successful iteration.
-    previous_state = get_rollbackables_state(concrete_input_reader, current_container)
     no_succeeded = 0
     while(True) :
       try :
-        self._get_and_store_item(lens, concrete_input_reader, current_container)
-        no_succeeded += 1
-      except LensException:
-        # We didn't succeed this time, so rollback the state.
-        set_rollbackables_state(previous_state, concrete_input_reader, current_container)
-        break
-
-      # If we succeeded without consuming any of the input, we may go on for
-      # ever, so break out and declare we succeeded with min_count - there's no
-      # need to actually do that.
-      # XXX: Could argue that a lens that consumes no input could in theory
-      # generate an item, though this is unlikely in practice.
-      if previous_state[0] == concrete_input_reader._get_state() :
-        no_succeeded = max(no_succeeded, self.min_count)
+        with automatic_rollback(concrete_input_reader, current_container) :
+          self._get_and_store_item(lens, concrete_input_reader, current_container)
+          no_succeeded += 1
+      except LensException :
         break
 
       # Don't get more than maximim
       if has_value(self.max_count) and no_succeeded == self.max_count :
         break
 
-      # The current state will be the previous of the next iteration.
-      previous_state = get_rollbackables_state(concrete_input_reader, current_container)
+      # Check for infinite iteration (i.e. if lens does not progress state)
+      if has_value(self.infinity_limit) and no_succeeded >= self.infinity_limit :
+        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
 
     # Something with algorthm has gone wrong if this fails.
     if has_value(self.max_count) :
@@ -572,66 +554,76 @@ class Repeat(Lens) :
 
     if no_succeeded < self.min_count :
       raise LensException("Expected at least %s successful GETs" % (self.min_count))
+    
 
 
   def _put(self, item, concrete_input_reader, current_container) :
-   
-    # It's important to realise here that the number items we may put may not
-    # equal the number in the concrete input, since we may have added or removed
-    # some abstract items.  So we try to PUT as many as possible (i.e. where
-    # input can be associated with our abstract items); then do some CREATEs,
-    # for the case where we have more abstract items than represented in the
-    # concrete input; before mopping up any additional concrete structures (for
-    # removed abstract items).
-    # Note the if we are called via create we will have no
-    # concrete_input_reader, so out PUTs will reduce anyway to CREATEs and our
-    # GETs will not be necessary.
-    # On top of that, we need to make sure that we do
-    # not iterate on the lens if it consumes no state in either direction.
 
     # For brevity.
     lens = self.lenses[0]
 
     no_succeeded = 0
+    no_put = 0
     output = ""
-
-    # If we have concrete input...
-    if has_value(concrete_input_reader) :
-      
-      # Try to PUT as many items as possible.
-      previous_state = get_rollbackables_state(concrete_input_reader, current_container)
-      while True:
-        try :
-          output += lens.put(item, concrete_input_reader, current_container)
-          no_succeeded +=1
-        except LensException :
-          set_rollbackables_state(previous_state, concrete_input_reader, current_container)
+    
+    # This first tries to PUT (if we have concrete input) then tries to CREATE.
+    effective_concrete_reader = concrete_input_reader
+    while True :
+      try :
+        with automatic_rollback(effective_concrete_reader, current_container) :
+          output += lens.put(item, effective_concrete_reader, current_container)
+          no_succeeded += 1
+      except LensException:
+        if has_value(effective_concrete_reader) :
+          effective_concrete_reader = None
+          continue
+        else :
           break
 
-        # Store the current state for progression test next iteration.
-        previous_state = get_rollbackables_state(concrete_input_reader, current_container)
+      # Later on, for GETs, we need to know how many were PUT (vs. CREATED).
+      if has_value(effective_concrete_reader) :
+        no_put = no_succeeded
 
-        if has_value(self.max_count) and no_succeeded == self.max_count :
-          break
-      
-      # Then mop up any remaining concrete structures for removed abstract
-      # items, discarding and extracted abstract items.
-      # while True:
-      #  try :
-      #    with automatic_rollback(concrete_input_reader) :
-      #      output += lens.put(item, concrete_input_reader, current_container)
-      #  except LensException :
-      #    break
+      # Don't get more than maximim
+      if has_value(self.max_count) and no_succeeded == self.max_count :
+        break
 
-
-
+      # Check for infinite iteration (i.e. if lens does not progress state)
+      if has_value(self.infinity_limit) and no_succeeded >= self.infinity_limit :
+        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
+    
     # Something with algorthm has gone wrong if this fails.
     if has_value(self.max_count) :
       assert(no_succeeded <= self.max_count)
 
     if no_succeeded < self.min_count :
-      raise LensException("Expected at least %s successful PUT/CREATEs" % (self.min_count))
-    
+      raise LensException("Expected at least %s successful GETs" % (self.min_count))
+   
+    # Finally, the items we PUT/CREATED may be fewer than the number of concrete
+    # structures, so we GET as many as possible, discarding any extracted its
+    # (using a throw-away copy of the container).
+    if has_value(concrete_input_reader) :
+      
+      # Determine how any we need to get to consume max from input.
+      if has_value(self.max_count) :
+        no_to_get = self.max_count - no_put
+        assert(no_to_get >= 0)
+      
+      no_got = 0
+      state = get_rollbackables_state(current_container)
+      while True :
+        try :
+          with automatic_rollback(concrete_input_reader) :
+            lens.get(concrete_input_reader, current_container)
+            no_got += 1
+        except LensException:
+          break
+
+        if has_value(self.max_count) and no_got == no_to_get :
+          break
+      # Discard any items added by the lens.
+      set_rollbackables_state(state, current_container)
+
     return output
 
 
@@ -647,11 +639,22 @@ class Repeat(Lens) :
 
     d("PUT")
     assert(lens.put([1,2,3,4,5,6], "987654321") == "12345")
-    #assert(lens.put([1,2,3,4,5,6], "981") == "12345")
+    assert(lens.put([1,2,3,4,5,6], "981") == "12345")
+    input_reader = ConcreteInputReader("87654321")
+    assert(lens.put([1,2,3,4], input_reader) == "1234")
+    assert(input_reader.get_remaining() == "321")
+
+    assert(lens.create([1,2,3,4]) == "1234")
+    with assert_raises(LensException) :
+      lens.create([1,2])
+    assert(lens.create([1,2,3,4,5,6,7,8]) == "12345")
 
     # Test infinity problem
-    lens = Repeat(Empty(), min_count=3, max_count=None, type=list)
-    lens.get("anything")
+    lens = Repeat(Empty(), min_count=3, max_count=None, infinity_limit=5, type=list)
+    with assert_raises(InfiniteIterationException) :
+      lens.get("anything")
+    with assert_raises(InfiniteIterationException) :
+      lens.put([], "anything")
 
 
 class Empty(Lens) :
