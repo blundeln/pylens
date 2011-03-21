@@ -520,9 +520,10 @@ class Repeat(Lens) :
   Applies a repetition of the givien lens (i.e. kleene-star).
   """
 
-  def __init__(self, lens, min_count=1, max_count=None, **kargs):
+  def __init__(self, lens, min_count=1, max_count=None, infinity_limit=1000, **kargs):
     super(Repeat, self).__init__(**kargs)
     self.min_count, self.max_count = min_count, max_count
+    self.infinity_limit = infinity_limit
     self.lenses = [self._coerce_to_lens(lens)]
 
   def _get(self, concrete_input_reader, current_container) :
@@ -578,18 +579,60 @@ class Repeat(Lens) :
     # It's important to realise here that the number items we may put may not
     # equal the number in the concrete input, since we may have added or removed
     # some abstract items.  So we try to PUT as many as possible (i.e. where
-    # input can be associated with our abstract items); then mop up any
-    # additional concrete structures (for removed abstract items); before trying
-    # some CREATEs, for the case where we have more abstract items than
-    # represented in the concrete input.
-    # On top of that, we need to make sure that we do not iterate on the lens if
-    # it consumes no state in either direction.
+    # input can be associated with our abstract items); then do some CREATEs,
+    # for the case where we have more abstract items than represented in the
+    # concrete input; before mopping up any additional concrete structures (for
+    # removed abstract items).
+    # Note the if we are called via create we will have no
+    # concrete_input_reader, so out PUTs will reduce anyway to CREATEs and our
+    # GETs will not be necessary.
+    # On top of that, we need to make sure that we do
+    # not iterate on the lens if it consumes no state in either direction.
 
-
-    
     # For brevity.
     lens = self.lenses[0]
-    #return self.lenses[0].put(item, concrete_input_reader, current_container)
+
+    no_succeeded = 0
+    output = ""
+
+    # If we have concrete input...
+    if has_value(concrete_input_reader) :
+      
+      # Try to PUT as many items as possible.
+      previous_state = get_rollbackables_state(concrete_input_reader, current_container)
+      while True:
+        try :
+          output += lens.put(item, concrete_input_reader, current_container)
+          no_succeeded +=1
+        except LensException :
+          set_rollbackables_state(previous_state, concrete_input_reader, current_container)
+          break
+
+        # Store the current state for progression test next iteration.
+        previous_state = get_rollbackables_state(concrete_input_reader, current_container)
+
+        if has_value(self.max_count) and no_succeeded == self.max_count :
+          break
+      
+      # Then mop up any remaining concrete structures for removed abstract
+      # items, discarding and extracted abstract items.
+      # while True:
+      #  try :
+      #    with automatic_rollback(concrete_input_reader) :
+      #      output += lens.put(item, concrete_input_reader, current_container)
+      #  except LensException :
+      #    break
+
+
+
+    # Something with algorthm has gone wrong if this fails.
+    if has_value(self.max_count) :
+      assert(no_succeeded <= self.max_count)
+
+    if no_succeeded < self.min_count :
+      raise LensException("Expected at least %s successful PUT/CREATEs" % (self.min_count))
+    
+    return output
 
 
   @staticmethod
@@ -604,6 +647,7 @@ class Repeat(Lens) :
 
     d("PUT")
     assert(lens.put([1,2,3,4,5,6], "987654321") == "12345")
+    #assert(lens.put([1,2,3,4,5,6], "981") == "12345")
 
     # Test infinity problem
     lens = Repeat(Empty(), min_count=3, max_count=None, type=list)

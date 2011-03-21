@@ -1,6 +1,8 @@
 RESEARCH NOTES
   - Repeat lens: each iteration must progress state, otherwise assume reached
     min count and break out.
+    - Should we try to handle infinity problem, or just flag there is an issue
+      with lens.
     - By lens laws if put is infinity, then so may get and create, I think.
   - Add back full test coverage for refactored code.
   - Find nice way to add simple tracing messages so we can see what's going on
