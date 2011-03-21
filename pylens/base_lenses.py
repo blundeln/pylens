@@ -552,23 +552,29 @@ class Repeat(Lens) :
       # If we succeeded without consuming any of the input, we may go on for
       # ever, so break out and declare we succeeded with min_count - there's no
       # need to actually do that.
+      # XXX: Could argue that a lens that consumes no input could in theory
+      # generate an item, though this is unlikely in practice.
       if previous_state[0] == concrete_input_reader._get_state() :
         no_succeeded = max(no_succeeded, self.min_count)
+        break
+
+      # Don't get more than maximim
+      if has_value(self.max_count) and no_succeeded == self.max_count :
         break
 
       # The current state will be the previous of the next iteration.
       previous_state = get_rollbackables_state(concrete_input_reader, current_container)
 
-
-    # Somehting with algorthm has gone wrong if this fails.
-    assert(no_succeeded <= self.max_count)
+    # Something with algorthm has gone wrong if this fails.
+    if has_value(self.max_count) :
+      assert(no_succeeded <= self.max_count)
 
     if no_succeeded < self.min_count :
       raise LensException("Expected at least %s successful GETs" % (self.min_count))
 
 
-  #def _put(self, item, concrete_input_reader, current_container) :
-  #  return self.lenses[0].put(item, concrete_input_reader, current_container)
+  def _put(self, item, concrete_input_reader, current_container) :
+    return self.lenses[0].put(item, concrete_input_reader, current_container)
 
 
   @staticmethod
@@ -579,6 +585,80 @@ class Repeat(Lens) :
     assert(lens.get("1234") == [1,2,3,4])
     with assert_raises(LensException) :
       lens.get("12")
+    assert(lens.get("12345678") == [1,2,3,4,5])
+
+    d("PUT")
+    assert(lens.put([1,2,3,4,5,6], "987654321") == "12345")
+
+    # Test infinity problem
+    lens = Repeat(Empty(), min_count=3, max_count=None, type=list)
+    lens.get("anything")
+
+
+class Empty(Lens) :
+  """
+  Matches the empty string, used by Optional().  Can also set modes for special
+  empty matches.
+  """
+  
+  # Useful modifiers for empty matches.
+  START_OF_TEXT = "START_OF_TEXT"
+  END_OF_TEXT   = "END_OF_TEXT"
+
+  def __init__(self, mode=None, **kargs):
+    super(Empty, self).__init__(**kargs)
+    self.default = ""
+    self.mode = mode
+
+  def _get(self, concrete_input_reader, current_container) :
+    if self.mode == self.START_OF_TEXT :
+      if concrete_input_reader.get_pos() != 0 :
+        raise LensException("Will match only at start of text.")
+    elif self.mode == self.END_OF_TEXT :
+      if not concrete_input_reader.is_fully_consumed() :
+        raise LensException("Will match only at end of text.")
+
+    # Note thaht, useless as it is, this is actually an item that could potentially be stored that we
+    # return, which is why we must explicitly check for None elsewhere in the
+    # framework, since "" == False but "" != None.
+    return ""
+
+  def _put(self, item, concrete_input_reader, current_container) :
+    # XXX: Should check for start or end of text here, but what about CREATE?
+    
+    # Here we can put only the empty string token, though if this lens does not
+    # store an item, the default value of "" will intercept this function being called.
+    if not (isinstance(item, str) and item == "") :
+      raise LensException("Expected to put an empty string")
+    return ""
+
+  @staticmethod
+  def TESTS() :
+    
+    # Test with and without type
+    for lens in [Empty(type=str), Empty()] :
+      lens = Empty()
+      assert lens.get("anything") == ""
+      assert lens.put("", "anything") == ""
+      with assert_raises(LensException) :
+        lens.put(" ", "anything")
+      assert lens.create("") == ""
+    
+    # Try special modes.
+    lens = Empty(mode=Empty.START_OF_TEXT)
+    concrete_reader = ConcreteInputReader("hello")
+    concrete_reader.get_next_char()
+    with assert_raises(LensException) : 
+      lens.get(concrete_reader)
+    
+    lens = Empty(mode=Empty.END_OF_TEXT)
+    concrete_reader = ConcreteInputReader("h")
+    with assert_raises(LensException) : 
+      lens.get(concrete_reader)
+    concrete_reader.get_next_char()
+    lens.get(concrete_reader)
+
+
 
 class Group(Lens) :
   """

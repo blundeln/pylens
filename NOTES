@@ -1,18 +1,24 @@
 RESEARCH NOTES
   - Repeat lens: each iteration must progress state, otherwise assume reached
     min count and break out.
+    - By lens laws if put is infinity, then so may get and create, I think.
   - Add back full test coverage for refactored code.
   - Find nice way to add simple tracing messages so we can see what's going on
-  - Find solution to efficient object rollback, avoiding blanket deepcopy - use aspects, perhaps?
-    - Also for chekcing when an arbitrary container has been modified by a lens
-      for infinity problem
-      - should be easier by restricting modifications to container interface -
-        dirty flag?
   - If any kargs set on a lens, assume is a store using default type of str
   - Use of keys and labels: lens can set kargs: key (of next lens with label=current_key) or container_key
     - Think about how best to handle setting a key on a item that was passed
       from user which does not contain its key.
   - Think about how to best implement auto list idea
+  
+  - Optimisations
+    - Concering containers:
+      - How to know whether a given lens may modify a container or input
+      - How to know efficiently if a lens has modifed a container
+        - Dirty flag idea may fail with overwrites by nested lenses
+        - Listened objecj sounds good, but how to account for state reset
+    - Concerning Rollbackables
+      - Find solution to efficient object rollback, avoiding blanket deepcopy - use aspects, perhaps?
+    
 
 Links
 -----

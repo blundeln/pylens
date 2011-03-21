@@ -50,7 +50,7 @@ class assert_raises:
     pass
   
   def __exit__(self, type, exception, traceback) :
-    # Returning True means 'suppress exception', which we do if the exception of
+    # Returning True means 'suppress exception', which we do if the exception is
     # of the type we expected.
     return isinstance(exception, self.exception_class)
 
@@ -58,15 +58,13 @@ class assert_raises:
   def TESTS() :
     d("Testing")
     
-    # Assert the ZeroDivisionError is thrown 
+    # Assert the ZeroDivisionError is thrown.
     with assert_raises(ZeroDivisionError) :
       x = 1 / 0
 
-    # My most beautiful test!
+    # My most beautiful test, ever!
     with assert_raises(IndexError) :
-      # The inner block will not suppress an exception it is not expecting.
       with assert_raises(ZeroDivisionError) :
-        # This code raises a different exception than expected.
         x = []
         x[0] = 2
 

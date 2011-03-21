@@ -218,68 +218,6 @@ class OneOrMore(CombinatorLens) :
     d("No, we do not, which is good :)")
 
 
-class Empty(Lens) :
-  """
-  Matches the empty string, used by Optional().  Can also set modes for special
-  empty matches.
-  """
-  
-  # Useful modifiers for empty matches.
-  START_OF_TEXT = "START_OF_TEXT"
-  END_OF_TEXT   = "END_OF_TEXT"
-
-  def __init__(self, mode=None, **kargs):
-    super(Empty, self).__init__(**kargs)
-    self.default = ""
-    self.mode = mode
-
-  def _get(self, concrete_input_reader) :
-    
-    if self.mode == self.START_OF_TEXT :
-      lens_assert(concrete_input_reader.get_pos() == 0, "Will match only at start of text.")
-    elif self.mode == self.END_OF_TEXT :
-      lens_assert(concrete_input_reader.is_fully_consumed(), "Will match only at end of text.")
-
-    # Note this is actually a token (not None) we return, that could
-    # potentially be stored, so elsewhere in the framework, we need to ensure
-    # we check explicitly for None, since "" evaluates to False
-    return ""
-
-  def _put(self, abstract_token, concrete_input_reader) :
-    # Here we can put only the empty string token.
-    lens_assert(isinstance(abstract_token, str) and abstract_token == "")
-    return ""
-
-  @staticmethod
-  def TESTS() :
-    
-    # With store
-    lens = Empty(store=True)
-    assert lens.get("anything", check_fully_consumed=False) == ""
-    assert lens.put("", "anything") == ""
-    try :
-      lens.put(" ", "anything"); assert False
-    except LensException :
-      pass # The token ' ' is invalid for this lens.
-    assert lens.create("") == ""
-
-    # Without store
-    lens = Empty()
-    assert lens.get("anything", check_fully_consumed=False) == None
-    assert lens.put(AbstractTokenReader(GenericCollection()), "anything") == ""
-    try :
-      lens.put("", "anything"); assert False
-    except LensException :
-      pass # Even though token valid, this is not a store lens, so will fail.
-    
-    # Try special modes.
-    lens = Empty(mode=Empty.START_OF_TEXT)
-    concrete_reader = ConcreteInputReader("hello")
-    concrete_reader.get_next_char()
-    try : token = lens.get(concrete_reader); assert False, "This should fail - we should not get here!"
-    except LensException: pass
-
-
 
 
 
