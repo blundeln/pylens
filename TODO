@@ -1,5 +1,13 @@
 TODO
 ----
+
+Refactoring
+  - Add or improve  full test coverage for refactored code.
+  - Add basic dict container to demonstrate keys.
+  - Start to build up lenses.
+  - encapsulate debug routines for optional inclusion
+    - especially the formatting of debug messages which can add a significant overhead.
+
 target: 1.0.0a1
   - Complete Recursion
     - Need to test works correctly in both directions.
@@ -7,30 +15,20 @@ target: 1.0.0a1
     - Need to have a good think about how to create richer models
   - Add installation script
   - Publish on freshmeat
-  - Link Nick's site to github.
-  - Make compatible with python 3
 
 target: 1.0.0a2
+  - Make compatible with python 3
   - Improve basic docs
-  - encapsulate debug routines for optional inclusion
-    - especially the formatting of debug messages which can add a significant overhead.
 
 
 target: future
   - Store residue of get for more flexible matching.
-  - Allow datatypes to be specified similarly to keys.
-  - Allow hierarchical keys, like this: lens = X(..., is_label=1) for primary key, ... is_label=2 ... for secondary key
   - How to handle default indentation in recursive grammars.
-  - Should CombineChars be replaced by type=str or something, a more fundamental approach?
   - Shorter syntax for differentiating between store and non-store lenses so parsers less cluttered
     - e.g. Word(...) vs S(Word(...)), or something
-    - rather than: Word(store=False) vs Word(store=True)
-  - Need a way of accurately testing performance, since currently many tests require (slow) debug strings
-    to validate output
   - DynamicLens - pass a function which creates a lens when it is called with
     context params (e.g. current collection) e.g. <X> .... </X>
   - Ambiguity checking.
-  - Add API docs to code.
   - Implement PutGet check for sanity checking lenses.
   - Implement full lenses for deb conf and interfaces.
   - Apache lens

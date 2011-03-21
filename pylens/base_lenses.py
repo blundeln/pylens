@@ -193,10 +193,10 @@ class Lens(object) :
     return meta_data
 
 
-  def _get_and_store_item(self, lens, concrete_input_reader, container) :
+  def _get_and_store(self, lens, concrete_input_reader, container) :
     """
     Common function for storing an item in a container with useful meta data
-    about its origin, which will allow flexibility in how it is storedd and
+    about its origin, which will allow flexibility in how it is stored and
     retrieved.
     """
 
@@ -296,7 +296,7 @@ class And(Lens) :
     Sequential GET on each lens.
     """
     for lens in self.lenses :
-      self._get_and_store_item(lens, concrete_input_reader, current_container)
+      self._get_and_store(lens, concrete_input_reader, current_container)
 
     # Should not return anything, since we work on the container!
 
@@ -531,11 +531,12 @@ class Repeat(Lens) :
     # For brevity.
     lens = self.lenses[0]
     
+    # Try to get as many as we can, up to a maximum if set.
     no_succeeded = 0
     while(True) :
       try :
         with automatic_rollback(concrete_input_reader, current_container) :
-          self._get_and_store_item(lens, concrete_input_reader, current_container)
+          self._get_and_store(lens, concrete_input_reader, current_container)
           no_succeeded += 1
       except LensException :
         break
@@ -548,7 +549,7 @@ class Repeat(Lens) :
       if has_value(self.infinity_limit) and no_succeeded >= self.infinity_limit :
         raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
 
-    # Something with algorthm has gone wrong if this fails.
+    # Something with the algorthm has gone wrong if this fails.
     if has_value(self.max_count) :
       assert(no_succeeded <= self.max_count)
 
@@ -566,7 +567,8 @@ class Repeat(Lens) :
     no_put = 0
     output = ""
     
-    # This first tries to PUT (if we have concrete input) then tries to CREATE.
+    # This first tries to PUT (if we have concrete input) then tries to CREATE
+    # (by effectively setting the concrete reader to None).
     effective_concrete_reader = concrete_input_reader
     while True :
       try :
@@ -574,13 +576,16 @@ class Repeat(Lens) :
           output += lens.put(item, effective_concrete_reader, current_container)
           no_succeeded += 1
       except LensException:
+        # If we fail and the effective_concrete_reader is set, we may now
+        # attempt some CREATEs by setting the reader to None for the next
+        # iteration.
         if has_value(effective_concrete_reader) :
           effective_concrete_reader = None
           continue
         else :
           break
 
-      # Later on, for GETs, we need to know how many were PUT (vs. CREATED).
+      # Later on, for the GETs, we need to know how many were PUT (vs. CREATED).
       if has_value(effective_concrete_reader) :
         no_put = no_succeeded
 
@@ -600,11 +605,11 @@ class Repeat(Lens) :
       raise LensException("Expected at least %s successful GETs" % (self.min_count))
    
     # Finally, the items we PUT/CREATED may be fewer than the number of concrete
-    # structures, so we GET as many as possible, discarding any extracted its
-    # (using a throw-away copy of the container).
+    # structures, so we GET as many as possible, discarding any extracted items
+    # by reseting the container state after this process.
     if has_value(concrete_input_reader) :
       
-      # Determine how any we need to get to consume max from input.
+      # Determine how many we need to get to consume max from input.
       if has_value(self.max_count) :
         no_to_get = self.max_count - no_put
         assert(no_to_get >= 0)
@@ -638,6 +643,7 @@ class Repeat(Lens) :
     assert(lens.get("12345678") == [1,2,3,4,5])
 
     d("PUT")
+    assert(lens.put([1,2,3,4,5], "98765") == "12345")
     assert(lens.put([1,2,3,4,5,6], "987654321") == "12345")
     assert(lens.put([1,2,3,4,5,6], "981") == "12345")
     input_reader = ConcreteInputReader("87654321")
