@@ -574,7 +574,22 @@ class Repeat(Lens) :
 
 
   def _put(self, item, concrete_input_reader, current_container) :
-    return self.lenses[0].put(item, concrete_input_reader, current_container)
+   
+    # It's important to realise here that the number items we may put may not
+    # equal the number in the concrete input, since we may have added or removed
+    # some abstract items.  So we try to PUT as many as possible (i.e. where
+    # input can be associated with our abstract items); then mop up any
+    # additional concrete structures (for removed abstract items); before trying
+    # some CREATEs, for the case where we have more abstract items than
+    # represented in the concrete input.
+    # On top of that, we need to make sure that we do not iterate on the lens if
+    # it consumes no state in either direction.
+
+
+    
+    # For brevity.
+    lens = self.lenses[0]
+    #return self.lenses[0].put(item, concrete_input_reader, current_container)
 
 
   @staticmethod
