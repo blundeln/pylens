@@ -218,7 +218,7 @@ class OldConcreteInputReader(Reader):
   __repr__ = __str__
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     concrete_reader = ConcreteInputReader("ABCD")
     output = ""
     for i in range(0,2) :
@@ -308,7 +308,7 @@ class AbstractTokenReader(Reader):
   __repr__ = __str__
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     token_collection = GenericCollection(["snake", "cow"])
     token_collection.add_token("baboon", label="monkeys")
     token_collection.set_label_token("chimp")
@@ -408,7 +408,7 @@ class reader_rollback:
 
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     abstract_token_reader = AbstractTokenReader(["beans", "eggs", "sausages"])
     concrete_input_reader = ConcreteInputReader("hello world")
     

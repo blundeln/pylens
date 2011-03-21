@@ -6,6 +6,8 @@ RESEARCH NOTES
     - Think about how best to handle setting a key on a item that was passed
       from user which does not contain its key.
   - Think about how to best implement auto list idea
+  - TESTS inheritance, makes it difficult to disable tests by changin function
+    name.
   
   - Optimisations
     - Concering containers:
@@ -15,6 +17,7 @@ RESEARCH NOTES
         - Listened objecj sounds good, but how to account for state reset
     - Concerning Rollbackables
       - Find solution to efficient object rollback, avoiding blanket deepcopy - use aspects, perhaps?
+      - I think we only need two copies when we re-use the original state, such as in Or
     
 
 Links

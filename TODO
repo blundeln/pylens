@@ -2,9 +2,9 @@ TODO
 ----
 
 Refactoring
-  - Add or improve  full test coverage for refactored code.
   - Add basic dict container to demonstrate keys.
   - Start to build up lenses.
+  - Remove old code.
   - encapsulate debug routines for optional inclusion
     - especially the formatting of debug messages which can add a significant overhead.
 

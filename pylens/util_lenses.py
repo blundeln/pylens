@@ -48,7 +48,7 @@ class List(And) :
     super(List, self).__init__(lens, ZeroOrMore(delimiter_lens + lens), **kargs)
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     lens = List(Word(alphas, store=True), ",")
     CONCRETE_STRING = "hello,world,again"
     token = lens.get(CONCRETE_STRING)
@@ -64,7 +64,7 @@ class NewLine(Or) :
     super(NewLine, self).__init__(Literal("\n", **kargs), Empty(mode=Empty.END_OF_TEXT))
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     lens = NewLine()
     assert lens.put(AbstractTokenReader([]), "\n") == "\n"
     output = lens.create(AbstractTokenReader([]))
@@ -87,7 +87,7 @@ class Optional(Or) :
     super(Optional, self).__init__(Empty(), lens, **kargs)
  
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     for store in [True] :
       # GET
       lens = Optional(Literal("hello123", store=True))
@@ -133,7 +133,7 @@ class ZeroOrMore(Optional) :
     super(ZeroOrMore, self).__init__(OneOrMore(lens), **kargs)
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     # Just test we can build the thing.
     lens = ZeroOrMore(AnyOf(alphas, store=True))
     lens.get("abcd123", check_fully_consumed=False)
@@ -167,7 +167,7 @@ class Literal(CombineChars) :
       self.default = literal_string
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     for store in [False, True] :
       # GET
       lens = Literal("hello", store=store)
@@ -205,7 +205,7 @@ class Word(CombineChars) :
       self.lens = OneOrMore(AnyOf(body_chars, negate=negate, store=self.store))
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     for store in [True, False] :
       # GET
       lens = Word(alphanums, init_chars=alphas, store=store, default="thisis123valid") # A word that can contain but not begin with a number.
@@ -261,7 +261,7 @@ class Whitespace(CombineChars) :
       self.lens = Optional(self.lens)
   
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     lens = Whitespace(" ", store=True) + Word(alphanums, store=True)
     token = lens.get("  \thello")
     assert token[1] == "hello"

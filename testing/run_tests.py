@@ -33,88 +33,78 @@
 # 
 #
 
-# TODO: Allow all unit testing to be performed alone.
-# Different testing modes.
-UNIT_TESTS = "unit_tests"
-LONG_TESTS = "long_tests"
-ALL_TESTS = "all"
+import unittest
 
-# Import everything in the library
 from pylens import *
-
-# And import the longer, integrated tests.
 from long_tests import *
+from nbdebug import d
 
+CLASS_TEST_FUNCTION = "TESTS"
+FUNCTION_TEST_SUFFIX = "_test"
 
-def run_tests(args) :
-  unit_tests(args)
-
-def unit_tests(args=None) :
+def get_tests() :
   
-  import unittest
-
   # Automatically discover test routines.
-  TESTS = {}
+  tests = {}
   for name, item in globals().iteritems() :
     # Add (long) test functions, or class unit tests
-    if name.lower().endswith("_test") :
-      TESTS[name] = item
-    elif hasattr(item, "TESTS"):
-      TESTS[item.__name__] = item.TESTS
+    if name.lower().endswith(FUNCTION_TEST_SUFFIX) :
+      tests[name] = item
+    elif hasattr(item, CLASS_TEST_FUNCTION):
+      tests[item.__name__] = getattr(item, CLASS_TEST_FUNCTION)
 
-  if "commit_tests" in args :
-    # Disable commit testing, for experimentation.
-    exit(0)
+  return tests
+ 
 
-  # Determine if a specific test was specified to be run.
-  test_name = args[-1]
-  if test_name in ["test", "commit_tests"] :
-    test_name = None
-
-  if test_name and test_name not in TESTS :
-    raise Exception("There is no test called: %s" % test_name)
-
-
-
+def run_tests(test_mode, args) :
+  
+  all_tests = get_tests()
+  
+  if test_mode == "test" :
+    filtered_tests = {}
+    if not args :
+      raise Exception("You must specify a series of tests")
+    for test_name in args :
+      # TODO: Allow omision of _test in specifying funciton tests.
+      if test_name not in all_tests :
+        raise Exception("There is no test called: %s" % test_name)
+      filtered_tests[test_name] = all_tests[test_name]
+  else :
+    filtered_tests = all_tests
+  
   test_suite = unittest.TestSuite()
-  for name, test_function in TESTS.iteritems() :
-    if test_name and (name != test_name) :
-      continue
+  for name, test_function in filtered_tests.iteritems() :
     testcase = unittest.FunctionTestCase(test_function, description=name)
     test_suite.addTest(testcase)
   
   runner = unittest.TextTestRunner()
   test_result = runner.run(test_suite)
+  
+  # Useful to return an errorcode fo repository commit hook.
   if not test_result.wasSuccessful() :
     sys.exit(1)
 
 
-
 ###########################
 # Main.
-#
+###########################
 
 def main() :
   # This can be useful for testing.
-  print("Arbitrary tests")
-  class X:
-    def __eq__(self, other):
-      return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
-
-  x_1 = X()
-  x_1.a = "b"
-  x_2 = X()
-  x_2.a = "b"
-  print(x_1 == x_2)
   pass
 
 if __name__ == "__main__":
   import sys
   # Optionally run tests.
+  
+  if "commit_tests" in sys.argv :
+    # Disable commit testing, for experimentation.
+    pass #exit(0)
+
   if len(sys.argv) > 1 :
     print("="*50)
     print("Running tests")
     print("="*50)
-    run_tests(sys.argv)
+    run_tests(sys.argv[1].lower(), sys.argv[2:])
   else :
     main()

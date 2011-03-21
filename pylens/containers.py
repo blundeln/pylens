@@ -273,7 +273,8 @@ class ContainerFactory:
       return None
 
     return container_class(incoming_object)
-    
+   
+  # TODO: Add tests
     
 
 # OLD STUFF ===================================================
@@ -430,7 +431,7 @@ class GenericCollection(AbstractCollection):
 
 
   @staticmethod
-  def TESTS() :
+  def xTESTS() :
     t = GenericCollection(["x", 2, "Z"])
     d(t)
     d(t[0:2])
@@ -703,7 +704,7 @@ class TokenTypeFactory:
      
 
   @staticmethod
-  def TESTS() :
+  def xTESTS() :
     assert TokenTypeFactory.get_appropriate_collection_class(list) == ListCollection
     assert TokenTypeFactory.get_appropriate_collection_class(None) == GenericCollection
     

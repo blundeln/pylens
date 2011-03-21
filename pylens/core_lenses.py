@@ -165,7 +165,7 @@ class OneOrMore(CombinatorLens) :
     return self.lens.get_last_lenses()
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     d("GET")
     lens = OneOrMore(AnyOf(alphanums, store=True))
     token = lens.get("m1x3_p6", check_fully_consumed=False)
@@ -293,7 +293,7 @@ class CombineChars(Lens) :
     return self.lens.put(AbstractTokenReader(token_collection), concrete_input_reader)
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     d("GET")
     lens = CombineChars(AnyOf(alphas, store=True) + AnyOf(nums, store=True), store=True)
     concrete_reader = ConcreteInputReader("n6xxsf")
@@ -365,7 +365,7 @@ class Until(Lens) :
 
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     d("Testing")
     concrete_reader = ConcreteInputReader("(in the middle)")
     lens = "("+Until(")", store=True) + ")"
@@ -437,7 +437,7 @@ class Recurse(CombinatorLens):
     return [self]
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     lens = ("[" + (Recurse() | Word(alphas, store=True)) + "]")
     token = lens.get("[[hello]]")
     d(token)
@@ -501,7 +501,7 @@ class Forward(CombinatorLens):
 
 
   @staticmethod
-  def TESTS() :
+  def TESTSX() :
     d("GET")
     lens = Forward()
     # Now define the lens (must use '<<' rather than '=', since cannot easily

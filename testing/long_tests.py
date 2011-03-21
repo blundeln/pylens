@@ -37,7 +37,7 @@
 
 from pylens import *
 
-def deb_test() :
+def deb_testx() :
 
   INPUT = """Build-Depends: debhelper (>= 7.0.0),
                  perl-modules (>= 5.10) | libmodule-build-perl,
@@ -112,7 +112,7 @@ def deb_test() :
   """
 
 
-def touching_lens_test() :
+def touching_lens_testx() :
   """Tests that touching lenses are correctly computed from the lens tree."""
   literal_d = Literal("D")
   and_1 = Literal("A") + Literal("B") + Literal("C")
@@ -153,7 +153,7 @@ def touching_lens_test() :
 
 
 
-def apache_test() :
+def apache_testx() :
  
   # http://httpd.apache.org/docs/2.2/configuring.html
 
@@ -245,7 +245,7 @@ def apache_test() :
   #output = lens.put(abstract_data, INPUT)
 
 
-def iface_test() :
+def iface_testx() :
   """Put the module through its paces."""
   
   INPUT = """iface  eth0 inet static
@@ -341,7 +341,7 @@ auto eth1 eth2
 """)
 
 
-def api_test():
+def api_testx():
   
   CONCRETE_STRING = "Person:name=albert;surname=camus"
   class Person(object): # Must be new-style class
@@ -375,7 +375,7 @@ def api_test():
 
 
 
-def experimental_test() :
+def experimental_testx() :
   d("Started")
 
   lens = AnyOf(alphas, store=True)
