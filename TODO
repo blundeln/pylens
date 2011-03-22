@@ -7,6 +7,7 @@ Refactoring
   - Remove old code.
   - encapsulate debug routines for optional inclusion
     - especially the formatting of debug messages which can add a significant overhead.
+  - Try to build an arbitrary object structure container.
 
 target: 1.0.0a1
   - Complete Recursion

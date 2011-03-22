@@ -56,7 +56,7 @@ class Lens(object) :
 
     # Allow arbitrary arguments to be set which can aid flexible storage and
     # retrival of items from a container.
-    self.kargs = kargs
+    self.options = Properties(kargs)
 
   def has_type(self) :
     """Determines if this lens will GET and PUT a variable - a STORE lens."""
@@ -186,10 +186,9 @@ class Lens(object) :
 
   def _get_storage_meta_data(self, concrete_input_reader) :
      # Create some basic meta data to help with storing and retrieving the item.
-    meta_data = {
-      Meta.LENS: self, # Container can use attributes of lens.
-      Meta.CONCRETE_INPUT_READER: concrete_input_reader, # For flexible matching.
-    }
+    meta_data = Properties()
+    meta_data.lens = self
+    meta_data.concrete_input_reader = concrete_input_reader
     return meta_data
 
 
@@ -199,7 +198,6 @@ class Lens(object) :
     about its origin, which will allow flexibility in how it is stored and
     retrieved.
     """
-
     storage_meta_data = lens._get_storage_meta_data(concrete_input_reader)
     item = lens.get(concrete_input_reader, current_container=container)
     if has_value(item) :

@@ -36,13 +36,7 @@ import inspect
 import copy
 from debug import *
 from exceptions import *
-
-
-# Perhaps can simply be a class.
-class Meta:
-  LENS = "LENS"
-  CONCRETE_INPUT_READER = "CONCRETE_READER"
-
+from util import *
 
 
 class Rollbackable(object) :
@@ -167,6 +161,9 @@ class automatic_rollback:
     assert(o_3.y == [3,4])
 
 
+#
+# Containers
+#
 
 class AbstractContainer(Rollbackable) :
   """
@@ -175,6 +172,20 @@ class AbstractContainer(Rollbackable) :
   storage and retrieval of items in the container (e.g. labels, keys, concrete
   residue).
   """
+
+  # TODO: Add a default constructor to AbstractContainer
+
+  def set_label(self, label) :
+    if label and self.label :
+      raise Exception("Container already has a label defined.")
+    self.label = label
+
+  def get_label(self) :
+    if hasattr(self, "label") :
+      return self.label
+    else :
+      return None
+
 
   def store_item(self, item, meta_data) :
     raise NotImplementedError()
@@ -200,11 +211,11 @@ class ListContainer(AbstractContainer) :
     else :
       self.list = []
 
-  def store_item(self, item, meta_data=None) :
+  def store_item(self, item, meta_data) :
     d(meta_data)
     self.list.append(item)
 
-  def consume_item(self, meta_data=None) :
+  def consume_item(self, meta_data) :
     try :
       return self.list.pop(0)
     except IndexError:
@@ -218,19 +229,93 @@ class ListContainer(AbstractContainer) :
 
   @staticmethod
   def TESTS() :
+    dummy_meta = Properties()
+
     list_container = ListContainer([1,2,3])
-    list_container.store_item(4)
+    list_container.store_item(4, dummy_meta)
     assert(list_container.unwrap() == [1,2,3,4])
-    assert(list_container.consume_item(None) == 1)
+    assert(list_container.consume_item(dummy_meta) == 1)
     assert(list_container.unwrap() == [2,3,4])
-    list_container.consume_item(None)
-    list_container.consume_item(None)
-    list_container.consume_item(None)
+    list_container.consume_item(dummy_meta)
+    list_container.consume_item(dummy_meta)
+    list_container.consume_item(dummy_meta)
     try :
-      list_container.consume_item(None)
+      list_container.consume_item(dummy_meta)
       assert(False) # Should not get here
     except NoTokenToConsumeException:
       pass
+
+
+class DictContainer(AbstractContainer) :
+  """Stores items in a dict."""
+
+  def __init__(self, value=None) :
+    # Use list if passed; otherwise create a new list.
+    if has_value(value) :
+      assert isinstance(value, dict)
+      self.value = value
+    else :
+      self.value = {}
+
+  def store_item(self, item, meta_data) :
+    
+    # For brevity.
+    storage_options = meta_data.lens.options
+    
+    if storage_options.label :
+      if storage_options.label in self.value :
+        raise Exception("Label '%s' is already in use" % storage_options.label)
+      self.value[storage_options.label] = item
+      return
+
+    # Get the lens kargs
+    #lens_storage_options = ... 
+    
+
+  def consume_item(self, meta_data) :
+    
+    # For brevity.
+    storage_options = meta_data.lens.options
+
+    if storage_options.label :
+      if storage_options.label in self.value :
+        item = self.value[storage_options.label]
+        del self.value[storage_options.label]
+        return item
+        
+    
+    raise NoTokenToConsumeException()
+
+  def unwrap(self):
+    return self.value
+
+  def __str__(self) :
+    return str(self.value)
+
+  @staticmethod
+  def TESTS() :
+
+    def create_dummy_meta() :
+      meta_data = Properties()
+      meta_data.lens = Properties()
+      meta_data.lens.options = Properties()
+      return meta_data
+    
+    meta_data = create_dummy_meta()
+    options = meta_data.lens.options
+
+    container = DictContainer({"a":"x", "b":"y"})
+    
+    # Test simple label
+    options.clear()
+    options.label = "greeting"
+    container.store_item("hello", meta_data)
+    assert(container.consume_item(meta_data) == "hello")
+    with assert_raises(NoTokenToConsumeException) :
+      container.consume_item(meta_data)
+    
+    
+
 
 
 class ContainerFactory:

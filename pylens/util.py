@@ -57,6 +57,43 @@ def range_truncate(s, max_len=10) :
   if len(s) > max_len :
     return s[0:3] + "..." + s[-3:]
 
+class Properties(object):
+  """
+  A useful class for holding properties (e.g. meta data or lens options), which
+  uses __getattr__ to save us from always asking if it has a particular attribute.
+  """
+
+  def __init__(self, value=None) :
+    if not has_value(value) :
+      return
+    if type(value) != dict :
+      raise Exception("Expected to be passed a dict to wrap.")
+
+    self.__dict__.update(value)
+
+  def __getattr__(self, name) :
+    if name in self.__dict__ :
+      return self.__dict__[name]
+    else :
+      return None
+
+
+  def unwrap(self) :
+    return self.__dict__
+
+  def clear(self) :
+    """Useful in test cases."""
+    self.__dict__ = {}
+  
+  @staticmethod
+  def TESTS() :
+    d("Testing")
+    properties = Properties({"food":"cheese"})
+    assert(properties.food == "cheese")
+    properties.something = [1,2,3]
+    assert(properties.something == [1,2,3])
+
+
 def has_value(var) :
   """To avoid possible comparison bugs with empty values vs None."""
   return var != None
@@ -84,7 +121,7 @@ else :
   pformat = lambda x:""
 
 
-# XXX: Not used - yet.
+# XXX: Not used.
 class Charset:
   """Used for representing allowed characters and for handling negative sets, combination and checking for overlaps."""
   def __init__(self, charset, negate=False) :
