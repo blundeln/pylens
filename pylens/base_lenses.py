@@ -124,15 +124,14 @@ class Lens(object) :
     # an item directly or by some descendant lens.
     #
     # If we are a typed lens (i.e. a STORE lens) we will expect to put an item
-    # into our PUT proper function (_put) and discared the current container
-    # from that branch.
-    #   To simplify specific lens definition, we can pluck an item from the
-    #   container and pass it to _put
-    #   Though if we are a container lens (e.g. list, dict, etc.), we can wrap
-    #   the item as a AbstractContainer and replace the current_container.
+    # into our PUT proper function (_put)
+    #   To simplify specific lens definition if we are a container lens (e.g.
+    #   list, dict, etc.), we can wrap the item as a AbstractContainer and
+    #   replace the current_container of this branch.
     #
     # If we are not a typed lens, we have nothing special to do, so simply pass
-    # on the arguments to our PUT proper function
+    # on the arguments to our PUT proper function, noting that we could still
+    # have been passed an item from the user.
 
     # If there is no concrete input (i.e. for CREATE) and we have a default value, return it.
     if concrete_input == None and has_value(self.default) :
@@ -145,13 +144,8 @@ class Lens(object) :
     
     # If we are a typed lens, we will expect to PUT an item.
     if self.has_type() :
-      # To simplify _put definition, if we were not passed an item, try to pluck
-      # one from the current container.
-      if not has_value(item) :
-        storage_meta_data = self._get_storage_meta_data(concrete_input_reader)
-        item = current_container.consume_item(storage_meta_data)
-
-      # A typed lens expectes something to put.
+      
+      # A typed lens expects some item to put.
       assert(has_value(item))
       
       # If we are of type auto_list, wrap item in list if necessary.
@@ -201,25 +195,6 @@ class Lens(object) :
   def _get_container_class(self) :
     # Try to get a container class appropriate for this lens' type, which may be None
     return ContainerFactory.get_container_class(self.type)
-
-  def _get_storage_meta_data(self, concrete_input_reader) :
-     # Create some basic meta data to help with storing and retrieving the item.
-    meta_data = Properties()
-    meta_data.lens = self
-    meta_data.concrete_input_reader = concrete_input_reader
-    return meta_data
-
-
-  def _get_and_store(self, lens, concrete_input_reader, container) :
-    """
-    Common function for storing an item in a container with useful meta data
-    about its origin, which will allow flexibility in how it is stored and
-    retrieved.
-    """
-    storage_meta_data = lens._get_storage_meta_data(concrete_input_reader)
-    item = lens.get(concrete_input_reader, current_container=container)
-    if has_value(item) :
-      container.store_item(item, storage_meta_data)
 
 
   # XXX: I don't really like these forward declarations, but for now this does
@@ -312,7 +287,7 @@ class And(Lens) :
     Sequential GET on each lens.
     """
     for lens in self.lenses :
-      self._get_and_store(lens, concrete_input_reader, current_container)
+      current_container.get_and_store_item(lens, concrete_input_reader)
 
     # Should not return anything, since we work on the container!
 
@@ -322,7 +297,7 @@ class And(Lens) :
     # Simply concatenate output from the sub-lenses.
     output = ""
     for lens in self.lenses :
-      output += lens.put(item, concrete_input_reader, current_container)
+      output += current_container.consume_and_put_item(lens, concrete_input_reader)
 
     return output
     
@@ -552,7 +527,7 @@ class Repeat(Lens) :
     while(True) :
       try :
         with automatic_rollback(concrete_input_reader, current_container) :
-          self._get_and_store(lens, concrete_input_reader, current_container)
+          current_container.get_and_store_item(lens, concrete_input_reader)
           no_succeeded += 1
       except LensException :
         break
@@ -589,7 +564,7 @@ class Repeat(Lens) :
     while True :
       try :
         with automatic_rollback(effective_concrete_reader, current_container) :
-          output += lens.put(item, effective_concrete_reader, current_container)
+          output += current_container.consume_and_put_item(lens, effective_concrete_reader)
           no_succeeded += 1
       except LensException:
         # If we fail and the effective_concrete_reader is set, we may now
@@ -635,7 +610,8 @@ class Repeat(Lens) :
       while True :
         try :
           with automatic_rollback(concrete_input_reader) :
-            lens.get(concrete_input_reader, current_container)
+            #lens.get(concrete_input_reader, current_container)
+            current_container.get_and_store_item(lens, concrete_input_reader)
             no_got += 1
         except LensException:
           break

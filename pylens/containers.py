@@ -187,17 +187,40 @@ class AbstractContainer(Rollbackable) :
       return None
 
 
-  def store_item(self, item, meta_data) :
+  #
+  # Can overload these for more control (e.g. tentative PUT/CREATE if non-deterministic)
+  # 
+
+  def get_and_store_item(self, lens, concrete_input_reader) :
+    """Called by lenses that store items from sub-lenses in the container (e.g. And)."""
+    item = lens.get(concrete_input_reader, self)
+    if has_value(item) :
+      self.store_item(item, lens, concrete_input_reader)
+  
+  def consume_and_put_item(self, lens, concrete_input_reader) :
+    """Called by lenses that put items from the container into sub-lenses (e.g. And)."""
+    if has_value(lens.type) :
+      item = self.consume_item(lens, concrete_input_reader)
+    else :
+      item = None
+
+    return lens.put(item, concrete_input_reader, self)
+
+  #
+  # Must overload these.
+  # 
+
+  def store_item(self, item, lens, concrete_input_reader) :
     raise NotImplementedError()
 
-  def consume_item(self, meta_data) :
-    # Must consume something, else raise NoTokenToConsumeException.
+  def consume_item(self, lens, concrete_input_reader) :
     raise NotImplementedError()
-
+  
   def unwrap(self) :
     """Unwrap to native python type where appropriate: e.g. for list and dict.""" 
-    return self
-    
+    raise NotImplementedError()
+
+
 
 # Use this for user convenience, when we like to manipulate single item lists
 # as single items and auto convert those single items to and from lists at the
@@ -215,15 +238,16 @@ class ListContainer(AbstractContainer) :
     else :
       self.list = []
 
-  def store_item(self, item, meta_data) :
-    d(meta_data)
+  
+  def store_item(self, item, lens, concrete_input_reader) :
     self.list.append(item)
 
-  def consume_item(self, meta_data) :
+  def consume_item(self, lens, concrete_input_reader) :
     try :
       return self.list.pop(0)
     except IndexError:
       raise NoTokenToConsumeException()
+  
 
   def unwrap(self):
     return self.list
@@ -233,18 +257,19 @@ class ListContainer(AbstractContainer) :
 
   @staticmethod
   def TESTS() :
-    dummy_meta = Properties()
+    # Dummy arguments
+    lens, concrete_input_reader = None, None
 
     list_container = ListContainer([1,2,3])
-    list_container.store_item(4, dummy_meta)
+    list_container.store_item(4, lens, concrete_input_reader)
     assert(list_container.unwrap() == [1,2,3,4])
-    assert(list_container.consume_item(dummy_meta) == 1)
+    assert(list_container.consume_item(lens, concrete_input_reader) == 1)
     assert(list_container.unwrap() == [2,3,4])
-    list_container.consume_item(dummy_meta)
-    list_container.consume_item(dummy_meta)
-    list_container.consume_item(dummy_meta)
+    list_container.consume_item(lens, concrete_input_reader)
+    list_container.consume_item(lens, concrete_input_reader)
+    list_container.consume_item(lens, concrete_input_reader)
     try :
-      list_container.consume_item(dummy_meta)
+      list_container.consume_item(lens, concrete_input_reader)
       assert(False) # Should not get here
     except NoTokenToConsumeException:
       pass
