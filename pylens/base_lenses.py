@@ -58,6 +58,10 @@ class Lens(object) :
     # retrival of items from a container.
     self.options = Properties(kargs)
 
+    # There is no point setting a non-store lens as a label, so set type as str.
+    if not has_value(self.type) and self.options.is_label :
+      self.type = str
+
   def has_type(self) :
     """Determines if this lens will GET and PUT a variable - a STORE lens."""
     return self.type != None

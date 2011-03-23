@@ -249,51 +249,90 @@ class ListContainer(AbstractContainer) :
 class DictContainer(AbstractContainer) :
   """Stores items in a dict."""
 
-  def __init__(self, value=None) :
+  def __init__(self, dictionary=None) :
     # Use list if passed; otherwise create a new list.
-    if has_value(value) :
-      assert isinstance(value, dict)
-      self.value = value
+    if has_value(dictionary) :
+      assert isinstance(dictionary, dict)
+      self.dictionary = dictionary
     else :
-      self.value = {}
+      self.dictionary = {}
+
+    self.pending_key = None
 
   def store_item(self, item, meta_data) :
-    
+   
+    # Algorithm
+    #
+    # If lens has container label, use that
+    # If the item has a label, store by that label.
+    # else if it has is_label
+    # else if it has
+
     # For brevity.
     storage_options = meta_data.lens.options
     
+    # Static label
     if storage_options.label :
-      if storage_options.label in self.value :
-        raise Exception("Label '%s' is already in use" % storage_options.label)
-      self.value[storage_options.label] = item
+      if storage_options.label in self.dictionary :
+        raise CannotStoreException("Label '%s' is already in use" % storage_options.label)
+      self.dictionary[storage_options.label] = item
       return
 
-    # Get the lens kargs
-    #lens_storage_options = ... 
+    if storage_options.is_label :
+      assert(self.pending_key == None)
+      assert(isinstance(item, str))
+      self.pending_key = item
+      return
+   
+    #
+    #
+    #
+
+    # If no label can be found and there is a pending key, store by that.
+    if self.pending_key :
+      self.dictionary[self.pending_key] = item
+      self.pending_key = None
+
+
+  def _get_and_remove(self, key) :
+    item = self.dictionary[key]
+    del self.dictionary[key]
+    return item
+
+  def _find_next_key_in_input(self, meta_data) :
     
+    return None
 
   def consume_item(self, meta_data) :
     
     # For brevity.
     storage_options = meta_data.lens.options
 
+    # The easy case.
     if storage_options.label :
-      if storage_options.label in self.value :
-        item = self.value[storage_options.label]
-        del self.value[storage_options.label]
-        return item
-        
+      if storage_options.label in self.dictionary :
+        return self._get_and_remove(storage_options.label)
+
+    # Now we need to choose a key appropriately, either with or without concrete
+    # input (i.e. such that we match keys where possible).
+    
+
+    # If no idea and have pending, use that.
+
     
     raise NoTokenToConsumeException()
 
   def unwrap(self):
-    return self.value
+    return self.dictionary
 
   def __str__(self) :
-    return str(self.value)
+    return str(self.dictionary)
 
   @staticmethod
   def TESTS() :
+
+    # XXX
+    return
 
     def create_dummy_meta() :
       meta_data = Properties()
@@ -310,10 +349,25 @@ class DictContainer(AbstractContainer) :
     options.clear()
     options.label = "greeting"
     container.store_item("hello", meta_data)
+    with assert_raises(CannotStoreException) :
+      container.store_item("hello", meta_data)
     assert(container.consume_item(meta_data) == "hello")
     with assert_raises(NoTokenToConsumeException) :
       container.consume_item(meta_data)
-    
+    options.label = "a"
+    assert(container.consume_item(meta_data) == "x")
+   
+    # Test simple label-value pairs
+    options.clear()
+    options.is_label = True
+    container.store_item("key", meta_data)
+    options.clear()
+    container.store_item("value", meta_data)
+    # Now retrieve the item.
+    options.clear()
+    options.is_label = True
+    assert(container.consume_item(meta_data) == "key")
+
     
 
 

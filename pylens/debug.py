@@ -50,6 +50,9 @@ class assert_raises:
     pass
   
   def __exit__(self, type, exception, traceback) :
+    if not exception :
+      raise Exception("Expected to see exception: %s" % self.exception_class)
+    
     # Returning True means 'suppress exception', which we do if the exception is
     # of the type we expected.
     return isinstance(exception, self.exception_class)
@@ -62,7 +65,12 @@ class assert_raises:
     with assert_raises(ZeroDivisionError) :
       x = 1 / 0
 
-    # My most beautiful test, ever!
+    # Assert that we expected the ZeroDivisionError to be thrown.
+    with assert_raises(Exception) :
+      with assert_raises(ZeroDivisionError) :
+        x = 1 / 1
+    
+    # Confirm that the unexpected exception is let through.  My most beautiful test, ever!
     with assert_raises(IndexError) :
       with assert_raises(ZeroDivisionError) :
         x = []
