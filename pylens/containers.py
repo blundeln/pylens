@@ -302,6 +302,21 @@ class DictContainer(AbstractContainer) :
 
     raise CannotStoreException("I do not know how to store this lens item.")
 
+
+  def consume_item(self, lens, concrete_input_reader) :
+    
+    key = None
+
+    if lens.options.label and lens.options.label in self.dictionary:
+      key = lens.options.label
+
+    if key :
+      item = self._get_and_remove(key)
+      return item
+
+    raise NoTokenToConsumeException("I cannot find an item in the dictionary approriate for the lens.")
+    
+
   def _get_and_remove(self, key) :
     item = self.dictionary[key]
     del self.dictionary[key]
@@ -324,45 +339,16 @@ class DictContainer(AbstractContainer) :
 
     lens = Group(AnyOf(nums, type=int, label="number") + AnyOf(alphas, type=str, label="character"), type=dict)
     assert(lens.get("1a") == {"number":1, "character":"a"})
-    
-    # XXX
-    return
-
-    def create_dummy_meta() :
-      meta_data = Properties()
-      meta_data.lens = Properties()
-      meta_data.lens.options = Properties()
-      return meta_data
-    
-    meta_data = create_dummy_meta()
-    options = meta_data.lens.options
-
-    container = DictContainer({"a":"x", "b":"y"})
-    
-    # Test simple label
-    options.clear()
-    options.label = "greeting"
-    container.store_item("hello", meta_data)
-    with assert_raises(CannotStoreException) :
-      container.store_item("hello", meta_data)
-    assert(container.consume_item(meta_data) == "hello")
+    assert(lens.put({"number":4, "character":"q"}, "1a") == "4q")
+    assert(lens.create({"number":4, "character":"q"}) == "4q")
     with assert_raises(NoTokenToConsumeException) :
-      container.consume_item(meta_data)
-    options.label = "a"
-    assert(container.consume_item(meta_data) == "x")
-   
-    # Test simple label-value pairs
-    options.clear()
-    options.is_label = True
-    container.store_item("key", meta_data)
-    options.clear()
-    container.store_item("value", meta_data)
-    # Now retrieve the item.
-    options.clear()
-    options.is_label = True
-    assert(container.consume_item(meta_data) == "key")
-
+      lens.put({"number":4, "wrong_label":"q"}, "1a")
     
+    #
+    # Test use of dynamic labels.
+    #
+
+    # TODO:
 
 
 
