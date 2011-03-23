@@ -84,7 +84,10 @@ class Properties(object):
   def clear(self) :
     """Useful in test cases."""
     self.__dict__ = {}
-  
+
+  def __str__(self) :
+    return str(self.__dict__)
+
   @staticmethod
   def TESTS() :
     d("Testing")

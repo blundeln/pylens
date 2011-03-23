@@ -286,70 +286,26 @@ class DictContainer(AbstractContainer) :
     else :
       self.dictionary = {}
 
-    self.pending_key = None
 
-  def store_item(self, item, meta_data) :
-   
-    # Algorithm
-    #
-    # If lens has container label, use that
-    # If the item has a label, store by that label.
-    # else if it has is_label
-    # else if it has
-
-    # For brevity.
-    storage_options = meta_data.lens.options
+  def store_item(self, item, lens, concrete_input_reader) :
     
-    # Static label
-    if storage_options.label :
-      if storage_options.label in self.dictionary :
-        raise CannotStoreException("Label '%s' is already in use" % storage_options.label)
-      self.dictionary[storage_options.label] = item
+    key = None
+    
+    if lens.options.label :
+      if lens.options.label in self.dictionary :
+        raise CannotStoreException("Label '%s' is already in use" % lens.options.label)
+      key = lens.options.label
+
+    if key :
+      self.dictionary[key] = item
       return
 
-    if storage_options.is_label :
-      assert(self.pending_key == None)
-      assert(isinstance(item, str))
-      self.pending_key = item
-      return
-   
-    #
-    #
-    #
-
-    # If no label can be found and there is a pending key, store by that.
-    if self.pending_key :
-      self.dictionary[self.pending_key] = item
-      self.pending_key = None
-
+    raise CannotStoreException("I do not know how to store this lens item.")
 
   def _get_and_remove(self, key) :
     item = self.dictionary[key]
     del self.dictionary[key]
     return item
-
-  def _find_next_key_in_input(self, meta_data) :
-    
-    return None
-
-  def consume_item(self, meta_data) :
-    
-    # For brevity.
-    storage_options = meta_data.lens.options
-
-    # The easy case.
-    if storage_options.label :
-      if storage_options.label in self.dictionary :
-        return self._get_and_remove(storage_options.label)
-
-    # Now we need to choose a key appropriately, either with or without concrete
-    # input (i.e. such that we match keys where possible).
-    
-
-    # If no idea and have pending, use that.
-
-    
-    raise NoTokenToConsumeException()
 
   def unwrap(self):
     return self.dictionary
@@ -360,6 +316,15 @@ class DictContainer(AbstractContainer) :
   @staticmethod
   def TESTS() :
 
+    from pylens.base_lenses import Group, AnyOf, alphas, nums
+
+    #
+    # Test use of static labels.
+    #
+
+    lens = Group(AnyOf(nums, type=int, label="number") + AnyOf(alphas, type=str, label="character"), type=dict)
+    assert(lens.get("1a") == {"number":1, "character":"a"})
+    
     # XXX
     return
 
@@ -416,6 +381,8 @@ class ContainerFactory:
     # Also handles auto_list
     if issubclass(incoming_type, list) :
       return ListContainer
+    elif issubclass(incoming_type, dict) :
+      return DictContainer
     
     return None
 

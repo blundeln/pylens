@@ -88,8 +88,9 @@ class Lens(object) :
 
         # Call get proper, though a container lens' GET proper should not return
         # an item, since its sub-lenses may add items to the current_container.
+        # XXX: Hmmm, does this make sense for a Group?
         assert(self._get(concrete_input_reader, new_container) == None)
-
+        
         # Since we created the container, we will return it as our item,
         # checking it has the corrent type.
         item = new_container.unwrap()
