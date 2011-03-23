@@ -372,7 +372,20 @@ def api_testx():
   d(output)
   assert(output == "Person:name=fred;surname=flintstone" or output == "Person:surname=flintstone;name=fred")
 
+def auto_list_test() :
+  lens = Group(Repeat(AnyOf(nums, type=int)), type=auto_list)
+  
+  d("GET")
+  assert(lens.get("123") == [1,2,3])
+  assert(lens.get("1") == 1)
+  
+  d("PUT")
+  assert(lens.put([5,6,7], "123") == "567")
+  assert(lens.put(5, "123") == "5")
 
+  d("CREATE")
+  assert(lens.create([5,6,7]) == "567")
+  assert(lens.create(5) == "5")
 
 
 def experimental_testx() :

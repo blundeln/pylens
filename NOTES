@@ -1,15 +1,25 @@
 RESEARCH NOTES
-  - Have a properties util class for accessing dicts
-  - Use of keys and labels: lens can set kargs: key (of next lens with label=current_key) or container_key
+  - Use of keys and labels: lens designer can set arbitrary lens options
     - When returning items, ensure set_key is called to update cont key.
     - Think about how best to handle setting a key on a item that was passed
       from user which does not contain its key.
+      - On reflection, seems better to wrap in a group, though we could use
+        auto_list idea and a wrapper of group: KeyValue(X(is_key) + "==>" +
+        Y(type=P)) --> Group(<lens>, type=auto_list)
+    - Still, during create, we may make a bad choice of several candidates of
+      items to put into a given lens, so might be best to let container handle
+      put, such that it can flexibly make tentitive puts on certain tokens.
+      - Though we can certainly hone our candidate selection based on lens type
+      - Correctly handle auto_list in candidate selection.
+    - In general, if a container can store items correctly from lenses, it must
+      be able to put them back or create them correctly.
+  - Create KeyValue lens
   - What does it mean to pass a None item to put on an non-typed lens
   - Could have containers in container, multiplex store and consume.
   - Find nice way to add simple tracing messages so we can see what's going on
   - If any kargs set on a lens, assume is a store using default type of str
   - Think about how to best implement auto list idea
-  - TESTS inheritance, makes it difficult to disable tests by changin function
+  - TESTS inheritance, makes it difficult to disable tests by changing function
     name.
   
   - Optimisations

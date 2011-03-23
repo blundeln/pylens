@@ -93,7 +93,14 @@ class Lens(object) :
         # Since we created the container, we will return it as our item,
         # checking it has the corrent type.
         item = new_container.unwrap()
-        assert(type(item) == self.type)
+        
+        # Handle special case of an auto_list, unwrapping list if we have only a single item.
+        if self.type == auto_list :
+          assert(isinstance(item, list))
+          if len(item) == 1 :
+            item = item[0]
+        else :
+          assert(isinstance(item, self.type))
 
       else :
         # Call GET proper with the current container.
@@ -144,10 +151,17 @@ class Lens(object) :
         storage_meta_data = self._get_storage_meta_data(concrete_input_reader)
         item = current_container.consume_item(storage_meta_data)
 
-      # We should now have an item suitable for PUTing with our lens.
+      # A typed lens expectes something to put.
       assert(has_value(item))
-      if type(item) != self.type :
-        raise LensException("This lens cannot PUT and item of that type")
+      
+      # If we are of type auto_list, wrap item in list if necessary.
+      if self.type == auto_list :
+        if not isinstance(item, list) :
+          item = [item]
+      else : 
+        # We should now have an item suitable for PUTing with our lens.
+        if not isinstance(item, self.type) :
+          raise LensException("This lens cannot PUT an item of that type")
 
       # Now, the item could be a container (e.g. a list, dict, or some other
       # AbstractContainer), so to save the _put definition from having to wrap

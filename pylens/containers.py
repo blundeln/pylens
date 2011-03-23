@@ -199,6 +199,10 @@ class AbstractContainer(Rollbackable) :
     return self
     
 
+# Use this for user convenience, when we like to manipulate single item lists
+# as single items and auto convert those single items to and from lists at the
+# edge of the API.
+class auto_list(list) : pass
 
 class ListContainer(AbstractContainer) :
   """Simply stores items in a list, making no use of meta data."""
@@ -384,7 +388,8 @@ class ContainerFactory:
     if issubclass(incoming_type, AbstractContainer) :
       return incoming_type
 
-    if incoming_type == list :
+    # Also handles auto_list
+    if issubclass(incoming_type, list) :
       return ListContainer
     
     return None
@@ -687,10 +692,6 @@ class ObjectAttributeCollection(DictCollection) :
   def unwrap(self) :
     return self.obj
   
-# Use this for user convenience, when we like to manipulate single item lists
-# as single items and auto convert those single items to and from lists at the
-# edge of the API.
-class auto_list(list) : pass
 
 class TokenTypeFactory:
   """
