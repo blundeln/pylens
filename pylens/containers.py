@@ -38,6 +38,12 @@ from debug import *
 from exceptions import *
 from util import *
 
+# Wrappers for simple types, so we can transparently add arbitrary properies.
+class str_wrapper(str) :pass
+class int_wrapper(int) :pass
+class float_wrapper(float) :pass
+class list_wrapper(list) :pass
+class dict_wrapper(dict) :pass
 
 class Rollbackable(object) :
   """

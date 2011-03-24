@@ -62,7 +62,6 @@ class Properties(object):
   A useful class for holding properties (e.g. meta data or lens options), which
   uses __getattr__ to save us from always asking if it has a particular attribute.
   """
-
   def __init__(self, value=None) :
     if not has_value(value) :
       return
@@ -72,6 +71,10 @@ class Properties(object):
     self.__dict__.update(value)
 
   def __getattr__(self, name) :
+    # This is important, since obj.__dict__ would equal None!
+    if name.startswith("__") :
+      return super(object, self).__getattr__(name)
+
     if name in self.__dict__ :
       return self.__dict__[name]
     else :

@@ -81,6 +81,10 @@ class Lens(object) :
       # Get the appropriate container class for our lens, if there is one.
       container_class = self._get_container_class()
 
+      # Remember the start position of the concrete reader, to aid
+      # absract-concrete matching.
+      start_position = concrete_input_reader.get_pos()
+
       # If we are a container type (e.g. a list or some other AbstractContainer)...
       if container_class :
         # Replace the current container of sub-lenses with our own.
@@ -113,7 +117,11 @@ class Lens(object) :
           assert(has_value(item))
           # Cast the type (e.g. to an int, float).
           item = self.type(item)
-        
+     
+      # Attach meta data to the item to help with matching when it gets put
+      # back.
+      item = self._attach_source_meta_data(item, start_position, concrete_input_reader)
+
       return item
       
 
@@ -211,6 +219,22 @@ class Lens(object) :
     # Try to get a container class appropriate for this lens' type, which may be None
     return ContainerFactory.get_container_class(self.type)
 
+  def _attach_source_meta_data(self, item, start_position, concrete_input_reader) :
+    """Adds meta data to an item, indicating its origin in the concrete input."""
+    # If item has meta data already, do not add again.
+    if not has_value(item) or hasattr(item, "source_meta_data") :
+      return item
+
+    if isinstance(item, (str)) : item = str_wrapper(item)
+    if isinstance(item, (float)) : item = float_wrapper(item)
+    if isinstance(item, (int)) : item = int_wrapper(item)
+    if isinstance(item, (list)) : item = list_wrapper(item)
+    if isinstance(item, (dict)) : item = dict_wrapper(item)
+    
+    item.source_meta_data = Properties()
+    item.source_meta_data.start_position = start_position
+    item.source_meta_data.concrete_input_reader = concrete_input_reader
+    return item
 
   # XXX: I don't really like these forward declarations, but for now this does
   # the job.  Perhaps lenses can be registered with the framework for more

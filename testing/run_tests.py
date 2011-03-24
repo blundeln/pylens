@@ -91,6 +91,13 @@ def run_tests(test_mode, args) :
 
 def main() :
   # This can be useful for testing.
+  item = ["ssd","sdsd"]
+  if isinstance(item, (str, int, float, list, dict)) :
+    class wrapper(type(item)): pass
+  item = wrapper(item)
+  item.source_meta_data = Properties()
+
+  d(type(item))
   pass
 
 if __name__ == "__main__":
