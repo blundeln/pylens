@@ -1,4 +1,10 @@
 RESEARCH NOTES
+  - Revision of containers
+    - Original concrete structures should be bound where possible, even in a
+      list
+    - Attach source info to items as transparently as possible (e.g. props of
+      simple types, or at least type wrappers.
+    - Container should decide when to create and when to put.
   - Use of keys and labels: lens designer can set arbitrary lens options
     - When returning items, ensure set_key is called to update cont key.
     - Think about how best to handle setting a key on a item that was passed

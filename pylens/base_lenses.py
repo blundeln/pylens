@@ -184,6 +184,20 @@ class Lens(object) :
   def create(self, item=None, current_container=None) :
     return self.put(item, None, current_container)
 
+  def get_and_discard(self, concrete_input, current_container) :
+    """
+    Sometimes we wish to consume input but discard any items.
+    Note, since some lenses might one day use the current container state we must first
+    store items in the container before reverting it.  For example, the opening
+    and closing tags in XML-like structures.
+    """
+    # If we have a container, store its start state.
+    if has_value(current_container): container_start_state = current_container._get_state()
+
+    # Issue the get.
+    self.get(concrete_input, current_container)
+
+
   def _normalise_concrete_input(self, concrete_input) :
     # If input a string, wrap in a stateful string reader.
     if concrete_input == None:
@@ -378,23 +392,15 @@ class Or(Lens) :
     # to create a dummy container rather than copying it, but we might later
     # define lenses that can alter their behaviour based on the current state of
     # the container.
-    if has_value(current_container): container_start_state = current_container._get_state()
-    input_start_state = concrete_input_reader._get_state()
     GET_succeeded = False
     for lens in self.lenses :
       try :
-        lens.get(concrete_input_reader, current_container)
-        # If we got here, get succeeded, so revert container - though keep the
-        # input reader as it is: with some input consumed by this lens.
-        if has_value(current_container) : current_container._set_state(container_start_state)
-        GET_succeeded = True
-        break
+        with automatic_rollback(concrete_input_reader, current_container) :
+          lens.get_and_discard(concrete_input_reader, current_container)
+          GET_succeeded = True
+          break
       except LensException:
         pass
-      
-      # Revert the container AND input reader, ready to try the next lens.
-      if has_value(current_container) : current_container._set_state(container_start_state)
-      concrete_input_reader._set_state(input_start_state)
 
     if not GET_succeeded:
       raise LensException("Cross-put GET failed.")
@@ -420,15 +426,18 @@ class Or(Lens) :
     
     d("GET")
     lens = AnyOf(alphas, type=str) | AnyOf(nums, type=int)
-    got = lens.get("abc")
-    assert(got == "a")
-    got = lens.get("123")
-    assert(got == 1)
+    concrete_input_reader = ConcreteInputReader("abc")
+    got = lens.get(concrete_input_reader)
+    assert(got == "a" and concrete_input_reader.get_remaining() == "bc")
+    concrete_input_reader = ConcreteInputReader("123")
+    got = lens.get(concrete_input_reader)
+    assert(got == 1 and concrete_input_reader.get_remaining() == "23")
 
     d("PUT")
     assert(lens.put(5, "123") == "5")
     assert(lens.put("z", "abc") == "z")
-    assert(lens.put(5, "abc") == "5")
+    concrete_input_reader = ConcreteInputReader("abc")
+    assert(lens.put(5, concrete_input_reader) == "5" and concrete_input_reader.get_remaining() == "bc")
     assert(lens.put("z", "123") == "z")
     
     d("CREATE")
