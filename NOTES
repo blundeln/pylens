@@ -1,11 +1,13 @@
 RESEARCH NOTES
-  - Revision of containers
-    - Original concrete structures should be bound where possible, even in a
-      list
-    - Attach source info to items as transparently as possible (e.g. props of
-      simple types, or at least type wrappers.
-    - Container should decide when to create and when to put.
+  - Revision of PUT
+    - Items GOTten have source meta attached: source lens, input, and input pos.
+    - Makes no sense to weave new items into matching concrete structure
+    - If lens has type and is passed item, if item has source meta, replace
+      input for branch; else have no input, so becomes create.
+    - No need for create function.
   - Use of keys and labels: lens designer can set arbitrary lens options
+    - Should be simplified greatly by PUT revision, though still need careful
+      thought.
     - When returning items, ensure set_key is called to update cont key.
     - Think about how best to handle setting a key on a item that was passed
       from user which does not contain its key.

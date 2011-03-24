@@ -160,7 +160,13 @@ class Lens(object) :
       # If we are of type auto_list, wrap item in list if necessary.
       if self.type == auto_list :
         if not isinstance(item, list) :
-          item = [item]
+          # Ensure wrapped item preserves source_meta_data.
+          item_as_list = list_wrapper([item])
+          if hasattr(item, "source_meta_data") :
+            item_as_list.source_meta_data = item.source_meta_data
+            item.source_meta_data = None
+          item = item_as_list
+
       else : 
         # We should now have an item suitable for PUTing with our lens.
         if not isinstance(item, self.type) :
@@ -234,6 +240,7 @@ class Lens(object) :
     item.source_meta_data = Properties()
     item.source_meta_data.start_position = start_position
     item.source_meta_data.concrete_input_reader = concrete_input_reader
+    item.source_meta_data.lens = self
     return item
 
   # XXX: I don't really like these forward declarations, but for now this does
