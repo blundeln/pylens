@@ -80,6 +80,7 @@ class NoTokenToConsumeException(LensException): pass
 
 class InfiniteRecursionException(Exception): pass
 class CannotStoreException(Exception): pass
+class NoDefaultException(Exception): pass
 
 class EndOfStringException(LensException):
   pass

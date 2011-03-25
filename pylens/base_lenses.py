@@ -70,60 +70,73 @@ class Lens(object) :
   def get(self, concrete_input, current_container=None) :
       """
       """
-      
-      # Ensure we have a ConcreteInputReader
-      concrete_input_reader = self._normalise_concrete_input(concrete_input)
-      assert(has_value(concrete_input_reader))
-      
-      # The abstract item we will extract from the concret input.
-      item = None
+      #
+      # Algorithm
+      #
+      # If we have a container type
+      #   replace container with new one - to save hassle of doing it in each _get 
+      # item = _get(input, container)
+      # if typed_lens:
+      #   cast item if not instance
+      #   assert(item is correct type)
+      #   if auto_list :
+      #     item = unwrap item
+      #   assert not already got properties
+      #   set properties
+      #
+      # Note, even if non-typed, we may return an item from a lens we wrap (e.g. Or)
+      #
+      # return item
 
+      
+
+      # Ensure we have a ConcreteInputReader
+      assert(has_value(concrete_input))
+      concrete_input_reader = self._normalise_concrete_input(concrete_input)
+      
       # Get the appropriate container class for our lens, if there is one.
       container_class = self._get_container_class()
 
       # Remember the start position of the concrete reader, to aid
-      # absract-concrete matching.
+      # abstract--concrete matching.
       start_position = concrete_input_reader.get_pos()
 
-      # If we are a container type (e.g. a list or some other AbstractContainer)...
+      # Replace the current container of sub-lenses with our own.
       if container_class :
-        # Replace the current container of sub-lenses with our own.
         new_container = container_class()
-
-        # Call get proper, though a container lens' GET proper should not return
-        # an item, since its sub-lenses may add items to the current_container.
-        # XXX: Hmmm, does this make sense for a Group?
+        # Call GET proper with our container, checking that no item is returned,
+        # since all items should be stored WITHIN the container
         assert(self._get(concrete_input_reader, new_container) == None)
         
         # Since we created the container, we will return it as our item,
-        # checking it has the corrent type.
         item = new_container.unwrap()
-        
-        # Handle special case of an auto_list, unwrapping list if we have only a single item.
+      else :
+        # Call GET proper.
+        item = self._get(concrete_input_reader, current_container)
+
+      if self.has_type() :
+        # Cast the item to our type.
+        if not isinstance(item, self.type) :
+          item = self.type(item)
+
+        # Handle auto_list (i.e. unwrap single item from list)
         if self.type == auto_list :
+          # XXX: Have to be careful with source meta data here.
+          # Check we got a list.
           assert(isinstance(item, list))
           if len(item) == 1 :
             item = item[0]
         else :
+          # Check we got an item of the correct type (after any casting).
           assert(isinstance(item, self.type))
 
-      else :
-        # Call GET proper with the current container.
-        item = self._get(concrete_input_reader, current_container)
+        # Now add source info to the item.
+        # XXX: May also be useful to add end position.
+        item = self._attach_source_meta_data(item, start_position, concrete_input_reader)
 
-        # Any lens may return an item, though a lens with a type MUST return an
-        # item of its specified type.
-        if self.has_type() :
-          assert(has_value(item))
-          # Cast the type (e.g. to an int, float).
-          item = self.type(item)
-     
-      # Attach meta data to the item to help with matching when it gets put
-      # back.
-      item = self._attach_source_meta_data(item, start_position, concrete_input_reader)
 
       return item
-      
+
 
   def put(self, item=None, concrete_input=None, current_container=None) :
     
@@ -227,9 +240,9 @@ class Lens(object) :
 
   def _attach_source_meta_data(self, item, start_position, concrete_input_reader) :
     """Adds meta data to an item, indicating its origin in the concrete input."""
-    # If item has meta data already, do not add again.
-    if not has_value(item) or hasattr(item, "source_meta_data") :
-      return item
+    # There is a problem with the lens definition if an item already has
+    # this.
+    assert(has_value(item) and not hasattr(item, "source_meta_data"))
 
     if isinstance(item, (str)) : item = str_wrapper(item)
     if isinstance(item, (float)) : item = float_wrapper(item)
@@ -494,14 +507,31 @@ class AnyOf(Lens) :
         raise LensException("Expected char %s but got '%s'" % (self._display_id(), truncate(char)))
     except EndOfStringException:
       raise LensException("Expected char %s but at end of string" % (self._display_id()))
-    
-    return char
+   
+    if self.has_type() :
+      return char
+    else :
+      return None
 
 
   def _put(self, item, concrete_input_reader, current_container) :
+    
+    # If we are not a store lens, simply return what we would consume from the input.
+    if not self.has_type() :
+      # We should not have been passed an item.
+      assert(not has_value(item))
+      if has_value(concrete_input_reader) :
+        start_position = concrete_input_reader.get_pos()
+        self._get(concrete_input_reader, current_container)
+        return concrete_input_reader.get_consumed_string(start_position)
+        
+      else :
+        raise NoDefaultException("Cannot CREATE: a default should have been set on this lens, or a higher lens.")
+    
     # If this is PUT (vs CREATE) then first consume input.
     if concrete_input_reader :
       self.get(concrete_input_reader)
+    
     lens_assert(isinstance(item, str) and len(item) == 1 and self._is_valid_char(item), "Invalid item '%s', expected %s." % (item, self._display_id()))
     return item
 
@@ -546,6 +576,14 @@ class AnyOf(Lens) :
     assert lens.get("3") == 3
     assert lens.put(8, "3") == "8"
 
+    d("Test non-typed lens")
+    lens = AnyOf(alphas, default="d")
+    assert(lens.put(None,"a") == "a")
+    assert(lens.create(None) == "d")
+    lens = AnyOf(alphas)
+    with assert_raises(NoDefaultException) :
+      lens.create(None)
+    
 
 class Repeat(Lens) :
   """
@@ -568,6 +606,7 @@ class Repeat(Lens) :
     while(True) :
       try :
         with automatic_rollback(concrete_input_reader, current_container) :
+          # TODO: What if there is no container???
           current_container.get_and_store_item(lens, concrete_input_reader)
           no_succeeded += 1
       except LensException :
@@ -635,6 +674,7 @@ class Repeat(Lens) :
 
     if no_succeeded < self.min_count :
       raise LensException("Expected at least %s successful GETs" % (self.min_count))
+  
    
     # Finally, the items we PUT/CREATED may be fewer than the number of concrete
     # structures, so we GET as many as possible, discarding any extracted items
@@ -694,6 +734,11 @@ class Repeat(Lens) :
       lens.get("anything")
     with assert_raises(InfiniteIterationException) :
       lens.put([], "anything")
+
+    # Test non-typed and default
+    # XXX
+    lens = Repeat(AnyOf(nums))
+    #d(lens.get("12345"))
 
 
 class Empty(Lens) :

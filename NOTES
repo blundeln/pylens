@@ -1,10 +1,19 @@
 RESEARCH NOTES
+  - Need to be careful with source meta and auto_list - work on auto_list tests
+  - HOw best to handle non-typed lenses
+    - Container lenses, need to handle case where no container (i.e. non-store container)
+    - Work on repeat test
+  - Remember: stuff on stash
   - Revision of PUT
     - Items GOTten have source meta attached: source lens, input, and input pos.
     - Makes no sense to weave new items into matching concrete structure
     - If lens has type and is passed item, if item has source meta, replace
-      input for branch; else have no input, so becomes create.
+      input for branch and cosume from original input; else have no input, so becomes create.
+    - input reader must still be passed down to non-typed lenses
     - No need for create function.
+    - Create a simple mathcing test such as: a------bx-y <--> [[a,b][x,y]]
+  - Could we have type=str on container lens rather than combine chars?
+  - Group should take only non-typed lens?
   - Use of keys and labels: lens designer can set arbitrary lens options
     - Should be simplified greatly by PUT revision, though still need careful
       thought.
@@ -22,7 +31,6 @@ RESEARCH NOTES
     - In general, if a container can store items correctly from lenses, it must
       be able to put them back or create them correctly.
   - Create KeyValue lens
-  - What does it mean to pass a None item to put on an non-typed lens
   - Could have containers in container, multiplex store and consume.
   - Find nice way to add simple tracing messages so we can see what's going on
   - If any kargs set on a lens, assume is a store using default type of str
