@@ -1,8 +1,13 @@
 RESEARCH NOTES
-  - Need to be careful with source meta and auto_list - work on auto_list tests
   - HOw best to handle non-typed lenses
     - Container lenses, need to handle case where no container (i.e. non-store container)
+      - have container_get and container_put methods in base lens
+        - get: if no container, call get and check nothing returned
+        - put: if no container, call put(lens, None, in=in, cont=None)
     - Work on repeat test
+    - Lenses that parse input directly should return None
+  - Reorganise code:
+    - storage.py -> item things, containers, input reader
   - Remember: stuff on stash
   - Revision of PUT
     - Items GOTten have source meta attached: source lens, input, and input pos.

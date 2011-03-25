@@ -121,11 +121,8 @@ class Lens(object) :
 
         # Handle auto_list (i.e. unwrap single item from list)
         if self.type == auto_list :
-          # XXX: Have to be careful with source meta data here.
           # Check we got a list.
           assert(isinstance(item, list))
-          if len(item) == 1 :
-            item = item[0]
         else :
           # Check we got an item of the correct type (after any casting).
           assert(isinstance(item, self.type))
@@ -133,6 +130,13 @@ class Lens(object) :
         # Now add source info to the item.
         # XXX: May also be useful to add end position.
         item = self._attach_source_meta_data(item, start_position, concrete_input_reader)
+
+        if self.type == auto_list :
+          if len(item) == 1 :
+            # Ensure we preserve the meta data of the list within meta data of the item.
+            list_source_meta_data = item.source_meta_data
+            item = item[0]
+            item.source_meta_data.list_source_meta_data = list_source_meta_data
 
 
       return item
@@ -173,11 +177,12 @@ class Lens(object) :
       # If we are of type auto_list, wrap item in list if necessary.
       if self.type == auto_list :
         if not isinstance(item, list) :
-          # Ensure wrapped item preserves source_meta_data.
           item_as_list = list_wrapper([item])
+          # Restore the source_meta_data of the list from the item.
           if hasattr(item, "source_meta_data") :
-            item_as_list.source_meta_data = item.source_meta_data
-            item.source_meta_data = None
+            assert(item.source_meta_data.list_source_meta_data != None)
+            item_as_list.source_meta_data = item.source_meta_data.list_source_meta_data
+            item.source_meta_data.list_source_meta_data = None
           item = item_as_list
 
       else : 

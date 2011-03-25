@@ -374,8 +374,6 @@ def api_testx():
 
 def auto_list_test() :
   lens = Group(Repeat(AnyOf(nums, type=int)), type=auto_list)
-  #XXX
-  return 
   d("GET")
   assert(lens.get("123") == [1,2,3])
   assert(lens.get("1") == 1)
@@ -387,6 +385,10 @@ def auto_list_test() :
   d("CREATE")
   assert(lens.create([5,6,7]) == "567")
   assert(lens.create(5) == "5")
+
+  # Test list_source_meta_data preservation - assertion will fail if not preserved.
+  assert(lens.put(lens.get("1")) == "1")
+  
 
 
 def experimental_testx() :
