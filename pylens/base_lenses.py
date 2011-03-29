@@ -171,8 +171,9 @@ class Lens(object) :
     # If we are a typed lens, we will expect to PUT an item.
     if self.has_type() :
       
-      # A typed lens expects some item to put.
-      assert(has_value(item))
+      # A typed lens expects some item to put, though we use a lens exception to allow Or options to be tried.
+      if not has_value(item) :
+        raise LensException("This typed lens expected an item to be passed to it.")
       
       # If we are of type auto_list, wrap item in list if necessary.
       if self.type == auto_list :
@@ -229,6 +230,25 @@ class Lens(object) :
     # Issue the get.
     self.get(concrete_input, current_container)
 
+  #
+  # container_get and container_put are used by container lenses to store and
+  # put items from a container, whilst cleaninly handling the case where there
+  # is no container (e.g. repetition of non-store lenses, etc.)
+  #
+
+  def container_get(self, lens, concrete_input_reader, current_container) :
+    if current_container :
+      return current_container.get_and_store_item(lens, concrete_input_reader)
+    else :
+      # Call get on lens passing no container, checking it returns no item.
+      assert(lens.get(concrete_input_reader, None) == None)
+      return None
+
+  def container_put(self, lens, concrete_input_reader, current_container) :
+    if current_container :
+      return current_container.consume_and_put_item(lens, concrete_input_reader)
+    else :
+      return lens.put(None, concrete_input_reader, None)
 
   def _normalise_concrete_input(self, concrete_input) :
     # If input a string, wrap in a stateful string reader.
@@ -493,6 +513,11 @@ class Or(Lens) :
     assert(lens.create(5) == "5")
     assert(lens.create("a") == "a")
 
+    d("Test with default values")
+    lens = AnyOf(alphas, type=str) | AnyOf(nums, default=3)
+    assert(lens.create(None) == "3")
+    
+
 
 class AnyOf(Lens) :
   """
@@ -611,8 +636,7 @@ class Repeat(Lens) :
     while(True) :
       try :
         with automatic_rollback(concrete_input_reader, current_container) :
-          # TODO: What if there is no container???
-          current_container.get_and_store_item(lens, concrete_input_reader)
+          self.container_get(lens, concrete_input_reader, current_container)
           no_succeeded += 1
       except LensException :
         break
@@ -649,7 +673,7 @@ class Repeat(Lens) :
     while True :
       try :
         with automatic_rollback(effective_concrete_reader, current_container) :
-          output += current_container.consume_and_put_item(lens, effective_concrete_reader)
+          output += self.container_put(lens, effective_concrete_reader, current_container)
           no_succeeded += 1
       except LensException:
         # If we fail and the effective_concrete_reader is set, we may now
@@ -691,13 +715,15 @@ class Repeat(Lens) :
         no_to_get = self.max_count - no_put
         assert(no_to_get >= 0)
       
+      # Do this without get_and_discard to avoid excessive state copying.
       no_got = 0
       state = get_rollbackables_state(current_container)
       while True :
         try :
           with automatic_rollback(concrete_input_reader) :
             #lens.get(concrete_input_reader, current_container)
-            current_container.get_and_store_item(lens, concrete_input_reader)
+            #current_container.get_and_store_item(lens, concrete_input_reader)
+            self.container_get(lens, concrete_input_reader, current_container)
             no_got += 1
         except LensException:
           break
@@ -740,10 +766,24 @@ class Repeat(Lens) :
     with assert_raises(InfiniteIterationException) :
       lens.put([], "anything")
 
-    # Test non-typed and default
-    # XXX
+    # Test non-typed lenses and lenses with default.
     lens = Repeat(AnyOf(nums))
-    #d(lens.get("12345"))
+    input_reader = ConcreteInputReader("12345abc")
+    d(lens.get(input_reader) == None and input_reader.get_remaining() == "abc")
+    input_reader.reset()
+    d(lens.put(None, input_reader, None) == "12345" and input_reader.get_remaining() == "abc")
+
+    # Should fail, since lens has no default
+    with assert_raises(LensException) :
+      lens.create(None)
+
+    # Test the functionality with defaul values.
+    lens = Repeat(AnyOf(nums), default="54321")
+    assert(lens.create(None) == "54321")
+    lens = Repeat(AnyOf(nums, default=4))
+    with assert_raises(InfiniteIterationException) :
+      lens.create(None)
+
 
 
 class Empty(Lens) :

@@ -1,14 +1,4 @@
 RESEARCH NOTES
-  - HOw best to handle non-typed lenses
-    - Container lenses, need to handle case where no container (i.e. non-store container)
-      - have container_get and container_put methods in base lens
-        - get: if no container, call get and check nothing returned
-        - put: if no container, call put(lens, None, in=in, cont=None)
-    - Work on repeat test
-    - Lenses that parse input directly should return None
-  - Reorganise code:
-    - storage.py -> item things, containers, input reader
-  - Remember: stuff on stash
   - Revision of PUT
     - Items GOTten have source meta attached: source lens, input, and input pos.
     - Makes no sense to weave new items into matching concrete structure
@@ -17,6 +7,9 @@ RESEARCH NOTES
     - input reader must still be passed down to non-typed lenses
     - No need for create function.
     - Create a simple mathcing test such as: a------bx-y <--> [[a,b][x,y]]
+  - Reorganise code:
+    - storage.py -> item things, containers, input reader
+  - Remember: stuff on stash
   - Could we have type=str on container lens rather than combine chars?
   - Group should take only non-typed lens?
   - Use of keys and labels: lens designer can set arbitrary lens options
