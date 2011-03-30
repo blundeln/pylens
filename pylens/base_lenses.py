@@ -59,6 +59,10 @@ class Lens(object) :
     # retrival of items from a container.
     self.options = Properties(kargs)
 
+    #
+    # Argument shortcuts
+    #
+
     # There is no point setting a non-store lens as a label, so set type as str.
     if not has_value(self.type) and self.options.is_label :
       self.type = str
@@ -167,6 +171,8 @@ class Lens(object) :
     # If there is no concrete input (i.e. for CREATE) and we have a default value, return it.
     if concrete_input == None and has_value(self.default) :
       return str(self.default)
+
+    # If we have an item, substitute
 
     # Ensure we have a ConcreteInputReader, otherwise None (for CREATE mode).
     concrete_input_reader = self._normalise_concrete_input(concrete_input)

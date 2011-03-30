@@ -1,5 +1,13 @@
 RESEARCH NOTES
   - Revision of PUT
+    - Incremental changes
+      - Plan algorithms
+      - Create input based on other
+      - use input from item
+      - pluck in put
+      - change args
+    - Should we merge item and content arg and remove input arg?
+    - Or issue: should a lens pluck its own item, rather than a container lens?
     - Items GOTten have source meta attached: source lens, input, and input pos.
     - Makes no sense to weave new items into matching concrete structure
     - If lens has type and is passed item, if item has source meta, replace

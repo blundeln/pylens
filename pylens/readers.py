@@ -30,7 +30,7 @@
 # Description:
 #   Stateful string reader classes (i.e. that can be rolled back for tentative parsing)
 #
-#from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
+
 from debug import *
 from exceptions import *
 from util import *
@@ -40,9 +40,14 @@ from containers import *
 class ConcreteInputReader(Rollbackable):
   """Stateful reader of the concrete input string."""
 
-  def __init__(self, string):
-    self.position  = 0
-    self.string    = string
+  def __init__(self, value):
+    if isinstance(value, self.__class__) :
+      self.position = value.position
+      self.string = value.string
+    else :
+      assert(isinstance(value, str))
+      self.position  = 0
+      self.string    = value
 
   def reset(self) :
     self.set_pos(0)
@@ -135,6 +140,9 @@ class ConcreteInputReader(Rollbackable):
 
     assert concrete_reader.get_remaining() == "ABCD"
 
+    # Test that clones share the string object, for efficiency.
+    cloned_reader = ConcreteInputReader(concrete_reader)
+    assert(cloned_reader.string is concrete_reader.string)
 
 
 
