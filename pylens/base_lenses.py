@@ -33,6 +33,7 @@ from debug import *
 from exceptions import *
 from containers import *
 from readers import *
+from item import *
 from util import *
 from charsets import *
 
@@ -128,15 +129,19 @@ class Lens(object) :
           assert(isinstance(item, self.type))
 
         # Now add source info to the item.
-        # XXX: May also be useful to add end position.
-        item = self._attach_source_meta_data(item, start_position, concrete_input_reader)
+        item = attach_meta_data(item)
+        item._meta_data = Properties()
+        item._meta_data.start_position = start_position
+        item._meta_data.concrete_input_reader = concrete_input_reader
+        item._meta_data.lens = self
+
 
         if self.type == auto_list :
           if len(item) == 1 :
             # Ensure we preserve the meta data of the list within meta data of the item.
-            list_source_meta_data = item.source_meta_data
+            list_meta_data = item._meta_data
             item = item[0]
-            item.source_meta_data.list_source_meta_data = list_source_meta_data
+            item._meta_data.list_meta_data = list_meta_data
 
 
       return item
@@ -174,16 +179,19 @@ class Lens(object) :
       # A typed lens expects some item to put, though we use a lens exception to allow Or options to be tried.
       if not has_value(item) :
         raise LensException("This typed lens expected an item to be passed to it.")
-      
+     
+      # For the sake of consistancy, ensure the incoming item can hold meta data.
+      item = attach_meta_data(item)
+
       # If we are of type auto_list, wrap item in list if necessary.
       if self.type == auto_list :
         if not isinstance(item, list) :
           item_as_list = list_wrapper([item])
-          # Restore the source_meta_data of the list from the item.
-          if hasattr(item, "source_meta_data") :
-            assert(item.source_meta_data.list_source_meta_data != None)
-            item_as_list.source_meta_data = item.source_meta_data.list_source_meta_data
-            item.source_meta_data.list_source_meta_data = None
+          # Restore the _meta_data of the list from the item.
+          if item._meta_data.list_meta_data :
+            item_as_list._meta_data = item._meta_data.list_meta_data
+            # Ensure we use this only once.
+            item._meta_data.list_meta_data = None
           item = item_as_list
 
       else : 
@@ -263,23 +271,6 @@ class Lens(object) :
     # Try to get a container class appropriate for this lens' type, which may be None
     return ContainerFactory.get_container_class(self.type)
 
-  def _attach_source_meta_data(self, item, start_position, concrete_input_reader) :
-    """Adds meta data to an item, indicating its origin in the concrete input."""
-    # There is a problem with the lens definition if an item already has
-    # this.
-    assert(has_value(item) and not hasattr(item, "source_meta_data"))
-
-    if isinstance(item, (str)) : item = str_wrapper(item)
-    if isinstance(item, (float)) : item = float_wrapper(item)
-    if isinstance(item, (int)) : item = int_wrapper(item)
-    if isinstance(item, (list)) : item = list_wrapper(item)
-    if isinstance(item, (dict)) : item = dict_wrapper(item)
-    
-    item.source_meta_data = Properties()
-    item.source_meta_data.start_position = start_position
-    item.source_meta_data.concrete_input_reader = concrete_input_reader
-    item.source_meta_data.lens = self
-    return item
 
   # XXX: I don't really like these forward declarations, but for now this does
   # the job.  Perhaps lenses can be registered with the framework for more
