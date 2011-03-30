@@ -2,7 +2,6 @@ RESEARCH NOTES
   - Revision of PUT
     - Incremental changes
       - Plan algorithms
-      - Create input based on other
       - use input from item
       - pluck in put
       - change args
@@ -12,6 +11,7 @@ RESEARCH NOTES
     - Makes no sense to weave new items into matching concrete structure
     - If lens has type and is passed item, if item has source meta, replace
       input for branch and cosume from original input; else have no input, so becomes create.
+      - Clone reader only if not already aligned.
     - input reader must still be passed down to non-typed lenses
     - No need for create function.
     - Create a simple mathcing test such as: a------bx-y <--> [[a,b][x,y]]

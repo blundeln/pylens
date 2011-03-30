@@ -76,6 +76,9 @@ class LensException(RollbackException):
 
 # Thrown when an abstract token collection cannot find an appropriate token in the
 # PUT direction.
+# Note, when deciding whether to throw a LensException or Exception it is useful
+# to consider the Or lens, when alternate branches may be tried (e.g. is it a
+# problem with the lens definition or just a failed parsing branch)
 class NoTokenToConsumeException(LensException): pass
 class NoDefaultException(LensException): pass
 

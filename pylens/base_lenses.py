@@ -152,21 +152,49 @@ class Lens(object) :
 
 
   def put(self, item=None, concrete_input=None, current_container=None) :
-    
+   
+    #
     # Algorithm
     #
-    # We will be passed either an item to PUT or a container from which to PUT
-    # an item directly or by some descendant lens.
+    # XXX: Is this correct, even for Or?
+    # Assert item => input = None and container = None
+    # XXX: Should we be passed an item and concrete_input?
     #
-    # If we are a typed lens (i.e. a STORE lens) we will expect to put an item
-    # into our PUT proper function (_put)
-    #   To simplify specific lens definition if we are a container lens (e.g.
-    #   list, dict, etc.), we can wrap the item as a AbstractContainer and
-    #   replace the current_container of this branch.
+    # Normalise concrete input reader.
     #
-    # If we are not a typed lens, we have nothing special to do, so simply pass
-    # on the arguments to our PUT proper function, noting that we could still
-    # have been passed an item from the user.
+    # We are an un-typed lens
+    #   if we have a default value and no concrete input, return it.
+    #
+    # We are a typed lens
+    #  If we are passed an item
+    #    ensure meta attached
+    #    handle auto list
+    #    check correct type, else raise LensException
+    #    get the item input reader if there is one - can be None
+    #    if item_input_reader 
+    #      if input_reader
+    #        if item_input_reader is not aligned with input_reader
+    #          consume from input_reader
+    #          set input_reader item_input_reader
+    #        else we use the input_reader (i.e both consume and put) - can discard item_input_reader
+    #    else :
+    #      No input for this item, so we are CREATING
+    #      consume from input_reader
+    #      set input_reader = None
+    #      
+    #    if we are container type, wrap item as current_container and set item = None
+    #    call put proper on item with item, input_reader and current_container
+    #  else if we are passed a container (and no item)
+    #    instruct the container to put it.
+    #  else :
+    #    LensException expected something to put.
+    #
+    # else if not typed lens return put proper, passing through our args - note, item could be passed through us
+
+
+    #
+    # OLD Algorithm
+    #
 
     # If there is no concrete input (i.e. for CREATE) and we have a default value, return it.
     if concrete_input == None and has_value(self.default) :
