@@ -102,6 +102,9 @@ class ConcreteInputReader(Rollbackable):
     """
     return self.get_remaining() == ""
 
+  def is_aligned_with(self, other) :
+    return self.position == other.position and self.string == other.string
+
   def __str__(self) :
     # Return a string representation of this reader, to help debugging.
     if self.is_fully_consumed() :
@@ -143,6 +146,9 @@ class ConcreteInputReader(Rollbackable):
     # Test that clones share the string object, for efficiency.
     cloned_reader = ConcreteInputReader(concrete_reader)
     assert(cloned_reader.string is concrete_reader.string)
+    assert(cloned_reader.is_aligned_with(concrete_reader))
+    cloned_reader.position += 1
+    assert(not cloned_reader.is_aligned_with(concrete_reader))
 
 
 
