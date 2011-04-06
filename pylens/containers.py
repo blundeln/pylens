@@ -192,18 +192,18 @@ class AbstractContainer(Rollbackable) :
 
   def get_and_store_item(self, lens, concrete_input_reader) :
     """Called by lenses that store items from sub-lenses in the container (e.g. And)."""
+    # Note, here the lens may not have a type, though may still return an item
+    # that was GOT from a sub-lens
     item = lens.get(concrete_input_reader, self)
     if has_value(item) :
       self.store_item(item, lens, concrete_input_reader)
   
   def consume_and_put_item(self, lens, concrete_input_reader) :
     """Called by lenses that put items from the container into sub-lenses (e.g. And)."""
-    if has_value(lens.type) :
-      item = self.consume_item(lens, concrete_input_reader)
-    else :
-      item = None
-
-    return lens.put(item, concrete_input_reader, self)
+    assert(lens.has_type())
+    item = self.consume_item(lens, concrete_input_reader)
+    assert(has_value(item))
+    return lens.put(item, concrete_input_reader, None)
 
   #
   # Must overload these.
@@ -388,7 +388,7 @@ class ContainerFactory:
     if incoming_object == None or issubclass(type(incoming_object), AbstractContainer) :
       return incoming_object
     
-    d("Wrapping %s" % incoming_object)
+    #d("Wrapping %s" % incoming_object)
     container_class = ContainerFactory.get_container_class(type(incoming_object))
     if container_class == None :
       return None

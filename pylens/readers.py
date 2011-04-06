@@ -65,6 +65,7 @@ class ConcreteInputReader(Rollbackable):
     return self.position
 
   def set_pos(self, pos) :
+    assert(isinstance(pos, int))
     self.position = pos
 
   def get_remaining(self) :

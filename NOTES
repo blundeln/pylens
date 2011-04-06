@@ -1,25 +1,12 @@
 RESEARCH NOTES
   - Revision of PUT
     - Incremental changes
-      - Plan algorithms
-      - use input from item
-      - pluck in put
-      - change args
-    - Should we merge item and content arg and remove input arg?
-    - Or issue: should a lens pluck its own item, rather than a container lens?
-    - Items GOTten have source meta attached: source lens, input, and input pos.
-    - Makes no sense to weave new items into matching concrete structure
-    - If lens has type and is passed item, if item has source meta, replace
-      input for branch and cosume from original input; else have no input, so becomes create.
-      - Clone reader only if not already aligned.
-    - input reader must still be passed down to non-typed lenses
-    - No need for create function.
+      - Check all tests are sensible with new PUT (i.e. don't use CREATE).
+        before trusting results.
     - Create a simple mathcing test such as: a------bx-y <--> [[a,b][x,y]]
   - Reorganise code:
     - storage.py -> item things, containers, input reader
   - Remember: stuff on stash
-  - Could we have type=str on container lens rather than combine chars?
-  - Group should take only non-typed lens?
   - Use of keys and labels: lens designer can set arbitrary lens options
     - Should be simplified greatly by PUT revision, though still need careful
       thought.
@@ -36,6 +23,8 @@ RESEARCH NOTES
       - Correctly handle auto_list in candidate selection.
     - In general, if a container can store items correctly from lenses, it must
       be able to put them back or create them correctly.
+  - Could we have type=str on container lens rather than combine chars?
+  - Group should take only non-typed lens?
   - Create KeyValue lens
   - Could have containers in container, multiplex store and consume.
   - Find nice way to add simple tracing messages so we can see what's going on
@@ -53,6 +42,8 @@ RESEARCH NOTES
     - Concerning Rollbackables
       - Find solution to efficient object rollback, avoiding blanket deepcopy - use aspects, perhaps?
       - I think we only need two copies when we re-use the original state, such as in Or
+    - Concering meta data
+      - It does not make sense for all lens items to carry their input string (e.g. AO) since they do not interleve input with created values.
     
 
 Links

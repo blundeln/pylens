@@ -30,6 +30,11 @@
 from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
 from exceptions import *
 
+# More syntacticaly consistant assert function, for displaying explanations
+def assert_msg(condition, msg) :
+  assert condition, msg
+
+# Deprecate this - too confusing.
 def lens_assert(condition, message=None) :
   """
   Useful for assertion within lenses that should raise LensException, such that
@@ -39,6 +44,7 @@ def lens_assert(condition, message=None) :
   """
   if not condition :
     raise LensException(message)
+
 
 class assert_raises:
   """A cleaner way to assert that an exception is thrown from some code."""
@@ -93,14 +99,12 @@ def debug_indent_function() :
     function_names.append(location)
     callerFrame = callerFrame.f_back
 
-  #indent = max(function_names.count("put"), function_names.count("get"))
   indent = 0
-  for name in ["put", "get", "_put", "_get"] :
+  # Includes 'get' and 'put' since get may be called directly in put (not _put), etc.
+  for name in ["_put", "_get", "put", "get"] :
     indent += function_names.count(name)
   indent -= 1
   indent = max(0, indent)
-
-  #print ">>>: " +str(function_names)
  
   return " "*indent
 
@@ -114,6 +118,4 @@ def auto_name_lenses(local_variables) :
   for variable_name, obj in local_variables.iteritems() :
     if isinstance(obj, BaseLens) :
       obj.name = variable_name
-
-
 

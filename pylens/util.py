@@ -32,6 +32,9 @@
 #
 from debug import *
 
+# XXX: Realy we should call these only when in debug mode rather than checking
+# individually.
+
 def escape_for_display(s) :
   if not IN_DEBUG_MODE :
     return s
@@ -51,11 +54,12 @@ def truncate(s, max_len=10) :
     display_string = display_string[0:MAX_LEN] + "..."
   return display_string
 
-def range_truncate(s, max_len=10) :
+def range_truncate(s, max_len=8) :
   if not IN_DEBUG_MODE :
     return s
   if len(s) > max_len :
-    return s[0:3] + "..." + s[-3:]
+    return s[0:2] + "..." + s[-2:]
+  return s
 
 class Properties(object):
   """

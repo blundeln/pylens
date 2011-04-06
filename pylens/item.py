@@ -34,7 +34,7 @@
 #
 
 from debug import *
-from util import Properties
+from util import *
 
 META_ATTRIBUTE = "_meta_data"
 
@@ -48,6 +48,8 @@ class dict_wrapper(dict) :pass
 
 def attach_meta_data(item) :
   """Adds a flexible Properties attribute to any object (inc. simple types) for storing meta data."""  
+  assert(has_value(item))
+
   if not hasattr(item, META_ATTRIBUTE) : 
     
     # Wrap simple types to allow attributes to be added to them.
