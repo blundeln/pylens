@@ -23,8 +23,8 @@ Usage
 I will work on this, but for now, to get a feel for how it works, see the unit
 tests and longer tests in the following files::
 
-  pylens/__init__.py
-  testing/long_tests.py
+  pylens/*_lenses.py
+  testing/tests.py
 
 Status
 -----------------------------------------------------

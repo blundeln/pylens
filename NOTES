@@ -3,13 +3,23 @@ RESEARCH NOTES
     - Incremental changes
       - Check all tests are sensible with new PUT (i.e. don't use CREATE).
         before trusting results.
-    - Create a simple mathcing test such as: a------bx-y <--> [[a,b][x,y]]
+        - Need richer tests to make sure item input is being used correctly AO too simple.
   - Reorganise code:
     - storage.py -> item things, containers, input reader
   - Remember: stuff on stash
   - Use of keys and labels: lens designer can set arbitrary lens options
-    - Should be simplified greatly by PUT revision, though still need careful
-      thought.
+    - Do I need to rethink lists, too?:
+      - In a repeated lens, say, when using meta we know for sure if the
+        current concrete item matches our abstract item
+        - So with a list or dict, the container will know when to output nothing
+          given some concrete input (e.g. when its abstract item has been
+          deleted)
+        - With position info it would be possible to change keys in-place (in
+          concrete) and indeed may make no sense to use concrete input from a
+          different item simply because the keys now match - but perhaps not
+          always?!?
+        - Perhaps maintaince of position reagardless of keys, etc. is a
+          potention lens option?
     - When returning items, ensure set_key is called to update cont key.
     - Think about how best to handle setting a key on a item that was passed
       from user which does not contain its key.
@@ -32,7 +42,8 @@ RESEARCH NOTES
   - Think about how to best implement auto list idea
   - TESTS inheritance, makes it difficult to disable tests by changing function
     name.
-  
+  - Commit hooks 
+    - Would be good if hook can add prefix to commit message to show test status.
   - Optimisations
     - Concering containers:
       - How to know whether a given lens may modify a container or input
@@ -44,6 +55,12 @@ RESEARCH NOTES
       - I think we only need two copies when we re-use the original state, such as in Or
     - Concering meta data
       - It does not make sense for all lens items to carry their input string (e.g. AO) since they do not interleve input with created values.
+    - When does a PUT first require a GET:
+      - Or cross put
+      - Key matching
+      - None aligned input
+      - ?
+      - Could we improve this?
     
 
 Links

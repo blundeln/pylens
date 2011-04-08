@@ -36,7 +36,7 @@
 import unittest
 
 from pylens import *
-from long_tests import *
+from tests import *
 from nbdebug import d
 
 CLASS_TEST_FUNCTION = "TESTS"

@@ -379,12 +379,8 @@ def auto_list_test() :
   assert(lens.get("1") == 1)
   
   d("PUT")
-  assert(lens.put([5,6,7], "123") == "567")
-  assert(lens.put(5, "123") == "5")
-
-  d("CREATE")
-  assert(lens.create([5,6,7]) == "567")
-  assert(lens.create(5) == "5")
+  assert(lens.put([5,6,7]) == "567")
+  assert(lens.put(5) == "5")
 
   # Test list_source_meta_data preservation - assertion will fail if not preserved.
   assert(lens.put(lens.get("1")) == "1")
