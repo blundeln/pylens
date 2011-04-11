@@ -251,7 +251,7 @@ class Lens(object) :
       else : 
         # We should now have an item suitable for PUTing with our lens.
         if not isinstance(item, self.type) :
-          raise LensException("This lens cannot PUT an item of that type")
+          raise LensException("This lens %s cannot PUT an item of that type %s" % (self, type(item)))
 
       # If this item was previously GOTten, we can get its original input.
       if item._meta_data.concrete_input_reader :

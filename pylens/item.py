@@ -38,30 +38,51 @@ from util import *
 
 META_ATTRIBUTE = "_meta_data"
 
+#
+# Custom types.
+#
+
+# Use this for user convenience, when we like to manipulate single item lists
+# as single items and auto convert those single items to and from lists at the
+# edge of the API.
+class auto_list(list) : pass
+
+# Signifies that a lens will use an UnorderedListContainer.
+class unordered_list(list): pass
+
+
+#
 # Wrappers for simple types, so we can transparently add arbitrary properies.
+#
 class str_wrapper(str) :pass
 class int_wrapper(int) :pass
 class float_wrapper(float) :pass
 class list_wrapper(list) :pass
+class unordered_list_wrapper(unordered_list) :pass
 class dict_wrapper(dict) :pass
 
+
+def item_has_meta(item) :
+  return hasattr(item, META_ATTRIBUTE) 
 
 def attach_meta_data(item) :
   """Adds a flexible Properties attribute to any object (inc. simple types) for storing meta data."""  
   assert(has_value(item))
 
-  if not hasattr(item, META_ATTRIBUTE) : 
+  if not item_has_meta(item) : 
     
     # Wrap simple types to allow attributes to be added to them.
     if isinstance(item, str) : item = str_wrapper(item)
     elif isinstance(item, float) : item = float_wrapper(item)
     elif isinstance(item, int) : item = int_wrapper(item)
+    elif isinstance(item, unordered_list) : item = unordered_list_wrapper(item)
     elif isinstance(item, list) : item = list_wrapper(item)
     elif isinstance(item, dict) : item = dict_wrapper(item)
    
     setattr(item, META_ATTRIBUTE, Properties())
   
   return item
+
 
 #
 # TESTS

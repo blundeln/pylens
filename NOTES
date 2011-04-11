@@ -1,14 +1,11 @@
 RESEARCH NOTES
-  - Revision of PUT
-    - Incremental changes
-      - Check all tests are sensible with new PUT (i.e. don't use CREATE).
-        before trusting results.
-        - Need richer tests to make sure item input is being used correctly AO too simple.
-  - Reorganise code:
-    - storage.py -> item things, containers, input reader
-  - Remember: stuff on stash
+  - Think more about general container behaviour in light of using source meta
+    - Still feels a bit muggy
+    - Create UnorderedListContainer
+      - Need to be careful to handle auto_list
+    - How does this relate to a dict, which is a set that also stores keys to access items.
   - Use of keys and labels: lens designer can set arbitrary lens options
-    - Do I need to rethink lists, too?:
+    - Do I need to rethink lists, too? (see above):
       - In a repeated lens, say, when using meta we know for sure if the
         current concrete item matches our abstract item
         - So with a list or dict, the container will know when to output nothing

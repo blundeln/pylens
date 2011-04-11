@@ -37,6 +37,7 @@ import copy
 from debug import *
 from exceptions import *
 from util import *
+from item import *
 
 class Rollbackable(object) :
   """
@@ -221,10 +222,6 @@ class AbstractContainer(Rollbackable) :
 
 
 
-# Use this for user convenience, when we like to manipulate single item lists
-# as single items and auto convert those single items to and from lists at the
-# edge of the API.
-class auto_list(list) : pass
 
 class ListContainer(AbstractContainer) :
   """Simply stores items in a list, making no use of meta data."""
@@ -272,6 +269,86 @@ class ListContainer(AbstractContainer) :
       assert(False) # Should not get here
     except NoTokenToConsumeException:
       pass
+
+
+
+class UnorderedListContainer(ListContainer) :
+  """
+  Container that tries to respect original positioning of items in the concrete
+  input, where possible.  It is tempting to use a python set, though this
+  requires items to be immutable. 
+  """
+
+  def __init__(self, initial_list=None) :
+    # Use list if passed; otherwise create a new list.
+    if initial_list != None :
+      if not isinstance(initial_list, unordered_list) :
+        assert isinstance(initial_list, list)
+        self.list = unordered_list(initial_list)
+      self.list = initial_list
+    else :
+      self.list = unordered_list()
+    
+
+
+  def consume_item(self, lens, concrete_input_reader) :
+    # XXX: What if someone copies an item such that multiple have same source in meta?
+    # XXX: Need to handle auto list here, surely.
+
+    # First try to put an item back into this position
+    # Failing that, put any suitable item.
+
+    #
+    # Sort the items into positional and non-positional.
+    #
+    # XXX: Not good to build this every time, but okay for now.
+    items_with_meta = {}
+    items_without_meta = []
+    for item in self.list :
+      if item_has_meta(item) :
+        assert(has_value(item._meta_data.start_position))
+        # TODO: handle auto_list position that may be embedded in item.
+        items_with_meta[item._meta_data.start_position] = item
+      else :
+        items_without_meta.append(item)
+
+    if concrete_input_reader :
+      current_input_position = concrete_input_reader.get_pos()
+    else :
+      current_input_position = None
+
+    # See if we have an item that aligns with out current position.
+    if has_value(current_input_position) and current_input_position in items_with_meta:
+      item = items_with_meta[current_input_position]
+      self.list.remove(item)
+      return item
+
+    # If we haven't yet returned an item that matches positionally, return any non-positional item (e.g. a new item).
+    try :
+      item = items_without_meta.pop(0)
+      self.list.remove(item)
+      return item
+    except IndexError:
+      raise NoTokenToConsumeException()
+  
+  
+  @staticmethod
+  def TESTS() :
+
+    from pylens import Repeat, Group, AnyOf, alphas, nums
+
+    lens = Repeat(Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list), type=unordered_list)
+
+    d("GET")
+    got = lens.get("a+3c-2z*7")
+    assert(got == [["a",3],["c",2],["z",7]])
+
+    # Move the front item to the end - should not affect positional ordering.
+    got.append(got.pop(0))
+
+    output = lens.put(got)
+    assert(output == "a+3c-2z*7")
+
 
 
 class DictContainer(AbstractContainer) :
@@ -367,7 +444,9 @@ class ContainerFactory:
       return incoming_type
 
     # Also handles auto_list
-    if issubclass(incoming_type, list) :
+    if issubclass(incoming_type, unordered_list) :
+      return UnorderedListContainer
+    elif issubclass(incoming_type, list) :
       return ListContainer
     elif issubclass(incoming_type, dict) :
       return DictContainer
