@@ -373,7 +373,7 @@ def api_testx():
   assert(output == "Person:name=fred;surname=flintstone" or output == "Person:surname=flintstone;name=fred")
 
 def auto_list_test() :
-  lens = Group(Repeat(AnyOf(nums, type=int)), type=auto_list)
+  lens = Group(Repeat(AnyOf(nums, type=int)), type=list, auto_list=True)
   d("GET")
   assert(lens.get("123") == [1,2,3])
   assert(lens.get("1") == 1)

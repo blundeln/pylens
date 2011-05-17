@@ -30,6 +30,7 @@
 # Description:
 #   Utilities of global use.
 #
+import copy
 from debug import *
 
 # XXX: Realy we should call these only when in debug mode rather than checking
@@ -84,6 +85,8 @@ class Properties(object):
     else :
       return None
 
+  def copy(self) :
+    return copy.copy(self)
 
   def unwrap(self) :
     return self.__dict__

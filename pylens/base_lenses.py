@@ -76,17 +76,19 @@ class Lens(object) :
     # Algorithm
     #
     # If we have a container type
-    #   replace container with new one - to save hassle of doing it in each _get 
+    #   replace container with new one - to save hassle of doing it in each
+    #   _get (proper), since a typed-container lens will always deal with its
+    #   own container
     # item = _get(input, container)
     # if typed_lens:
     #   cast item if not instance
     #   assert(item is correct type)
-    #   if auto_list :
-    #     item = unwrap item
     #   assert not already got properties
     #   set properties
     #
     # Note, even if non-typed, we may return an item from a lens we wrap (e.g. Or)
+    #
+    # item = process_item(item) # e.g. allow pre-processing of item (e.g. for auto_list)
     #
     # return item
 
@@ -121,35 +123,28 @@ class Lens(object) :
       item = self._get(concrete_input_reader, current_container)
 
     if self.has_type() :
-      # Cast the item to our type.
+      
+      # Cast the item to our type (usually if it is a string).
       if not isinstance(item, self.type) :
         item = self.type(item)
 
-      # Handle auto_list (i.e. unwrap single item from list)
-      if self.type == auto_list :
-        # Check we got a list.
-        assert(isinstance(item, list))
-      else :
-        # Check we got an item of the correct type (after any casting).
-        assert(isinstance(item, self.type))
-
-      # Now add source info to the item.
+      # Double check we got an item of the correct type (after any casting).
+      assert(isinstance(item, self.type))
+     
+      # Attach meta data to the item (e.g. cast it to a wrapper class if type
+      # does not support adding new attributes).
       item = attach_meta_data(item)
-      item._meta_data = Properties()
+      
+      # Now add source info to the item.
+      item._meta_data.lens = self
       item._meta_data.start_position = start_position
       item._meta_data.concrete_input_reader = concrete_input_reader
-      item._meta_data.lens = self
-
-
-      if self.type == auto_list :
-        if len(item) == 1 :
-          # Ensure we preserve the meta data of the list within meta data of the item.
-          list_meta_data = item._meta_data
-          item = item[0]
-          item._meta_data.list_meta_data = list_meta_data
 
     if IN_DEBUG_MODE :
       d("GOT: %s" % (item == None and "NOTHING" or item))
+    
+    # Pre-process outgoing item.
+    item = self._process_outgoing_item(item)
 
     return item
 
@@ -173,7 +168,7 @@ class Lens(object) :
     #
     #  If we are passed an item
     #    ensure meta attached
-    #    handle auto list
+    #    pre-process item (e.g. to handle auto_list)
     #    check correct type, else raise LensException
     #    get the item input reader if there is one - can be None
     #    if item_input_reader 
@@ -234,25 +229,12 @@ class Lens(object) :
       # For the sake of consistancy, ensure the incoming item can hold meta data.
       item = attach_meta_data(item)
       
-      # If we are of type auto_list, wrap item in list if necessary.
-      if self.type == auto_list :
-        if not isinstance(item, list) :
-          item_as_list = list_wrapper([item])
-          # Restore the _meta_data of the list from the item.
-          if item._meta_data.list_meta_data :
-            item_as_list._meta_data = item._meta_data.list_meta_data
-            # Ensure we use this only once.
-            item._meta_data.list_meta_data = None
-          else :
-            # For the sake of consistancy, ensure item_as_list also has meta data.
-            item_as_list = attach_meta_data(item_as_list)
-            
-          item = item_as_list
-      else : 
-        # We should now have an item suitable for PUTing with our lens.
-        if not isinstance(item, self.type) :
-          raise LensException("This lens %s cannot PUT an item of that type %s" % (self, type(item)))
-
+      # Pre-process the incoming item (e.g to handle auto_list)
+      item = self._process_incoming_item(item)
+     
+      if not isinstance(item, self.type) :
+        raise LensException("This lens %s of type %s cannot PUT an item of that type %s" % (self, self.type, type(item)))
+      
       # If this item was previously GOTten, we can get its original input.
       if item._meta_data.concrete_input_reader :
         item_input_reader = ConcreteInputReader(item._meta_data.concrete_input_reader)
@@ -332,6 +314,9 @@ class Lens(object) :
     """Determines if this lens will GET and PUT a variable - a STORE lens."""
     return self.type != None
 
+  def item_is_compatible_type(self, item) :
+    """Checks if this item is of type compatible with this lens."""
+    pass
 
   #
   # container_get and container_put are used by container lenses to store and
@@ -402,6 +387,59 @@ class Lens(object) :
     lens = Lens._coerce_to_lens(lens)
     return lens
 
+  #
+  # Allow the potential modification of incoming and outgoing items (e.g. to handle auto_list)
+  #
+
+  def _process_outgoing_item(self, item) :
+    
+    if self.options.auto_list == True and self.has_type() and issubclass(self.type, list) and len(item) == 1:
+      # This allows a list singleton to be returned as a single item, for
+      # convenience.
+      # The easy part is extracting a singleton from the list, but we must
+      # preserve the source meta data of the list item by piggybacking it onto
+      # the extracted item's meta data
+
+      # XXX: Need to ensure piggybacked meta data gets flexed in the tests.
+      list_meta_data = item._meta_data
+      singleton_meta_data = item[0]._meta_data
+      item = item[0]
+      item._meta_data = list_meta_data
+      item._meta_data.singleton_meta_data = singleton_meta_data
+      
+      #if self.type == auto_list and len(item) == 1 :
+      #  item = item[0]
+        # Store a copy of the item's meta data within the item, since our item
+        # will next get the equivalent of the list's meta data.  We copy it
+        # since we wish to update the current meta data without affecting the
+        # copy.
+      #  item._meta_data.singleton_meta_data = item._meta_data.copy()
+
+    
+    return item
+
+  def _process_incoming_item(self, item) :
+   
+    if self.options.auto_list == True and self.has_type() and issubclass(self.type, list) and not isinstance(item, list):
+      # Expand an item into a list, being careful to restore any meta data.
+
+      # Create some variables to clarify the process.
+      singleton = item
+      list_meta_data = item._meta_data
+      singleton_meta_data = item._meta_data.singleton_meta_data
+      
+      # Safeguard to ensure piggybacked data cannot be used more than once.
+      list_meta_data.singleton_meta_data = None
+      
+      # Wrap the singleton in a list, giving it the meta_data of the item.
+      item = list_wrapper([singleton])
+      item._meta_data = list_meta_data
+
+      # Ensure the singleton has its meta data restored, if it was maintained.
+      if singleton_meta_data :
+        singleton._meta_data = singleton_meta_data
+
+    return item
 
 
   #-------------------------

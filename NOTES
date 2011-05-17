@@ -1,8 +1,13 @@
 RESEARCH NOTES
+  - Update typing to simplify it, modifying behaviour through lens options.
+    - Need to revise some of the below ideas
   - Think more about general container behaviour in light of using source meta
-    - Still feels a bit muggy
-    - Create UnorderedListContainer
-      - Need to be careful to handle auto_list
+    - Should we have a general container that handles various alignment and puts checks in based on type used?
+    - Need to think about USER-INTENDED alignment:
+      - Case of using labels where value changed, loosing meta
+       - perhaps if item has no meta but its label had a copy of original meta we can reinstate meta in 
+         (new) item where the user would feel they are the same item.
+    - Create UnorderedListContainer - not sure about this approach now.
     - How does this relate to a dict, which is a set that also stores keys to access items.
   - Use of keys and labels: lens designer can set arbitrary lens options
     - Do I need to rethink lists, too? (see above):
@@ -27,7 +32,7 @@ RESEARCH NOTES
       items to put into a given lens, so might be best to let container handle
       put, such that it can flexibly make tentitive puts on certain tokens.
       - Though we can certainly hone our candidate selection based on lens type
-      - Correctly handle auto_list in candidate selection.
+      - IMPORTANT: Correctly handle auto_list in candidate selection.
     - In general, if a container can store items correctly from lenses, it must
       be able to put them back or create them correctly.
   - Could we have type=str on container lens rather than combine chars?
