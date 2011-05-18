@@ -39,6 +39,12 @@ from exceptions import *
 from util import *
 from item import *
 
+# Item alignment modes for containers.
+SOURCE = "SOURCE"
+MODEL = "MODEL"
+LABEL = "LABEL"
+
+
 class Rollbackable(object) :
   """
   A class that can have its state rolled back, to undo modifications.
@@ -173,7 +179,9 @@ class AbstractContainer(Rollbackable) :
   residue).
   """
 
-  # TODO: Add a default constructor to AbstractContainer
+  def __init__(self, lens=None) :
+    assert_msg(has_value(lens), "A new container must be passed a lens.")
+    self.lens = lens
 
   def set_label(self, label) :
     if label and self.label :
@@ -198,24 +206,42 @@ class AbstractContainer(Rollbackable) :
     item = lens.get(concrete_input_reader, self)
     if has_value(item) :
       self.store_item(item, lens, concrete_input_reader)
-  
+ 
   def consume_and_put_item(self, lens, concrete_input_reader) :
     """Called by lenses that put items from the container into sub-lenses (e.g. And)."""
     assert(lens.has_type())
-    item = self.consume_item(lens, concrete_input_reader)
-    assert(has_value(item))
-    return lens.put(item, concrete_input_reader, None)
+    
+    # Get candidates to PUT
+    candidates = self.get_put_candidates(lens, concrete_input_reader)
+    for candidate in candidates :
+      try :
+        # TODO : Don't need to copy initial state every time within automatic_rollback.
+        with automatic_rollback(concrete_input_reader) :
+          output = lens.put(candidate, concrete_input_reader, None)
+          self.remove_item(candidate)
+          return output
+      except LensException:
+        pass
+
+    
+    # Didn't PUT any token.
+    raise NoTokenToConsumeException()
+
 
   #
   # Must overload these.
   # 
 
+  def get_put_candidates(self, lens, concrete_input_reader) :
+    """Returns a list of candidate items that could be PUT into the lens."""
+    raise NotImplementedError()
+  
+  def remove_item(self, item) :
+    raise NotImplementedError()
+
   def store_item(self, item, lens, concrete_input_reader) :
     raise NotImplementedError()
 
-  def consume_item(self, lens, concrete_input_reader) :
-    raise NotImplementedError()
-  
   def unwrap(self) :
     """Unwrap to native python type where appropriate: e.g. for list and dict.""" 
     raise NotImplementedError()
@@ -226,7 +252,9 @@ class AbstractContainer(Rollbackable) :
 class ListContainer(AbstractContainer) :
   """Simply stores items in a list, making no use of meta data."""
 
-  def __init__(self, initial_list=None) :
+  def __init__(self, initial_list=None, **kargs) :
+    super(ListContainer, self).__init__(**kargs)
+    
     # Use list if passed; otherwise create a new list.
     if initial_list != None :
       assert isinstance(initial_list, list)
@@ -234,17 +262,24 @@ class ListContainer(AbstractContainer) :
     else :
       self.list = []
 
+  def get_put_candidates(self, lens, concrete_input_reader) :
+
+    # In abstract ordering mode (default), take next item.
+    # In soure ordering mode, 
+
+    candidates = []
+    if len(self.list) > 0 :
+      # TODO: Check type compatible with lens.
+      candidates.append(self.list[0])
+    return candidates
   
+  def remove_item(self, item) :
+    self.list.remove(item)
+
   def store_item(self, item, lens, concrete_input_reader) :
     self.list.append(item)
 
-  def consume_item(self, lens, concrete_input_reader) :
-    try :
-      return self.list.pop(0)
-    except IndexError:
-      raise NoTokenToConsumeException()
   
-
   def unwrap(self):
     return self.list
 
@@ -256,27 +291,16 @@ class ListContainer(AbstractContainer) :
     # Dummy arguments
     lens, concrete_input_reader = None, None
 
-    list_container = ListContainer([1,2,3])
-    list_container.store_item(4, lens, concrete_input_reader)
-    assert(list_container.unwrap() == [1,2,3,4])
-    assert(list_container.consume_item(lens, concrete_input_reader) == 1)
-    assert(list_container.unwrap() == [2,3,4])
-    list_container.consume_item(lens, concrete_input_reader)
-    list_container.consume_item(lens, concrete_input_reader)
-    list_container.consume_item(lens, concrete_input_reader)
-    try :
-      list_container.consume_item(lens, concrete_input_reader)
-      assert(False) # Should not get here
-    except NoTokenToConsumeException:
-      pass
+    # TODO: Redo these
+    return
 
 
-
+# XXX: Deprecate
 class UnorderedListContainer(ListContainer) :
   """
   Container that tries to respect original positioning of items in the concrete
   input, where possible.  It is tempting to use a python set, though this
-  requires items to be immutable. 
+  requires items to be immutable (for hashability). 
   """
 
   def __init__(self, initial_list=None) :
@@ -289,6 +313,18 @@ class UnorderedListContainer(ListContainer) :
     else :
       self.list = unordered_list()
     
+  def get_put_candidates(self, lens, concrete_input_reader) :
+    candidates = []
+
+    # Want to end up with items in postional order or fall back on abstract order.
+    
+    # Note: if item is auto_list item need to get correct position from it.
+
+    # Start with candidate list
+    candidates = self.list[:]
+
+
+    return candidates
 
 
   def consume_item(self, lens, concrete_input_reader) :
@@ -337,7 +373,11 @@ class UnorderedListContainer(ListContainer) :
 
     from pylens import Repeat, Group, AnyOf, alphas, nums
 
+    # TODO
+    return
+
     lens = Repeat(Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list), type=unordered_list)
+    # XXX lens = Repeat(Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list), type=list, alignment=model)
 
     d("GET")
     got = lens.get("a+3c-2z*7")
@@ -347,6 +387,7 @@ class UnorderedListContainer(ListContainer) :
     got.append(got.pop(0))
 
     output = lens.put(got)
+    d(output)
     assert(output == "a+3c-2z*7")
 
 
@@ -410,7 +451,7 @@ class DictContainer(AbstractContainer) :
     from pylens.base_lenses import Group, AnyOf, alphas, nums
 
     # TODO: Update these
-
+    return
 
     #
     # Test use of static labels.
@@ -445,6 +486,7 @@ class ContainerFactory:
 
     # Also handles auto_list
     if issubclass(incoming_type, unordered_list) :
+      raise Exception("Deprecated") #XXX
       return UnorderedListContainer
     elif issubclass(incoming_type, list) :
       return ListContainer
@@ -455,17 +497,16 @@ class ContainerFactory:
 
 
   @staticmethod
-  def create_container(container_type) :
+  def create_container(container_lens) :
     
-    container_class = ContainerFactory.get_container_class(container_type)
+    container_class = ContainerFactory.get_container_class(container_lens.type)
     
     if container_class == None:
       return None
-
-    return container_class()
+    return container_class(lens = container_lens)
 
   @staticmethod
-  def wrap_container(incoming_object) :
+  def wrap_container(incoming_object, container_lens=None) :
     """Wraps a container if possible."""
     if incoming_object == None or issubclass(type(incoming_object), AbstractContainer) :
       return incoming_object
@@ -475,10 +516,30 @@ class ContainerFactory:
     if container_class == None :
       return None
 
-    return container_class(incoming_object)
+    return container_class(incoming_object, lens = container_lens)
    
   # TODO: Add tests
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # OLD STUFF ===================================================
 

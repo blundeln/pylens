@@ -372,8 +372,60 @@ def api_testx():
   d(output)
   assert(output == "Person:name=fred;surname=flintstone" or output == "Person:surname=flintstone;name=fred")
 
+
+def list_test() :
+
+  lens = Repeat(AnyOf(nums, type=int), type=list)
+  d("GET")
+  assert(lens.get("123") == [1,2,3])
+  
+  d("PUT")
+  assert(lens.put([5,6,7]) == "567")
+
+  d("GET-PUT")
+  assert(lens.put(lens.get("1")) == "1")
+
+def model_ordered_matching_list_test() :
+  
+  lens = Repeat(
+    Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list),
+    type=list, alignment=MODEL)
+
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  assert(got == [["a",3],["c",2],["z",7]])
+
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "c-2z*7a+3")
+
+
+def source_ordered_matching_list_test() :
+
+  # TODO: LAST_EDIT
+
+  lens = Repeat(
+    Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list),
+    type=list)
+
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  assert(got == [["a",3],["c",2],["z",7]])
+
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "c-2z*7a+3")
+
+
+
 def auto_list_test() :
-  lens = Group(Repeat(AnyOf(nums, type=int)), type=list, auto_list=True)
+  lens = Repeat(AnyOf(nums, type=int), type=list, auto_list=True)
   d("GET")
   assert(lens.get("123") == [1,2,3])
   assert(lens.get("1") == 1)

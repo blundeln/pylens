@@ -45,11 +45,12 @@ from charsets import *
 class Lens(object) :
   
   def __init__(self, type=None, name=None, default=None, **kargs) :
-    # Set python type of lense data and a name, for debugging.
+    
+    # Set python type of lens data and a name, for debugging.
     self.type = type
     self.name = name
     if has_value(type) and has_value(default) :
-      raise Exception("Cannot set a default value on a lens with a type.")
+      raise Exception("Cannot set a default value on a lens with a type (i.e. on a store lens).")
     self.default = default
 
     # Composite lenses will store their sub-lenses in here.
@@ -102,16 +103,16 @@ class Lens(object) :
         current_container = current_container,
       ))
 
-    # Get the appropriate container class for our lens, if there is one.
-    container_class = self._get_container_class()
+    # Create the appropriate container class for our lens, if there is one.
+    new_container = self._create_container()
 
     # Remember the start position of the concrete reader, to aid
     # abstract--concrete matching.
     start_position = concrete_input_reader.get_pos()
 
-    # Replace the current container of sub-lenses with our own.
-    if container_class :
-      new_container = container_class()
+    # If we are a container-creating lens, replace the current container of
+    # sub-lenses with our own container (new_container).
+    if new_container :
       # Call GET proper with our container, checking that no item is returned,
       # since all items should be stored WITHIN the container
       assert_msg(self._get(concrete_input_reader, new_container) == None, "Container lens %s has GOT an item, but all items must be stored in the current container." % self)
@@ -173,7 +174,7 @@ class Lens(object) :
     #    get the item input reader if there is one - can be None
     #    if item_input_reader 
     #      if input_reader
-    #        if item_input_reader is not aligned with input_reader
+    #        if item_input_reader is not aligned with (outer) input_reader
     #          consume from input_reader
     #          set input_reader item_input_reader
     #        else we use the input_reader (i.e both consume and put) - can discard item_input_reader
@@ -259,7 +260,7 @@ class Lens(object) :
       # Now, the item could be a container (e.g. a list, dict, or some other
       # AbstractContainer), so to save the _put definition from having to wrap
       # it for stateful consumption of items, let's do it here.
-      item_as_container = ContainerFactory.wrap_container(item)
+      item_as_container = ContainerFactory.wrap_container(item, container_lens=self)
       if item_as_container :
         # The item is now represented as a consumable container.
         item = None
@@ -325,19 +326,21 @@ class Lens(object) :
   #
 
   def container_get(self, lens, concrete_input_reader, current_container) :
-    if current_container :
-      return current_container.get_and_store_item(lens, concrete_input_reader)
+    """Wraps get_and_store_item if we have a container."""
+    if has_value(current_container) :
+      current_container.get_and_store_item(lens, concrete_input_reader)
     else :
       # Call get on lens passing no container, checking it returns no item.
       assert_msg(lens.get(concrete_input_reader, None) == None,
         "The untyped container lens %s did not expect the sub-lens %s to return an item" % (self, lens)
       )
-      return None
 
   def container_put(self, lens, concrete_input_reader, current_container) :
+    """Wraps consume_and_put_item if we have a container."""
     if current_container :
       return current_container.consume_and_put_item(lens, concrete_input_reader)
     else :
+      # Otherwise, we PUT with no abstract data (e.g. for non-store sublenses)
       return lens.put(None, concrete_input_reader, None)
 
 
@@ -354,9 +357,9 @@ class Lens(object) :
     else :
       return concrete_input
 
-  def _get_container_class(self) :
-    # Try to get a container class appropriate for this lens' type, which may be None
-    return ContainerFactory.get_container_class(self.type)
+  def _create_container(self):
+    """Creates a container for this lens, if lens of appropriate type."""
+    return ContainerFactory.create_container(self)
 
 
   # XXX: I don't really like these forward declarations, but for now this does
@@ -381,11 +384,12 @@ class Lens(object) :
 
   def _preprocess_lens(self, lens) :
     """
-    Preprocesses a lens to ensure any type-to-lens conversion and for the
-    binding of recursive lenses.  This will be called before processing lens arguments.
+    Preprocesses a lens to enable type-to-lens conversion. This will be
+    called before processing lens arguments.
     """
     lens = Lens._coerce_to_lens(lens)
     return lens
+
 
   #
   # Allow the potential modification of incoming and outgoing items (e.g. to handle auto_list)
@@ -400,23 +404,15 @@ class Lens(object) :
       # preserve the source meta data of the list item by piggybacking it onto
       # the extracted item's meta data
 
-      # XXX: Need to ensure piggybacked meta data gets flexed in the tests.
+      # TODO: Need to ensure piggybacked meta data gets flexed in the tests.
       list_meta_data = item._meta_data
       singleton_meta_data = item[0]._meta_data
       item = item[0]
       item._meta_data = list_meta_data
       item._meta_data.singleton_meta_data = singleton_meta_data
       
-      #if self.type == auto_list and len(item) == 1 :
-      #  item = item[0]
-        # Store a copy of the item's meta data within the item, since our item
-        # will next get the equivalent of the list's meta data.  We copy it
-        # since we wish to update the current meta data without affecting the
-        # copy.
-      #  item._meta_data.singleton_meta_data = item._meta_data.copy()
-
-    
     return item
+
 
   def _process_incoming_item(self, item) :
    
@@ -465,8 +461,9 @@ class Lens(object) :
   def _put(self, item, concrete_input_reader, current_container) :
     """Put proper for a specific lens."""
     # Note, a low-level lens (i.e. that directly consumes input or tokens)
-    # should check if it has been mistakenly passed an item
+    # should check if it has been mistakenly passed an item.
     raise NotImplementedError("")
+
 
   #-------------------------
   # For debugging
@@ -522,7 +519,7 @@ class And(Lens) :
 
   def _put(self, item, concrete_input_reader, current_container) :
     
-    assert(item == None)
+    assert_msg(item == None, "Lens %s did not expect to PUT an individual item %s, since it PUTs from a container" % (self, item))
 
     # Simply concatenate output from the sub-lenses.
     output = ""
@@ -804,6 +801,8 @@ class Repeat(Lens) :
     super(Repeat, self).__init__(**kargs)
     self.min_count, self.max_count = min_count, max_count
     self.infinity_limit = infinity_limit
+    # TODO: Perhaps having an append_sublens in Lens class could ensure
+    # coercion always happens.
     self.lenses = [self._coerce_to_lens(lens)]
 
   def _get(self, concrete_input_reader, current_container) :
@@ -849,16 +848,16 @@ class Repeat(Lens) :
 
     # Algorithm
     #
-    # Note, it is tempting to do GETs then PUTs to simplify this algorithm, so we would
-    # loose possitional info from input that might be useful in matching up
+    # Note, it is tempting first to do GETs then PUTs to simplify this algorithm, though we would
+    # loose positional info from input that might be useful in matching up
     # items.
     #
     # First try to put with input - important for potential re-alignment
     # Then try to put with no input
-    # Then mop up input with GET
+    # Then mop up any remaining input with GET (i.e. if there are fewer abstract items)
 
-
-    # To facilitate potential re-alignment of items (e.g. perhaps for key
+    # XXX: This will be made redundant if a container can make the matching choice.
+    # To facilitate potential re-alignment of items within the container logic (e.g. perhaps for key
     # matching), this first tries to PUT by passing the outer concrete input (if
     # any) before trying to PUT without (by effectively setting the concrete
     # reader to None).
