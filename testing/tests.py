@@ -402,15 +402,29 @@ def model_ordered_matching_list_test() :
   d(output)
   assert(output == "c-2z*7a+3")
 
+  d("With deletion and creation")
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+  # Now remove the middle item
+  del got[1] # z*7
+  # And add a new item
+  got.append(["m",6])
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "c-2a+3m*6")
+
+
 
 def source_ordered_matching_list_test() :
 
-  # TODO: LAST_EDIT
-
   lens = Repeat(
     Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list),
-    type=list)
+    type=list, alignment=SOURCE)
 
+  d("Without deletion")
   d("GET")
   got = lens.get("a+3c-2z*7")
   assert(got == [["a",3],["c",2],["z",7]])
@@ -420,7 +434,21 @@ def source_ordered_matching_list_test() :
 
   output = lens.put(got)
   d(output)
-  assert(output == "c-2z*7a+3")
+  assert(output == "a+3c-2z*7")
+
+  d("With deletion and creation")
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+  # Now remove the middle item
+  del got[1] # z*7
+  # And add a new item
+  got.append(["m",6])
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "a+3c-2m*6")
 
 
 

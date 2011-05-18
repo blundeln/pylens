@@ -44,6 +44,7 @@ SOURCE = "SOURCE"
 MODEL = "MODEL"
 LABEL = "LABEL"
 
+LARGE_INTEGER = 0xffffffff
 
 class Rollbackable(object) :
   """
@@ -215,7 +216,7 @@ class AbstractContainer(Rollbackable) :
     candidates = self.get_put_candidates(lens, concrete_input_reader)
     for candidate in candidates :
       try :
-        # TODO : Don't need to copy initial state every time within automatic_rollback.
+        # TODO : Overkill to copy initial state every time within automatic_rollback.
         with automatic_rollback(concrete_input_reader) :
           output = lens.put(candidate, concrete_input_reader, None)
           self.remove_item(candidate)
@@ -258,19 +259,35 @@ class ListContainer(AbstractContainer) :
     # Use list if passed; otherwise create a new list.
     if initial_list != None :
       assert isinstance(initial_list, list)
-      self.list = initial_list
+      # Ensure items can hold meta data
+      self.list = [attach_meta_data(item) for item in initial_list]
     else :
       self.list = []
 
   def get_put_candidates(self, lens, concrete_input_reader) :
 
+    if not self.list :
+      return [] # No candidates
+
     # In abstract ordering mode (default), take next item.
-    # In soure ordering mode, 
+    # In source ordering mode, order by source in meta
+    container_alignment_mode = self.lens.options.alignment or MODEL
 
     candidates = []
-    if len(self.list) > 0 :
-      # TODO: Check type compatible with lens.
-      candidates.append(self.list[0])
+    if container_alignment_mode == MODEL :
+      if len(self.list) > 0 :
+        # TODO: Check type compatible with lens.
+        candidates.append(self.list[0])
+    elif container_alignment_mode == SOURCE :
+      def get_key(item) :
+        if has_value(item._meta_data.start_position) :
+          return item._meta_data.start_position
+        return LARGE_INTEGER # To ensure new items go on the end.
+      candidates = sorted(self.list, key = get_key)
+    # TODO: LABEL mode
+    else :
+
+      raise Exception("Unknown alignment mode: %s" % container_alignment_mode)
     return candidates
   
   def remove_item(self, item) :
