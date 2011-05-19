@@ -460,9 +460,9 @@ def dict_test() :
   assert(lens.get("1a") == {"number":1, "character":"a"})
   d("PUT")
   assert(lens.put({"number":4, "character":"q"}, "1a") == "4q")
-  return
   with assert_raises(NoTokenToConsumeException) :
     lens.put({"number":4, "wrong_label":"q"}, "1a")
+  
  
   # Test dynamic labels
   key_value_lens = Group(AnyOf(alphas, type=str, is_label=True) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list)
@@ -471,7 +471,11 @@ def dict_test() :
   d("GET")
   got = lens.get("a+3c-2z*7")
   d(got)
-  #assert(got == [["a",3],["c",2],["z",7]])
+  assert(got == {"a":[3], "c":[2], "z":[7]})
+  
+  d("PUT")
+  output = lens.put({"b":[9], "x":[5]})
+  d(output)
 
 def auto_list_test() :
   lens = Repeat(AnyOf(nums, type=int), type=list, auto_list=True)

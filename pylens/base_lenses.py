@@ -142,7 +142,10 @@ class Lens(object) :
       item._meta_data.concrete_input_reader = concrete_input_reader
 
     if IN_DEBUG_MODE :
-      d("GOT: %s" % (item == None and "NOTHING" or item))
+      if has_value(item) :
+        d("GOT: %s %s" % (item, item._meta_data.label and "[label: '%s']" % (item._meta_data.label) or ""))
+      else :
+        d("GOT: NOTHING")
     
     # Pre-process outgoing item.
     item = self._process_outgoing_item(item)
@@ -205,10 +208,17 @@ class Lens(object) :
     concrete_input_reader = self._normalise_concrete_input(concrete_input)
 
     if IN_DEBUG_MODE :
-      d("Initial state: item={item}, in={concrete_input_reader}, cont={current_container}".format(
+      
+      if hasattr(item, "_meta_data") and has_value(item._meta_data.label) :
+        item_label_string = " [label: %s]" % item._meta_data.label
+      else :
+        item_label_string = ""
+      
+      d("Initial state: item={item}{item_label_string}, in={concrete_input_reader}, cont={current_container}".format(
         item = item,
         concrete_input_reader = concrete_input_reader,
         current_container = current_container,
+        item_label_string = item_label_string,
       ))
 
     # Handle cases where our lens does not directly store an item.
@@ -231,7 +241,8 @@ class Lens(object) :
       item = attach_meta_data(item)
       
       # Associate a label with the item (usually a label passed from user which is required internally by a structure)
-      item._meta_data.label = label
+      if has_value(label) :
+        item._meta_data.label = label
 
       # Pre-process the incoming item (e.g to handle auto_list)
       item = self._process_incoming_item(item)
@@ -263,6 +274,7 @@ class Lens(object) :
       # Now, the item could be a container (e.g. a list, dict, or some other
       # AbstractContainer), so to save the _put definition from having to wrap
       # it for stateful consumption of items, let's do it here.
+      
       item_as_container = ContainerFactory.wrap_container(item, container_lens=self)
       if item_as_container :
         # The item is now represented as a consumable container.

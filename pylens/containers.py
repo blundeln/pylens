@@ -206,10 +206,11 @@ class AbstractContainer(Rollbackable) :
     item = lens.get(concrete_input_reader, self)
     if has_value(item) :
       if lens.options.is_label :
-        self.set_label(item)
+        self.set_label(item) # Store item as label.
       else :
         # Set a static label on the item if the lens defines one.
-        item._meta_data.label = lens.options.label
+        if has_value(lens.options.label) :
+          item._meta_data.label = lens.options.label
         self.store_item(item, lens, concrete_input_reader)
  
   def consume_and_put_item(self, lens, concrete_input_reader) :
@@ -275,7 +276,7 @@ class BasicContainer(AbstractContainer) :
     else : 
       assert isinstance(items, list)
       self.items = items
-    
+  
     # Ensure our items can carry meta data (for algorithmic convenience) and be careful
     # to protect the incoming lists meta data by modifying it in place.
     for index, item in enumerate(self.items) :
