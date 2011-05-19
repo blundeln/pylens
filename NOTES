@@ -1,12 +1,6 @@
 RESEARCH NOTES
-  - Think about how to handle dict (e.g. with labels) - what is common to list?
-    - Main idea: items carry labels in meta, so labels may or may not be used to organise in container
-    - Perhaps just use a list but store labels in meta for use with a dict.
-      - Let's start with the ListContainer then build the dict on top of that
-     - Might simplify everything.
-    - Just realised meta gets lost on unwrap, but need it to carry the label downstream
-    - Shold be possible for key to travel arbitrarily downstream
-     - perhaps explicitly set the container lens to be labelled
+  - Remove old code now to make things clearer.
+  - Think about how general class will be a container.
   - Re-organise these notes!
   - Update typing to simplify it, modifying behaviour through lens options.
     - Need to revise some of the below ideas
@@ -14,6 +8,7 @@ RESEARCH NOTES
     - Should we have a general container that handles various alignment and puts checks in based on type used?
     - How does this relate to a dict, which is a set that also stores keys to access items.
     - Need to think about USER-INTENDED (or perhaps IMPLIED) alignment:
+      - Perhaps based on LABEL vs SOURCE alignment.
       - Case of using labels where value changed, loosing meta
        - perhaps if item has no meta but its label had a copy of original meta we can reinstate meta in 
          (new) item where the user would feel they are the same item.

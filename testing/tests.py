@@ -476,6 +476,34 @@ def dict_test() :
   d("PUT")
   output = lens.put({"b":[9], "x":[5]})
   d(output)
+  assert(output in ["b*9x*5","x*5b*9"]) # Could be any order.
+
+  d("Test manipulation")
+  got = lens.get("a+3c-2z*7")
+  del got["c"]
+  output = lens.put(got)
+  assert(output == "a+3z*7") # Should have kept SOURCE alignment.
+
+  d("Test with auto list, which should keep source state")
+  key_value_lens = Group(AnyOf(alphas, type=str, is_label=True) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list, auto_list=True)
+  lens = Repeat(key_value_lens, type=dict, alignment=SOURCE)
+
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  d(got)
+  assert(got == {"a":3, "c":2, "z":7})
+  d("PUT")
+  output = lens.put(got)
+  assert(output == "a+3c-2z*7")
+ 
+  # For now this will loose some concrete, but later we will consider user-implied alignment
+  # or at least label alignment rather than source alignment.
+  d("Test auto_list with modification.")
+  got = lens.get("a+3c-2z*7")
+  got["c"] = 4
+  output = lens.put(got)
+  assert(output == "a+3z*7c*4")
+
 
 def auto_list_test() :
   lens = Repeat(AnyOf(nums, type=int), type=list, auto_list=True)
