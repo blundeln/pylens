@@ -1,4 +1,12 @@
 RESEARCH NOTES
+  - Think about how to handle dict (e.g. with labels) - what is common to list?
+    - Main idea: items carry labels in meta, so labels may or may not be used to organise in container
+    - Perhaps just use a list but store labels in meta for use with a dict.
+      - Let's start with the ListContainer then build the dict on top of that
+     - Might simplify everything.
+    - Just realised meta gets lost on unwrap, but need it to carry the label downstream
+    - Shold be possible for key to travel arbitrarily downstream
+     - perhaps explicitly set the container lens to be labelled
   - Re-organise these notes!
   - Update typing to simplify it, modifying behaviour through lens options.
     - Need to revise some of the below ideas
@@ -11,37 +19,18 @@ RESEARCH NOTES
          (new) item where the user would feel they are the same item.
   
   - Use of keys and labels: lens designer can set arbitrary lens options
-    - Do I need to rethink lists, too? (see above):
-      - In a repeated lens, say, when using meta we know for sure if the
-        current concrete item matches our abstract item
-        - So with a list or dict, the container will know when to output nothing
-          given some concrete input (e.g. when its abstract item has been
-          deleted)
-        - With position info it would be possible to change keys in-place (in
-          concrete) and indeed may make no sense to use concrete input from a
-          different item simply because the keys now match - but perhaps not
-          always?!?
-        - Perhaps maintaince of position reagardless of keys, etc. is a
-          potention lens option?
     - IMPORTANT: When returning items, ensure set_key is called to update cont key.
+      - Perhaps could handle this in DictContainer constructor.
     - Think about how best to handle setting a key on a item that was passed
       from user which does not contain its key.
       - On reflection, seems better to wrap in a group, though we could use
         auto_list idea and a wrapper of group: KeyValue(X(is_key) + "==>" +
         Y(type=P)) --> Group(<lens>, type=auto_list)
-    - Still, during create, we may make a bad choice of several candidates of
-      items to put into a given lens, so might be best to let container handle
-      put, such that it can flexibly make tentitive puts on certain tokens.
-      - Though we can certainly hone our candidate selection based on lens type
-      - IMPORTANT: Correctly handle auto_list in candidate selection.
-    - In general, if a container can store items correctly from lenses, it must
-      be able to put them back or create them correctly.
   - Misc ideas
   - Could we have type=str on container lens rather than combine chars?
   - Group should take only non-typed lens?
-  - Create KeyValue lens
+  - Create KeyValue lens -> wraps autolist with an is_label
   - Could have containers in container, multiplex store and consume.
-  - Find nice way to add simple tracing messages so we can see what's going on
   - If any kargs set on a lens, assume is a store using default type of str
   - DEV:TESTS inheritance, makes it difficult to disable tests by changing function
     name.

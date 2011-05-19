@@ -451,6 +451,27 @@ def source_ordered_matching_list_test() :
   assert(output == "a+3c-2m*6")
 
 
+def dict_test() :
+
+  
+  # Test use of static labels.
+  lens = Group(AnyOf(nums, type=int, label="number") + AnyOf(alphas, type=str, label="character"), type=dict, alignment=SOURCE)
+  d("GET")
+  assert(lens.get("1a") == {"number":1, "character":"a"})
+  d("PUT")
+  assert(lens.put({"number":4, "character":"q"}, "1a") == "4q")
+  return
+  with assert_raises(NoTokenToConsumeException) :
+    lens.put({"number":4, "wrong_label":"q"}, "1a")
+ 
+  # Test dynamic labels
+  key_value_lens = Group(AnyOf(alphas, type=str, is_label=True) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list)
+  lens = Repeat(key_value_lens, type=dict, alignment=SOURCE)
+
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  d(got)
+  #assert(got == [["a",3],["c",2],["z",7]])
 
 def auto_list_test() :
   lens = Repeat(AnyOf(nums, type=int), type=list, auto_list=True)

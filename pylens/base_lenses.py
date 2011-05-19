@@ -149,8 +149,8 @@ class Lens(object) :
 
     return item
 
-
-  def put(self, item=None, concrete_input=None, current_container=None) :
+  # TODO: Add label of item.
+  def put(self, item=None, concrete_input=None, current_container=None, label=None) :
    
     #
     # Algorithm
@@ -230,6 +230,9 @@ class Lens(object) :
       # For the sake of consistancy, ensure the incoming item can hold meta data.
       item = attach_meta_data(item)
       
+      # Associate a label with the item (usually a label passed from user which is required internally by a structure)
+      item._meta_data.label = label
+
       # Pre-process the incoming item (e.g to handle auto_list)
       item = self._process_incoming_item(item)
      

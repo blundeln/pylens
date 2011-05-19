@@ -183,17 +183,16 @@ class AbstractContainer(Rollbackable) :
   def __init__(self, lens=None) :
     assert_msg(has_value(lens), "A new container must be passed a lens.")
     self.lens = lens
+    self.label = None
 
   def set_label(self, label) :
+    assert_msg(isinstance(label, str), "The container label must be a string --- at least for the time being.")
     if label and self.label :
-      raise Exception("Container already has a label defined.")
+      raise Exception("Container already has a label defined: %s" % self.label)
     self.label = label
 
   def get_label(self) :
-    if hasattr(self, "label") :
-      return self.label
-    else :
-      return None
+    return self.label
 
 
   #
@@ -206,12 +205,25 @@ class AbstractContainer(Rollbackable) :
     # that was GOT from a sub-lens
     item = lens.get(concrete_input_reader, self)
     if has_value(item) :
-      self.store_item(item, lens, concrete_input_reader)
+      if lens.options.is_label :
+        self.set_label(item)
+      else :
+        # Set a static label on the item if the lens defines one.
+        item._meta_data.label = lens.options.label
+        self.store_item(item, lens, concrete_input_reader)
  
   def consume_and_put_item(self, lens, concrete_input_reader) :
     """Called by lenses that put items from the container into sub-lenses (e.g. And)."""
     assert(lens.has_type())
-    
+   
+    # Handle is_label lens
+    if lens.options.is_label:
+      if not self.label :
+        raise NoTokenToConsumeException("There was no item as this container's label to PUT.")
+      output = lens.put(self.label, concrete_input_reader, None)
+      self.label = None
+      return output
+
     # Get candidates to PUT
     candidates = self.get_put_candidates(lens, concrete_input_reader)
     for candidate in candidates :
@@ -250,173 +262,138 @@ class AbstractContainer(Rollbackable) :
 
 
 
-class ListContainer(AbstractContainer) :
-  """Simply stores items in a list, making no use of meta data."""
+# TODO: This will become BasicContainer which will be speciliased lightly by ListContainer and DictContainer
+class BasicContainer(AbstractContainer) :
+  """Basic container, extended by ListContainer and DictContainer"""
 
-  def __init__(self, initial_list=None, **kargs) :
-    super(ListContainer, self).__init__(**kargs)
+  def __init__(self, items=None, **kargs) :
+    super(BasicContainer, self).__init__(**kargs)
+
+    # Create new list if not passed one to wrap.
+    if not has_value(items) :
+      self.items = attach_meta_data([])
+    else : 
+      assert isinstance(items, list)
+      self.items = items
     
-    # Use list if passed; otherwise create a new list.
-    if initial_list != None :
-      assert isinstance(initial_list, list)
-      # Ensure items can hold meta data
-      self.list = [attach_meta_data(item) for item in initial_list]
-    else :
-      self.list = []
+    # Ensure our items can carry meta data (for algorithmic convenience) and be careful
+    # to protect the incoming lists meta data by modifying it in place.
+    for index, item in enumerate(self.items) :
+      self.items[index] = attach_meta_data(item)
+    
+    # Store the label (if set) of the list in our container for stateful consumption. 
+    self.label = self.items._meta_data.label
+    
+    # Set the container_alignment_mode
+    # In abstract ordering mode (default), take next item.
+    # In source ordering mode, order by source in meta
+    self.alignment_mode = self.lens.options.alignment or MODEL
+  
 
   def get_put_candidates(self, lens, concrete_input_reader) :
 
-    if not self.list :
+    if not self.items :
       return [] # No candidates
 
-    # In abstract ordering mode (default), take next item.
-    # In source ordering mode, order by source in meta
-    container_alignment_mode = self.lens.options.alignment or MODEL
-
     candidates = []
-    if container_alignment_mode == MODEL :
-      if len(self.list) > 0 :
-        # TODO: Check type compatible with lens.
-        candidates.append(self.list[0])
-    elif container_alignment_mode == SOURCE :
+    
+    # Handle a static label
+    if has_value(lens.options.label) :
+      candidates = [item for item in self.items if item._meta_data.label == lens.options.label]
+    
+    # Handle MODEL alignment
+    elif self.alignment_mode == MODEL :
+      if len(self.items) > 0 :
+        candidates.append(self.items[0])
+    
+    # Handle SOURCE alignment.
+    elif self.alignment_mode == SOURCE :
       def get_key(item) :
         if has_value(item._meta_data.start_position) :
           return item._meta_data.start_position
         return LARGE_INTEGER # To ensure new items go on the end.
-      candidates = sorted(self.list, key = get_key)
+      candidates = sorted(self.items, key = get_key)
     # TODO: LABEL mode
     else :
-
-      raise Exception("Unknown alignment mode: %s" % container_alignment_mode)
+      raise Exception("Unknown alignment mode: %s" % self.alignment_mode)
     return candidates
   
   def remove_item(self, item) :
-    self.list.remove(item)
+    self.items.remove(item)
 
   def store_item(self, item, lens, concrete_input_reader) :
-    self.list.append(item)
+    self.items.append(item)
 
   
   def unwrap(self):
-    return self.list
+    # Update the label of the list (e.g. if we stored and is_label item) then return it
+    self.items._meta_data.label = self.label
+    return self.items
 
   def __str__(self) :
-    return str(self.list)
+    return str(self.items)
 
-  @staticmethod
-  def TESTS() :
-    # Dummy arguments
-    lens, concrete_input_reader = None, None
+class ListContainer(BasicContainer) :
+  pass
 
-    # TODO: Redo these
-    return
+class DictContainer(BasicContainer) :
+  def __init__(self, items=None, **kargs) :
+   
+    # Create new dict if not passed one to wrap.
+    if not has_value(items) :
+      self.items = attach_meta_data([])
+    else : 
+      assert isinstance(items, dict)
+      self.items = items
 
-
-# XXX: Deprecate
-class UnorderedListContainer(ListContainer) :
-  """
-  Container that tries to respect original positioning of items in the concrete
-  input, where possible.  It is tempting to use a python set, though this
-  requires items to be immutable (for hashability). 
-  """
-
-  def __init__(self, initial_list=None) :
-    # Use list if passed; otherwise create a new list.
-    if initial_list != None :
-      if not isinstance(initial_list, unordered_list) :
-        assert isinstance(initial_list, list)
-        self.list = unordered_list(initial_list)
-      self.list = initial_list
-    else :
-      self.list = unordered_list()
+    # Create a list to hold the items.
+    items_as_list = attach_meta_data([])
     
-  def get_put_candidates(self, lens, concrete_input_reader) :
-    candidates = []
 
-    # Want to end up with items in postional order or fall back on abstract order.
-    
-    # Note: if item is auto_list item need to get correct position from it.
+    # Now add the items to the list, updating their labels from keys.
+    if has_value(items) :
+      assert isinstance(items, dict)
+      items_as_list._meta_data = items._meta_data
+      for key, item in items.iteritems() :
+        item = attach_meta_data(item)
+        item._meta_data.label = key
+        items_as_list.append(item)
 
-    # Start with candidate list
-    candidates = self.list[:]
+    super(DictContainer, self).__init__(items_as_list, **kargs)
 
+    # TODO: Choose default alignment mode.
 
-    return candidates
+  def store_item(self, item, *args, **kargs) :
+    if not has_value(item._meta_data.label) :
+      raise LensException("%s expected item %s to have a label." % (self, item))
+    super(DictContainer, self).store_item(item, *args, **kargs)
 
+  def unwrap(self):
+    # First unwrap to a list.
+    items_as_list = super(DictContainer, self).unwrap()
 
-  def consume_item(self, lens, concrete_input_reader) :
-    # XXX: What if someone copies an item such that multiple have same source in meta?
-    # XXX: Need to handle auto list here, surely.
+    # The convert to a dictionary.
+    items_as_dict = attach_meta_data({})
+    items_as_dict._meta_data = items_as_list._meta_data
+    for item in items_as_list :
+      items_as_dict[item._meta_data.label] = item
 
-    # First try to put an item back into this position
-    # Failing that, put any suitable item.
-
-    #
-    # Sort the items into positional and non-positional.
-    #
-    # XXX: Not good to build this every time, but okay for now.
-    items_with_meta = {}
-    items_without_meta = []
-    for item in self.list :
-      if item_has_meta(item) :
-        assert(has_value(item._meta_data.start_position))
-        # TODO: handle auto_list position that may be embedded in item.
-        items_with_meta[item._meta_data.start_position] = item
-      else :
-        items_without_meta.append(item)
-
-    if concrete_input_reader :
-      current_input_position = concrete_input_reader.get_pos()
-    else :
-      current_input_position = None
-
-    # See if we have an item that aligns with out current position.
-    if has_value(current_input_position) and current_input_position in items_with_meta:
-      item = items_with_meta[current_input_position]
-      self.list.remove(item)
-      return item
-
-    # If we haven't yet returned an item that matches positionally, return any non-positional item (e.g. a new item).
-    try :
-      item = items_without_meta.pop(0)
-      self.list.remove(item)
-      return item
-    except IndexError:
-      raise NoTokenToConsumeException()
-  
-  
-  @staticmethod
-  def TESTS() :
-
-    from pylens import Repeat, Group, AnyOf, alphas, nums
-
-    # TODO
-    return
-
-    lens = Repeat(Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list), type=unordered_list)
-    # XXX lens = Repeat(Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list), type=list, alignment=model)
-
-    d("GET")
-    got = lens.get("a+3c-2z*7")
-    assert(got == [["a",3],["c",2],["z",7]])
-
-    # Move the front item to the end - should not affect positional ordering.
-    got.append(got.pop(0))
-
-    output = lens.put(got)
-    d(output)
-    assert(output == "a+3c-2z*7")
+    return items_as_dict
 
 
-
-class DictContainer(AbstractContainer) :
+class xxDictContainer(AbstractContainer) :
   """Stores items in a dict."""
 
-  def __init__(self, dictionary=None) :
+  def __init__(self, dictionary=None, **kargs) :
+    super(DictContainer, self).__init__(**kargs)
     # Use list if passed; otherwise create a new list.
     if has_value(dictionary) :
       assert isinstance(dictionary, dict)
-      self.dictionary = dictionary
+      self.dictionary = {}
+      for key, item in dictionary.iteritems() :
+        self.dictionary[key] = attach_meta_data(item)
+        # Store the current label in the item's meta data.
+        self.dictionary[key]._meta_data.actual_label = key
     else :
       self.dictionary = {}
 
@@ -425,36 +402,48 @@ class DictContainer(AbstractContainer) :
     
     key = None
     
+    # Handle static labels (i.e. defined directly on the lens)
     if lens.options.label :
       if lens.options.label in self.dictionary :
         raise CannotStoreException("Label '%s' is already in use" % lens.options.label)
       key = lens.options.label
+    if hasattr(item, "get_label") and has_value(item.get_label()) :
+      key = item.get_label()
 
     if key :
       self.dictionary[key] = item
       return
 
-    raise CannotStoreException("I do not know how to store this lens item.")
+    raise CannotStoreException("I do not know how to store this lens item: %s" % item)
 
 
-  def consume_item(self, lens, concrete_input_reader) :
+  def get_put_candidates(self, lens, concrete_input_reader) :
     
-    key = None
+    container_alignment_mode = self.lens.options.alignment or SOURCE
 
-    if lens.options.label and lens.options.label in self.dictionary:
-      key = lens.options.label
-
-    if key :
-      item = self._get_and_remove(key)
-      return item
-
-    raise NoTokenToConsumeException("I cannot find an item in the dictionary approriate for the lens.")
+    candidates = []
     
+    # There is no choice for a static label.
+    if has_value(lens.options.label) :
+      if lens.options.label in self.dictionary:
+        candidates = [self.dictionary[lens.options.label]]
+      
+    else :
+      if container_alignment_mode == SOURCE :
+        def get_key(item) :
+          if has_value(item._meta_data.start_position) :
+            return item._meta_data.start_position
+          return LARGE_INTEGER # To ensure new items go on the end.
+        candidates = sorted(self.dictionary.values(), key = get_key)
+      # TODO: LABEL mode
+      else :
+        raise Exception("Unknown alignment mode: %s" % container_alignment_mode)
+    
+    return candidates
+ 
+  def remove_item(self, item) :
+    self.dictionary = {key: value for key, value in self.dictionary.iteritems() if value is not item}
 
-  def _get_and_remove(self, key) :
-    item = self.dictionary[key]
-    del self.dictionary[key]
-    return item
 
   def unwrap(self):
     return self.dictionary
@@ -502,10 +491,7 @@ class ContainerFactory:
       return incoming_type
 
     # Also handles auto_list
-    if issubclass(incoming_type, unordered_list) :
-      raise Exception("Deprecated") #XXX
-      return UnorderedListContainer
-    elif issubclass(incoming_type, list) :
+    if issubclass(incoming_type, list) :
       return ListContainer
     elif issubclass(incoming_type, dict) :
       return DictContainer
