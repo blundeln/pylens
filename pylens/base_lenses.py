@@ -433,6 +433,14 @@ class Lens(object) :
       return lens.put(None, concrete_input_reader, None)
 
 
+  def extend_sublenses(self, new_sublenses) :
+    """
+    Adds new sublenses to this lens, being sure to preprocess them (e.g. convert
+    strings to Literal lenses, etc.).
+    """
+    for new_sublens in new_sublenses :
+      self.lenses.append(self._preprocess_lens(new_sublens))
+
   #
   # Helper methods.
   #
@@ -616,10 +624,10 @@ class And(Lens) :
     # Flatten sub-lenses that are also Ands, so we don't have too much nesting,
     # which makes debugging lenses a nightmare.
     for lens in [left_lens, right_lens] :
-      if isinstance(lens, self.__class__) : 
-        self.lenses.extend(lens.lenses)
+      if isinstance(lens, self.__class__) :
+        self.extend_sublenses(lens.lenses)
       else :
-        self.lenses.append(lens)
+        self.extend_sublenses([lens])
 
 
   def _get(self, concrete_input_reader, current_container) :
@@ -682,28 +690,26 @@ class And(Lens) :
 class Or(Lens) :
   """
   This is the OR of two lenses.
-
-  To break ties in the GET direction, the longest match is returned; in the PUT
-  direction, to ensure tokens do actually get consumed when possible, the
-  left-most token-consuming token is favoured, else left-most lens.
   """
   
   def __init__(self, left_lens, right_lens, **kargs):
     super(Or, self).__init__(**kargs)
-    left_lens = self._preprocess_lens(left_lens)
-    right_lens = self._preprocess_lens(right_lens)
 
     # Flatten sub-lenses that are also Ors, so we don't have too much nesting, which makes debugging lenses a nightmare.
     for lens in [left_lens, right_lens] :
       if isinstance(lens, self.__class__) :
-        self.lenses.extend(lens.lenses)
+        self.extend_sublenses(lens.lenses)
       else :
-        self.lenses.append(lens)
+        self.extend_sublenses([lens])
 
 
   def _get(self, concrete_input_reader, current_container) :
+    """
+    Calls get on each lens until the firstmost succeeds.
     
-    # Try each lens until the firstmost succeeds.
+    Note that the lens should be designed accordingly to break ties over
+    multiple valid paths.
+    """
     for lens in self.lenses :
       try :
         with automatic_rollback(concrete_input_reader, current_container) :
@@ -715,7 +721,17 @@ class Or(Lens) :
 
 
   def _put(self, item, concrete_input_reader, current_container) :
-    
+    """
+    The goal here is to PUT into one of the possible sub-lenses, though to
+    succeed we can either:
+      - PUT into the current concrete with one of the lenses (I call this
+        a straight PUT)
+      - or consume from input with one lens and put with another (I call this
+        a cross-PUT)
+
+    Either way, we go with the first to succeed in terms of lens order, so
+    again the choice of lens order is important for the lens designer.
+    """
     # Algorithm
     #
     # Try a straight put (i.e. consuming with same lens that puts)
@@ -731,14 +747,8 @@ class Or(Lens) :
       except LensException:
         pass
 
-    # Failing a straight PUT we need to do a GET with one lens then CREATE with another.
-    # Note that, though we will not use any items from the GET it must be allowed to modify a copy of current_container.
-    # This means that the successful GET may consume from the concrete input, though must have its changes to the container
-    # discarded.
-
-
     # Now, if we fail a straight put, we must GET with one lens (to consume
-    # input, not to store any items), then CREATE with another; so we must make
+    # input, not to store any items), then PUT with another; so we must make
     # sure to revert the container after a successful GET.  It is tempting here
     # to create a dummy container rather than copying it, but we might later
     # define lenses that can alter their behaviour based on the current state of
@@ -756,7 +766,8 @@ class Or(Lens) :
     if not GET_succeeded:
       raise LensException("Cross-put GET failed.")
 
-    # Now we must put with one of the lenses, though without passing the (already consumed) input.
+    # Now we must put with one of the other lenses, though without passing the
+    # (already consumed) input.
     for lens in self.lenses :
       try :
         with automatic_rollback(current_container) :
@@ -764,7 +775,7 @@ class Or(Lens) :
       except LensException:
         pass
 
-    raise LensException("We should have PUT one of the lenses.")
+    raise LensException("We failed to PUT at least one of the lenses.")
     
 
   def _display_id(self) :
@@ -799,6 +810,7 @@ class Or(Lens) :
     d("Test with default values")
     lens = AnyOf(alphas, type=str) | AnyOf(nums, default=3)
     assert(lens.put() == "3")
+    assert(lens.put("r") == "r")
     
     # And whilst we are at it, check the outer lens default overrides the inner lens.
     lens.default = "x"
@@ -808,7 +820,8 @@ class Or(Lens) :
 
 class AnyOf(Lens) :
   """
-  Matches a single char within a specified set, and can also be negated.
+  The first useful low-level lens. Matches a single char within a specified
+  set, and can also be negated.
   """
   
   def __init__(self, valid_chars, negate=False, **kargs):
@@ -816,7 +829,10 @@ class AnyOf(Lens) :
     self.valid_chars, self.negate = valid_chars, negate
  
   def _get(self, concrete_input_reader, current_container) :
-    
+    """
+    Consumes a valid char form the input, returning it if we are a STORE
+    lens.
+    """
     char = None
     try:
       char = concrete_input_reader.get_next_char()
@@ -832,7 +848,10 @@ class AnyOf(Lens) :
 
 
   def _put(self, item, concrete_input_reader, current_container) :
-    
+    """
+    If a store lens, tries to output the given char; otherwise outputs
+    original char from concrete input.
+    """
     # If we are not a store lens, simply return what we would consume from the input.
     if not self.has_type() :
       # We should not have been passed an item.
@@ -874,7 +893,7 @@ class AnyOf(Lens) :
   def TESTS() :
     
     lens = AnyOf(alphas, type=str, some_property="some_val")
-    assert(lens.options.some_property == "some_val") # Test lens options working.
+    assert(lens.options.some_property == "some_val") # Might as well test lens options working.
     
     d("GET")
     got = lens.get("monkey")
@@ -893,7 +912,7 @@ class AnyOf(Lens) :
     output = lens.put()
     assert(output == "x")
 
-    d("Test failure when defalt value required.")
+    d("Test failure when default value required.")
     lens = AnyOf(alphas)
     with assert_raises(NoDefaultException) :
       lens.put()
@@ -902,10 +921,12 @@ class AnyOf(Lens) :
     lens = AnyOf(nums, type=int)
     assert(lens.get("3") == 3)
     assert(lens.put(8) == "8")
+    
     # Check default converted to string.
     lens = AnyOf(nums, default=5)
     assert(lens.put() == "5")
     
+# XXX: WORKING_HERE
 
 class Repeat(Lens) :
   """

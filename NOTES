@@ -4,7 +4,7 @@ RESEARCH NOTES
   - Re-organise these notes!
   
   ------------- Misc ideas
-  
+  - Look in to using something like coverage.py 
   - Need to think about USER-INTENDED (or perhaps IMPLIED) alignment:
     - Perhaps based on LABEL vs SOURCE alignment.
     - Case of using labels where value changed, loosing meta
