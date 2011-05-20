@@ -926,7 +926,6 @@ class AnyOf(Lens) :
     lens = AnyOf(nums, default=5)
     assert(lens.put() == "5")
     
-# XXX: WORKING_HERE
 
 class Repeat(Lens) :
   """
@@ -934,15 +933,29 @@ class Repeat(Lens) :
   """
 
   def __init__(self, lens, min_count=1, max_count=None, infinity_limit=1000, **kargs):
+    """
+    Arguments:
+      lens - the lens to repeat
+      min_count - the min repetitions
+      max_count - maximum repetitions (must be > 0 if set)
+      infinity_limit - For the sake of simplicity, rather than trying to
+      determine if a grammar may repeat infinitely (e.g. Repeat(Empty()).get()
+      being a simple example) we allow a looping limit to be set, with the aim
+      of signalling that a lens should be redesigned.
+    """
     super(Repeat, self).__init__(**kargs)
+    assert(min_count >= 0)
+    if has_value(max_count) :
+      assert(max_count > min_count)
+      assert(infinity_limit > max_count)
+    
     self.min_count, self.max_count = min_count, max_count
     self.infinity_limit = infinity_limit
-    # TODO: Perhaps having an append_sublens in Lens class could ensure
-    # coercion always happens.
-    self.lenses = [self._coerce_to_lens(lens)]
+    self.extend_sublenses([lens])
 
   def _get(self, concrete_input_reader, current_container) :
-    
+    """Calls a sequence of GETs on the sub-lens."""
+
     # For brevity.
     lens = self.lenses[0]
     
@@ -962,7 +975,7 @@ class Repeat(Lens) :
 
       # Check for infinite iteration (i.e. if lens does not progress state)
       if has_value(self.infinity_limit) and no_succeeded >= self.infinity_limit :
-        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
+        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned, or perhaps you need to increase infinity_limit")
 
     # Something with the algorthm has gone wrong if this fails.
     if has_value(self.max_count) :
@@ -974,6 +987,7 @@ class Repeat(Lens) :
 
 
   def _put(self, item, concrete_input_reader, current_container) :
+    """Calls a sequence of PUTs on the sub-lens."""
 
     # For brevity.
     lens = self.lenses[0]
@@ -992,7 +1006,12 @@ class Repeat(Lens) :
     # Then try to put with no input
     # Then mop up any remaining input with GET (i.e. if there are fewer abstract items)
 
+    # XXX: WORKING_HERE
+    # XXX: On reflection, this does not solve the problem if we had exact
+    # matching vs. ordering (e.g. for LABEL ordering, where we disregard source
+    # ordering)
     # XXX: This will be made redundant if a container can make the matching choice.
+    #  Will it, or does it add flexibilty?
     # To facilitate potential re-alignment of items within the container logic (e.g. perhaps for key
     # matching), this first tries to PUT by passing the outer concrete input (if
     # any) before trying to PUT without (by effectively setting the concrete
@@ -1008,6 +1027,7 @@ class Repeat(Lens) :
         # attempt some PUTs without outer input, by setting the reader to None for the next
         # iteration.
         if has_value(effective_concrete_reader) :
+          # XXX: Note, this is not actually flexed in the tests.
           effective_concrete_reader = None
           continue
         else :
@@ -1124,6 +1144,11 @@ class Repeat(Lens) :
     lens = Repeat(AnyOf(nums, type=int), type=list)
     assert(lens.put(lens.get("1234")) == "1234")
 
+    d("Test for completeness")
+    lens = Repeat(AnyOf(nums, type=int), type=list, min_count=0, max_count=1)
+    assert(lens.get("abc") == []) # No exception thrown since min_count == 0
+    assert(lens.get("123abc") == [1])
+    assert(lens.put([1,2,3]) == "1")
 
 
 

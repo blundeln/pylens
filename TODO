@@ -10,6 +10,7 @@ target: 1.0.0a1
   - Publish on freshmeat
 
 target: 1.0.0a2
+  - Allow label alignment (e.g. if label changes move item)
   - Complete Recursion
     - Need to test works correctly in both directions.
 
