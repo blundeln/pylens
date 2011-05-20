@@ -272,7 +272,7 @@ class BasicContainer(AbstractContainer) :
 
     # Create new list if not passed one to wrap.
     if not has_value(items) :
-      self.items = attach_meta_data([])
+      self.items = enable_meta_data([])
     else : 
       assert isinstance(items, list)
       self.items = items
@@ -280,7 +280,7 @@ class BasicContainer(AbstractContainer) :
     # Ensure our items can carry meta data (for algorithmic convenience) and be careful
     # to protect the incoming lists meta data by modifying it in place.
     for index, item in enumerate(self.items) :
-      self.items[index] = attach_meta_data(item)
+      self.items[index] = enable_meta_data(item)
     
     # Store the label (if set) of the list in our container for stateful consumption. 
     self.label = self.items._meta_data.label
@@ -310,8 +310,8 @@ class BasicContainer(AbstractContainer) :
     # Handle SOURCE alignment.
     elif self.alignment_mode == SOURCE :
       def get_key(item) :
-        if has_value(item._meta_data.start_position) :
-          return item._meta_data.start_position
+        if has_value(item._meta_data.concrete_start_position) :
+          return item._meta_data.concrete_start_position
         return LARGE_INTEGER # To ensure new items go on the end.
       candidates = sorted(self.items, key = get_key)
     # TODO: LABEL mode
@@ -342,13 +342,13 @@ class DictContainer(BasicContainer) :
    
     # Create new dict if not passed one to wrap.
     if not has_value(items) :
-      self.items = attach_meta_data([])
+      self.items = enable_meta_data([])
     else : 
       assert isinstance(items, dict)
       self.items = items
 
     # Create a list to hold the items.
-    items_as_list = attach_meta_data([])
+    items_as_list = enable_meta_data([])
     
 
     # Now add the items to the list, updating their labels from keys.
@@ -356,7 +356,7 @@ class DictContainer(BasicContainer) :
       assert isinstance(items, dict)
       items_as_list._meta_data = items._meta_data
       for key, item in items.iteritems() :
-        item = attach_meta_data(item)
+        item = enable_meta_data(item)
         item._meta_data.label = key
         items_as_list.append(item)
 
@@ -374,7 +374,7 @@ class DictContainer(BasicContainer) :
     items_as_list = super(DictContainer, self).unwrap()
 
     # The convert to a dictionary.
-    items_as_dict = attach_meta_data({})
+    items_as_dict = enable_meta_data({})
     items_as_dict._meta_data = items_as_list._meta_data
     for item in items_as_list :
       items_as_dict[item._meta_data.label] = item
@@ -392,7 +392,7 @@ class xxDictContainer(AbstractContainer) :
       assert isinstance(dictionary, dict)
       self.dictionary = {}
       for key, item in dictionary.iteritems() :
-        self.dictionary[key] = attach_meta_data(item)
+        self.dictionary[key] = enable_meta_data(item)
         # Store the current label in the item's meta data.
         self.dictionary[key]._meta_data.actual_label = key
     else :
@@ -432,8 +432,8 @@ class xxDictContainer(AbstractContainer) :
     else :
       if container_alignment_mode == SOURCE :
         def get_key(item) :
-          if has_value(item._meta_data.start_position) :
-            return item._meta_data.start_position
+          if has_value(item._meta_data.concrete_start_position) :
+            return item._meta_data.concrete_start_position
           return LARGE_INTEGER # To ensure new items go on the end.
         candidates = sorted(self.dictionary.values(), key = get_key)
       # TODO: LABEL mode

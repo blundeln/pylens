@@ -68,8 +68,15 @@ class unordered_list(list_wrapper): pass
 def item_has_meta(item) :
   return hasattr(item, META_ATTRIBUTE) 
 
-def attach_meta_data(item) :
-  """Adds a flexible Properties attribute to any object (inc. simple types) for storing meta data."""  
+def enable_meta_data(item) :
+  """
+  If not already present, this adds a flexible Properties attribute to any
+  object for storing meta data (e.g. information about the concrete origin of
+  an extracted item).
+  
+  Note that, since some builtin python types cannot hold
+  arbitrary attributes, we wrap them thinly in appropriate classes.
+  """  
   assert(has_value(item))
 
   if not item_has_meta(item) : 
@@ -93,7 +100,7 @@ def attach_meta_data(item) :
 def item_meta_test() :
   d("Started")
   item = "hello"
-  item = attach_meta_data(item)
+  item = enable_meta_data(item)
 
   # Should be able to add any attribute.
   item._meta_data.monkeys = True

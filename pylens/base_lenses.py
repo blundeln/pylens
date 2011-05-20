@@ -28,7 +28,11 @@
 # Organisation: www.nickblundell.org.uk
 # 
 #
+
+"""Contains base lenses, from which all other lenses are derived."""
+
 import inspect
+
 from debug import *
 from exceptions import *
 from containers import *
@@ -43,35 +47,54 @@ from charsets import *
 #########################################################
 
 class Lens(object) :
+  """Base lens, which handles most of the complexity."""
   
   def __init__(self, type=None, name=None, default=None, **kargs) :
     
-    # Set python type of lens data and a name, for debugging.
+    # Set python type of this lens.  If a lens has a type it is effectively a
+    # STORE lens, as described in the literature.
     self.type = type
-    self.name = name
+
+    # Set the default value of this lens (in the PUT direction) if it is not a
+    # STORE lens.
     if has_value(type) and has_value(default) :
       raise Exception("Cannot set a default value on a lens with a type (i.e. on a store lens).")
     self.default = default
+    
+    # For debugging purposes, allow a friendly name to be given to the lens,
+    # otherwise an automated name will be displayed (e.g. "And(106)")
+    self.name = name
 
-    # Composite lenses will store their sub-lenses in here.
+    # Composite lenses will store their sub-lenses in here, for consistency,
+    # and later perhaps to allow for some reasonning about a lens' structure.
     self.lenses = []
 
-    # Allow arbitrary arguments to be set which can aid flexible storage and
-    # retrival of items from a container.
+    # Allow arbitrary arguments to be set on the lens which can aid flexible
+    # storage and retrival of items from a container.
     self.options = Properties(kargs)
 
     #
     # Argument shortcuts
     #
 
-    # There is no point setting a non-store lens as a label, so set type as str.
-    if not has_value(self.type) and self.options.is_label :
+    # There is no point setting a non-store lens as a label or to have a
+    # label, so assume the user wanted a lens type of str.
+    if not has_value(self.type) and (self.options.is_label or self.options.label) :
       self.type = str
 
 
   def get(self, concrete_input, current_container=None) :
     """
-    Handles input normalisation and common functions of a GET call on a lens.
+    The top-level API function to extract a python structure from a given
+    string with this lens.
+
+    Arguments:
+      concrete_input - concrete string or stateful concrete input reader
+      current_container - outer container into which items are being extracted
+
+    This effectively wraps the _get function (GET proper) of the specific
+    lens, handling all of the common tasks (e.g. input normalisation, creation
+    of stateful containers, rolling back state for failed parsing branches).
     """
     #
     # Algorithm
@@ -93,7 +116,7 @@ class Lens(object) :
     #
     # return item
 
-    # Ensure we have a ConcreteInputReader
+    # Ensure we have the concrete input in the form of a ConcreteInputReader
     assert_msg(has_value(concrete_input), "Cannot GET if there is no input string!")
     concrete_input_reader = self._normalise_concrete_input(concrete_input)
   
@@ -103,43 +126,57 @@ class Lens(object) :
         current_container = current_container,
       ))
 
-    # Create the appropriate container class for our lens, if there is one.
+    # Remember the start position of the concrete reader, to aid
+    # re-alignment of concrete structures when we Lens.put is later called.
+    # We will store this in a returned items meta_data, effictively giving it
+    # a lifeline back to where it came from.
+    concrete_start_position = concrete_input_reader.get_pos()
+
+    # Create an empty appropriate container class for our lens, if there is one;
+    # this will be None if we are not a container-type lens (e.g. a dict or
+    # list).
     new_container = self._create_container()
 
-    # Remember the start position of the concrete reader, to aid
-    # abstract--concrete matching.
-    start_position = concrete_input_reader.get_pos()
-
-    # If we are a container-creating lens, replace the current container of
+    # If we are a container-type lens, replace the current container of
     # sub-lenses with our own container (new_container).
     if new_container :
       # Call GET proper with our container, checking that no item is returned,
       # since all items should be stored WITHIN the container
-      assert_msg(self._get(concrete_input_reader, new_container) == None, "Container lens %s has GOT an item, but all items must be stored in the current container." % self)
+      assert_msg(self._get(concrete_input_reader, new_container) == None, "Container lens %s has GOT an item, but all items must be stored in the current container, not returned." % self)
       
-      # Since we created the container, we will return it as our item,
+      # Since we created the container, we will return it as our item, for a
+      # higher order lens to store.
       item = new_container.unwrap()
+    # Otherwise, call GET proper using the outer container, if there is one.
     else :
-      # Call GET proper.
       item = self._get(concrete_input_reader, current_container)
 
+    # If we are a STORE lens (i.e. we extract an item) ...
     if self.has_type() :
       
-      # Cast the item to our type (usually if it is a string).
+      # Cast the item to our type (usually if it is a string being cast to a
+      # simple type, such as int).
       if not isinstance(item, self.type) :
         item = self.type(item)
 
       # Double check we got an item of the correct type (after any casting).
       assert(isinstance(item, self.type))
      
-      # Attach meta data to the item (e.g. cast it to a wrapper class if type
-      # does not support adding new attributes).
-      item = attach_meta_data(item)
+      # Allow meta data to be stored on the item.
+      item = enable_meta_data(item)
       
-      # Now add source info to the item.
+      # Now add source info to the item's meta data, which will help when
+      # putting it back into a concrete structure.
+      
+      # A refernce to the lens that extracted the item.
       item._meta_data.lens = self
-      item._meta_data.start_position = start_position
+
+      # A reference to the concrete reader and position parsed from.
+      item._meta_data.concrete_start_position = concrete_start_position
       item._meta_data.concrete_input_reader = concrete_input_reader
+
+    # Note that, even if we are not a typed lens, we may return an item
+    # extracted from some sub-lens, the Or lens being a good example.
 
     if IN_DEBUG_MODE :
       if has_value(item) :
@@ -152,13 +189,42 @@ class Lens(object) :
 
     return item
 
-  # TODO: Add label of item.
+
   def put(self, item=None, concrete_input=None, current_container=None, label=None) :
+    """
+    The top-level API function to PUT a python structure back into a string
+    structure.  This function holds much of the framework's complexity.
+
+    Arguments:
+      item - item to PUT back.
+      concrete_input - concrete input for weaving between STORE lens values
+      current_container - outer container from which items will be consumed
+      and PUT back
+      label - allows the user to set a label on the passed item, to allow for
+      structures that internally contain a label.
+
+    This effectively wraps the _put function (PUT proper) of the specific
+    lens, handling all of the common tasks (e.g. input normalisation, creation
+    of stateful containers, rolling back state for failed parsing branches).
+
+    Note that we make no distinction between PUT and CREATE (from the
+    literatur): since a previously extracted item will carry information of
+    its concrete structure within its meta data it will use this for weaving
+    in non-stored artifacts; otherwise, default artifacts will be used (as in
+    CREATE).
+
+    In some cases the order that items are put back in will differ from their
+    original order, so we are careful to both consume and discard from the
+    outer concrete structure whislt PUTing with the item' own concrete
+    structure.  If both structures are aligned (i.e. the item goes back in its
+    original order) then a single PUT on the outer concrete reader is
+    performed.
+    """
    
     #
     # Algorithm
     #
-    # Assert item => container = None
+    # Assert item => container == None
     # Note, though an item will hold its own input, the lens must consumed from
     # the outer input reader if one is supplied.
     #
@@ -168,10 +234,10 @@ class Lens(object) :
     #   if we have a default value and no concrete input, return it.
     #   otherwise return put proper, passing through our args - note, item could be passed through us
     #
-    # Now assumed we are typed lens
+    # Now assume we are typed lens
     #
     #  If we are passed an item
-    #    ensure meta attached
+    #    ensure meta enabled (e.g. for a new item, not previously extracted)
     #    pre-process item (e.g. to handle auto_list)
     #    check correct type, else raise LensException
     #    get the item input reader if there is one - can be None
@@ -199,16 +265,16 @@ class Lens(object) :
     # been passed.
     if has_value(item) :
       assert_msg(current_container == None, "A lens should not be passed both a container and an item.")
+      # Note, however, that a typed item may well be passed an outer concrete
+      # reader, which will be used for weaving in non-stored artifacts of concrete
+      # structures.
 
-      # XXX: The following does not account for lenses that use a container and poss. input to pluck their item.
-      #if self.has_type() :
-      #  assert_msg(concrete_input == None, "A typed lens should not be passed the outer concrete input.")
-
-    # Ensure we have a ConcreteInputReader, otherwise None (for CREATE mode).
+    # Ensure we have a ConcreteInputReader; otherwise None.
     concrete_input_reader = self._normalise_concrete_input(concrete_input)
 
     if IN_DEBUG_MODE :
       
+      # It's very useful to see if an item holds a label in its meta.
       if hasattr(item, "_meta_data") and has_value(item._meta_data.label) :
         item_label_string = " [label: %s]" % item._meta_data.label
       else :
@@ -223,24 +289,29 @@ class Lens(object) :
 
     # Handle cases where our lens does not directly store an item.
     if not self.has_type() :
-      # Use default for CREATE
-      if concrete_input == None and has_value(self.default) :
+      
+      # Use default (for CREATE)
+      if concrete_input_reader == None and has_value(self.default) :
         return str(self.default)
+      
       # Otherwise do a PUT proper, passing through our arguments, for example
-      # our child lens may put an item directly or from the container.
+      # our child lens may put an item directly or from the container of use
+      # its own default value.
       output = self._put(item, concrete_input_reader, current_container)
       d("PUT: %s" % output or "NOTHING")
       return output
 
 
-    # Now we can assume our lens has a type (i.e. directly stores/consumes an
+    # Now we can assume that our lens has a type (i.e. will directly PUT an
     # item)
     if has_value(item) :
     
-      # For the sake of consistancy, ensure the incoming item can hold meta data.
-      item = attach_meta_data(item)
+      # For the sake of algorithmic consistancy, ensure the incoming item can
+      # hold meta data.
+      item = enable_meta_data(item)
       
-      # Associate a label with the item (usually a label passed from user which is required internally by a structure)
+      # Associate a label with the item (usually a label passed from user
+      # which is required internally by a structure)
       if has_value(label) :
         item._meta_data.label = label
 
@@ -253,7 +324,7 @@ class Lens(object) :
       # If this item was previously GOTten, we can get its original input.
       if item._meta_data.concrete_input_reader :
         item_input_reader = ConcreteInputReader(item._meta_data.concrete_input_reader)
-        item_input_reader.set_pos(item._meta_data.start_position)
+        item_input_reader.set_pos(item._meta_data.concrete_start_position)
 
         # If the readers are not aligned...
         if not(has_value(concrete_input_reader) and item_input_reader.is_aligned_with(concrete_input_reader)) :
@@ -364,16 +435,18 @@ class Lens(object) :
   #
 
   def _normalise_concrete_input(self, concrete_input) :
-    # If input a string, wrap in a stateful string reader.
-    if concrete_input == None:
+    """If a string is passed, ensure it is normalised to a ConcreteInputReader."""
+    if not has_value(concrete_input) :
       return None
+    
     if isinstance(concrete_input, str) :
-      return ConcreteInputReader(concrete_input)
-    else :
-      return concrete_input
+      concrete_input = ConcreteInputReader(concrete_input)
+   
+    assert_msg(isinstance(concrete_input, ConcreteInputReader), "Expected to have a ConcreteInputReader not a %s" % type(concrete_input))
+    return concrete_input
 
   def _create_container(self):
-    """Creates a container for this lens, if lens of appropriate type."""
+    """Creates a container for this lens, if the lens is of a container type."""
     return ContainerFactory.create_container(self)
 
 
@@ -407,19 +480,26 @@ class Lens(object) :
 
 
   #
-  # Allow the potential modification of incoming and outgoing items (e.g. to handle auto_list)
+  # Allow the potential modification of incoming and outgoing items (e.g. to
+  # handle auto_list, where a single-item list is converted to and from a
+  # single item)
   #
 
   def _process_outgoing_item(self, item) :
+    """
+    Allows post-processing of an item in the GET direction.
     
+    For example, to handle auto_list, where a single-item list is converted to
+    a single item.
+    """
+    
+    # This allows a list singleton to be returned as a single item, for
+    # convenience.
     if self.options.auto_list == True and self.has_type() and issubclass(self.type, list) and len(item) == 1:
-      # This allows a list singleton to be returned as a single item, for
-      # convenience.
       # The easy part is extracting a singleton from the list, but we must
-      # preserve the source meta data of the list item by piggybacking it onto
+      # also preserve the source meta data of the list item by piggybacking it onto
       # the extracted item's meta data
 
-      # TODO: Need to ensure piggybacked meta data gets flexed in the tests.
       list_meta_data = item._meta_data
       singleton_meta_data = item[0]._meta_data
       item = item[0]
@@ -430,9 +510,15 @@ class Lens(object) :
 
 
   def _process_incoming_item(self, item) :
-   
+    """
+    Pre-processes an item in the PUT direction. 
+    
+    For example, reciprocating the auto_list example in
+    _process_outgoing_item.
+    """
+    
+    # Handle auto_list, expanding an item into a list, being careful to restore any meta data.
     if self.options.auto_list == True and self.has_type() and issubclass(self.type, list) and not isinstance(item, list):
-      # Expand an item into a list, being careful to restore any meta data.
 
       # Create some variables to clarify the process.
       singleton = item
@@ -453,8 +539,8 @@ class Lens(object) :
     return item
 
 
-  #-------------------------
-  # operator overloads
+  #
+  # Operator overloads to make for cleaner lens construction.
   #
   
   def __add__(self, other_lens): return And(self, self._preprocess_lens(other_lens))
@@ -466,29 +552,37 @@ class Lens(object) :
 
 
   #
-  # For overloading
+  # Specialised lenses must override these to implement their GET and PUT
+  # proper.
   #
 
   def _get(self, concrete_input_reader, current_container) :
-    """Get proper for a specific lens."""
+    """GET proper for a specific lens."""
     raise NotImplementedError("")
 
   def _put(self, item, concrete_input_reader, current_container) :
-    """Put proper for a specific lens."""
-    # Note, a low-level lens (i.e. that directly consumes input or tokens)
-    # should check if it has been mistakenly passed an item.
+    """
+    PUT proper for a specific lens.
+    
+    Note, a low-level lens (i.e. that directly consumes input or tokens)
+    should check if it has been mistakenly passed an item to PUT if it is not
+    operating as a STORE lens (i.e. if the lens has no type).
+    """
     raise NotImplementedError("")
 
 
-  #-------------------------
+  #
   # For debugging
   #
   
   def _display_id(self) :
-    """Useful for identifying specific lenses when debugging."""
+    """Useful for identifying specific lenses in debug traces."""
+    # If we have a specic name, use it.
     if self.name :
       return self.name
-    # If no name, a hash gives us a reasonably easy way to distinguish lenses in debug traces.
+
+    # If no name, a hash with small range gives us a reasonably easy way to
+    # distinguish lenses in debug traces.
     return str(hash(self) % 256)
 
   # String representation.
@@ -498,12 +592,13 @@ class Lens(object) :
   __repr__ = __str__
 
   def __instance_name__(self) :
-    """Used by nbdebug module to display a custom debug message context string."""
+    """Used by my nbdebug module to display a custom debug message context string."""
     return self.name or str(self)
 
 
+
 #########################################################
-# Core lenses
+# Core lenses - required fundamental lenses.
 #########################################################
     
 class And(Lens) :
@@ -511,6 +606,8 @@ class And(Lens) :
 
   def __init__(self, left_lens, right_lens, **kargs):
    
+    # Must always remember to invoke the parent lens, so it can initialise
+    # common arguments.
     super(And, self).__init__(**kargs)
 
     # Flatten sub-lenses that are also Ands, so we don't have too much nesting,
@@ -523,17 +620,19 @@ class And(Lens) :
 
 
   def _get(self, concrete_input_reader, current_container) :
-    """
-    Sequential GET on each lens.
-    """
+    """Sequential GET on each lens."""
     for lens in self.lenses :
       self.container_get(lens, concrete_input_reader, current_container)
 
-    # Important: we should not return anything, since we work on the outer container!
+    # Important: we should not return anything, since we work on the outer
+    # container, that the Lens class sets up for us in Lens.get regardless if our
+    # lens created the container or not.
 
 
   def _put(self, item, concrete_input_reader, current_container) :
-    
+    """Sequential PUT on each lens."""
+    # In the same way that we do not return an item in GET, we do not expect
+    # to PUT an individual item; again, this is handle in Lens.put
     assert_msg(item == None, "Lens %s did not expect to PUT an individual item %s, since it PUTs from a container" % (self, item))
 
     # Simply concatenate output from the sub-lenses.
@@ -546,8 +645,6 @@ class And(Lens) :
 
   @staticmethod
   def TESTS() :
-    # These tests flex the use of labels.
-
     d("GET")
     lens = And(AnyOf(alphas, type=str), AnyOf(nums, type=int), type=list)
     got = lens.get("m0nkey")
@@ -738,9 +835,9 @@ class AnyOf(Lens) :
       # We should not have been passed an item.
       assert(not has_value(item))
       if has_value(concrete_input_reader) :
-        start_position = concrete_input_reader.get_pos()
+        concrete_start_position = concrete_input_reader.get_pos()
         self._get(concrete_input_reader, current_container)
-        return concrete_input_reader.get_consumed_string(start_position)
+        return concrete_input_reader.get_consumed_string(concrete_start_position)
         
       else :
         raise NoDefaultException("Cannot CREATE: a default should have been set on lens %s, or a higher lens." % self)

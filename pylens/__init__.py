@@ -27,11 +27,11 @@
 # Author: Nick Blundell <blundeln@gmail.com>
 # Organisation: www.nickblundell.org.uk
 #
+"""Main API for using pylens."""
 
-#from base_lenses import *
-#from core_lenses import *
+
+# Imports all lenses
 from util_lenses import *
-
 
 # Some lens abbreviations, for short-hand lens definitions.
 ZM  = ZeroOrMore
@@ -46,11 +46,21 @@ WS  = Whitespace
 ##################################
 
 def get(lens, *args, **kargs) :
+  """
+  Extracts an python structure from some string structure using the given
+  lens.
+
+  Example: get(some_lens, "a=1,c=4") -> {"a":1, "c":4}
+  """
   lens = BaseLens.coerce_to_lens(lens)
   return lens.get(*args, **kargs)
 
 def put(lens_or_instance, *args, **kargs) :
-  
+  """
+  Puts some python structure back into some string structure.
+
+  Example: put(some_lens, {"a":1, "c":4}) -> "a=1,c=4"
+  """
   # If we have an instance of a class which defines its own lens...
   if hasattr(lens_or_instance, "__lens__") :
     # Might as well still coerce the lens, just in case.
@@ -62,7 +72,9 @@ def put(lens_or_instance, *args, **kargs) :
   lens = BaseLens.coerce_to_lens(lens_or_instance)
   return lens.put(*args, **kargs)
 
-create = put
+def main_api_test() :
+  #TODO: I'll test this with class item, since then it makes more sense.
+  pass
 
 ###########################
 # Main.

@@ -78,12 +78,12 @@ class OneOrMore(CombinatorLens) :
     no_GOT = 0
     while True:
       try :
-        start_position = concrete_input_reader.get_position_state()
+        concrete_start_position = concrete_input_reader.get_position_state()
         token = self.lens.get(concrete_input_reader, postprocess_token=False)
         self._store_token(token, self.lens, token_collection)
         no_GOT += 1
         # If the lens did not consume from the concrete input and we now have min items, break out.
-        if start_position == concrete_input_reader.get_position_state() and no_GOT >= self.min_items :
+        if concrete_start_position == concrete_input_reader.get_position_state() and no_GOT >= self.min_items :
           d("Got minimum items, so breaking out to avoid infinite loop")
           break
       except LensException:

@@ -1,38 +1,31 @@
 TODO
 ----
 
-Refactoring
-  - Add basic dict container to demonstrate keys.
-  - Start to build up lenses.
-  - Remove old code.
-  - encapsulate debug routines for optional inclusion
-    - especially the formatting of debug messages which can add a significant overhead.
-  - Try to build an arbitrary object structure container.
-
 target: 1.0.0a1
-  - Complete Recursion
-    - Need to test works correctly in both directions.
-  - Improve examples in long_tests.py
-    - Need to have a good think about how to create richer models
-  - Add installation script
+  - Remove old code and improve comments
+  - Add API docs
+  - Basic lenses using native containers (dict and list)
+  - Improve code clarity with comments and API docs
+  - Installation and packaging code
   - Publish on freshmeat
 
 target: 1.0.0a2
-  - Make compatible with python 3
-  - Improve basic docs
+  - Complete Recursion
+    - Need to test works correctly in both directions.
+
+target: 1.0.0a3
+  - Allow class containers.
+  - Alter obj attr names to be valid python variables.
 
 
 target: future
-  - Store residue of get for more flexible matching.
+  - Make compatible with python 3
   - How to handle default indentation in recursive grammars.
   - Shorter syntax for differentiating between store and non-store lenses so parsers less cluttered
     - e.g. Word(...) vs S(Word(...)), or something
   - DynamicLens - pass a function which creates a lens when it is called with
     context params (e.g. current collection) e.g. <X> .... </X>
   - Ambiguity checking.
-  - Implement PutGet check for sanity checking lenses.
-  - Implement full lenses for deb conf and interfaces.
-  - Apache lens
+  - Apache lens?
   - How can we simplify the lens definition?
     - Context of lens definition -> auto whitespace
-  - Alter obj attr names to be valid python variables.

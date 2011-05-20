@@ -33,6 +33,11 @@
 # 
 #
 
+import sys
+
+# Add required paths
+sys.path.append("testing")
+
 import unittest
 
 from pylens import *
