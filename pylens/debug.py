@@ -113,10 +113,11 @@ set_indent_function(debug_indent_function)
 
 
 def auto_name_lenses(local_variables) :
-  """Gives names to lenses based on their local variable names, which is
-  useful for tracing parsing. Should be called with globals()/locals()"""
+  """
+  Gives names to lenses based on their local variable names, which is
+  useful for tracing parsing. Should be called with globals()/locals()
+  """
   from pylens.base_lenses import Lens
   for variable_name, obj in local_variables.iteritems() :
     if isinstance(obj, Lens) :
       obj.name = variable_name
-

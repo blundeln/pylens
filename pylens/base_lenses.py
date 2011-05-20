@@ -310,19 +310,23 @@ class Lens(object) :
       # hold meta data.
       item = enable_meta_data(item)
       
-      # Associate a label with the item (usually a label passed from user
-      # which is required internally by a structure)
+      # Associate a label with the item, usually a label passed from the user
+      # which is required internally by a structure.
       if has_value(label) :
         item._meta_data.label = label
 
       # Pre-process the incoming item (e.g to handle auto_list)
       item = self._process_incoming_item(item)
      
+      # Check our item's type is compatible with the lens.
       if not isinstance(item, self.type) :
         raise LensException("This lens %s of type %s cannot PUT an item of that type %s" % (self, self.type, type(item)))
       
       # If this item was previously GOTten, we can get its original input.
       if item._meta_data.concrete_input_reader :
+        
+        # Create a personal concrete reader for this item, based on its meta
+        # data.
         item_input_reader = ConcreteInputReader(item._meta_data.concrete_input_reader)
         item_input_reader.set_pos(item._meta_data.concrete_start_position)
 
@@ -335,11 +339,15 @@ class Lens(object) :
           # Now use substitute the outer reader (if there was one) with our
           # item's reader
           concrete_input_reader = item_input_reader
+      
       else :
-        # Otherwise, if our item had no source meta, we will be CREATING.
+        
+        # Otherwise, if our item had no source meta, we will be CREATING, but
+        # must still consume from the outer reader, if there is one.
         if has_value(concrete_input_reader) :
           d("Inputs not aligned, so consuming and discarding from outer input reader.")
           self.get_and_discard(concrete_input_reader, current_container)
+        
         concrete_input_reader = None
       
       # Now, the item could be a container (e.g. a list, dict, or some other
@@ -352,18 +360,19 @@ class Lens(object) :
         item = None
         current_container = item_as_container
       else :
-        # When PUTing a non-container item, should cast to string (e.g. if int
-        # passed) and discard current container.
+        # When PUTing a non-container item, for consistancy, should cast to string (e.g. if int
+        # passed) and discard current container from this branch.
         item = str(item)
         current_container = None
 
-      # Now call PUT proper on our lens.
+      # Now that arguments are set up, call PUT proper on our lens.
       output = self._put(item, concrete_input_reader, current_container)
       d("PUT: %s" % output or "NOTHING")
       return output
    
     # If instead of an item we have a container, instruct the container to put
-    # an item into the lens.
+    # an item into the lens.  This gives the container much flexibilty about
+    # how it chooses an item to PUT, perhaps even doing so tentatively.
     elif has_value(current_container) :
       assert(isinstance(current_container, AbstractContainer))
       output = current_container.consume_and_put_item(self, concrete_input_reader)
@@ -373,11 +382,6 @@ class Lens(object) :
     # We should have returned by now.
     raise LensException("This typed lens expected to PUT an item either directly or from a container.")
 
-
-  #XXX: Will be depreciated, since now implicit in put.
-  def create(self, item=None, current_container=None) :
-    raise Exception("Deprecated")
-    return self.put(item, None, current_container)
 
   def get_and_discard(self, concrete_input, current_container) :
     """
@@ -396,23 +400,22 @@ class Lens(object) :
     # Now revert the state.
     if has_value(current_container): current_container._set_state(container_start_state)
 
+  
 
   def has_type(self) :
     """Determines if this lens will GET and PUT a variable - a STORE lens."""
     return self.type != None
 
-  def item_is_compatible_type(self, item) :
-    """Checks if this item is of type compatible with this lens."""
-    pass
-
-  #
-  # container_get and container_put are used by container lenses to store and
-  # put items from a container, whilst cleaninly handling the case where there
-  # is no container (e.g. repetition of non-store lenses, etc.)
-  #
 
   def container_get(self, lens, concrete_input_reader, current_container) :
-    """Wraps get_and_store_item if we have a container."""
+    """
+    Convenience function to handle the case where:
+      - if there is a container, get and store an item into it
+      - if there is no container, call get and check nothing is returned
+    
+    This simplifies lens such as And and Repeat, whose logic does not have to
+    worry about whether or not it is acting as a STORE lens.
+    """
     if has_value(current_container) :
       current_container.get_and_store_item(lens, concrete_input_reader)
     else :
@@ -422,7 +425,7 @@ class Lens(object) :
       )
 
   def container_put(self, lens, concrete_input_reader, current_container) :
-    """Wraps consume_and_put_item if we have a container."""
+    """Reciprocal of container_get."""
     if current_container :
       return current_container.consume_and_put_item(lens, concrete_input_reader)
     else :
@@ -651,10 +654,10 @@ class And(Lens) :
     assert(got == ["m", 0])
     
     d("PUT")
-    got[0] = "d" # Modify an item, though preserving list meta.
+    got[0] = "d" # Modify an item, though preserving list source info in meta.
     assert(lens.put(got) == "d0")
  
-    d("CREATE")
+    d("CREATE") # The new list and items will hold no meta.
     assert(lens.put(["z", 8]) == "z8")
 
     d("Input alignment test")
