@@ -2,10 +2,8 @@ TODO
 ----
 
 target: 1.0.0a1
-  - Remove old code and improve comments
-  - Add API docs
+  - Remove old code, and improve code clarity with comments and API docs
   - Basic lenses using native containers (dict and list)
-  - Improve code clarity with comments and API docs
   - Installation and packaging code
   - Publish on freshmeat
 

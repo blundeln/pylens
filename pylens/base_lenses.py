@@ -1002,16 +1002,10 @@ class Repeat(Lens) :
     # loose positional info from input that might be useful in matching up
     # items.
     #
-    # First try to put with input - important for potential re-alignment
-    # Then try to put with no input
+    # - Firstly, try to PUT as many items as we have, trying first with input
+    # (for LABEL alignment, which is yet to be implemented) then without input.
     # Then mop up any remaining input with GET (i.e. if there are fewer abstract items)
 
-    # XXX: WORKING_HERE
-    # XXX: On reflection, this does not solve the problem if we had exact
-    # matching vs. ordering (e.g. for LABEL ordering, where we disregard source
-    # ordering)
-    # XXX: This will be made redundant if a container can make the matching choice.
-    #  Will it, or does it add flexibilty?
     # To facilitate potential re-alignment of items within the container logic (e.g. perhaps for key
     # matching), this first tries to PUT by passing the outer concrete input (if
     # any) before trying to PUT without (by effectively setting the concrete
@@ -1027,7 +1021,8 @@ class Repeat(Lens) :
         # attempt some PUTs without outer input, by setting the reader to None for the next
         # iteration.
         if has_value(effective_concrete_reader) :
-          # XXX: Note, this is not actually flexed in the tests.
+          # XXX: Note, this is not actually flexed in the tests, but will be
+          # when we add LABEL alignment.
           effective_concrete_reader = None
           continue
         else :
@@ -1064,7 +1059,7 @@ class Repeat(Lens) :
         assert(no_to_get >= 0)
       
       # Do this without get_and_discard to avoid excessive state copying: we
-      # only need to make one copy of the original state.
+      # only need to make one copy of the original container state.
       no_got = 0
       state = get_rollbackables_state(current_container)
       while True :
@@ -1155,7 +1150,7 @@ class Repeat(Lens) :
 class Empty(Lens) :
   """
   Matches the empty string, used by Optional().  Can also set modes for special
-  empty matches.
+  empty matches (e.g. at the start or end of a string).
   """
   
   # Useful modifiers for empty matches.
@@ -1167,7 +1162,10 @@ class Empty(Lens) :
     self.default = ""
     self.mode = mode
 
+
   def _get(self, concrete_input_reader, current_container) :
+    
+    # Check for special modes.
     if self.mode == self.START_OF_TEXT :
       if concrete_input_reader.get_pos() != 0 :
         raise LensException("Will match only at start of text.")
@@ -1177,22 +1175,24 @@ class Empty(Lens) :
 
     # Note that, useless as it is, this is actually an item that could potentially be stored that we
     # return, which is why we must explicitly check for None elsewhere in the
-    # framework, since "" == False but "" != None.
+    # framework (e.g. use has_value(...)), since "" == False but "" != None.
     if self.has_type() :
       return ""
     return None
 
+
   def _put(self, item, concrete_input_reader, current_container) :
     
-    # We should not be passed an item with we are a non-store lens.
+    # We should not be passed an item if we are a non-store lens.
     if not self.has_type() and has_value(item) :
-      raise LensException("Did not expect to be passed an item")
+      raise LensException("Did not expect a non-store lens to be passed an item")
 
     # Here we can put only the empty string token, though if this lens does not
     # store an item, the default value of "" will intercept this function being called.
     if not (isinstance(item, str) and item == "") :
-      raise LensException("Expected to put an empty string")
+      raise LensException("Expected to PUT an empty string")
     return ""
+
 
   @staticmethod
   def TESTS() :
@@ -1236,13 +1236,14 @@ class Empty(Lens) :
 
 class Group(Lens) :
   """
-  A convenience lens that thinly wraps any lens to set a type.
+  A convenience lens that thinly wraps any lens, basically to set a type.
+  Usually this is used to close off a lenses container.
   """
 
   def __init__(self, lens, **kargs):
     super(Group, self).__init__(**kargs)
     assert_msg(self.has_type(), "To be meaningful, you must set a type on %s" % self)
-    self.lenses = [self._coerce_to_lens(lens)]
+    self.extend_sublenses([lens])
 
   def _get(self, concrete_input_reader, current_container) :
     return self.lenses[0].get(concrete_input_reader, current_container)
@@ -1260,11 +1261,11 @@ class Group(Lens) :
     assert(got == ["a", 2])
 
     d("PUT")
-    assert(lens.put(["x", 4], "a2b3") == "x4")
+    assert(lens.put(got, "n6b3") == "a2")
 
     d("CREATE")
     assert(lens.put(["x", 4]) == "x4")
 
-    d("TEST untyped Group")
+    d("TEST erroneous Group with no type")
     with assert_raises(AssertionError) :
       lens = Group(AnyOf(nums))
