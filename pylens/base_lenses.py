@@ -516,6 +516,14 @@ class Lens(object) :
       item = item[0]
       item._meta_data = list_meta_data
       item._meta_data.singleton_meta_data = singleton_meta_data
+    
+    # This allows a list of chars to be combined into a string.
+    elif self.options.combine_chars and self.has_type() and issubclass(self.type, list):
+      # Note, care should be taken to use this only when a list of single chars is used.
+      # XXX: Note, we actually loose each char's meta data here, but this should not be a problem in most cases.
+      original_meta = item._meta_data
+      item = enable_meta_data("".join(item))
+      item._meta_data = original_meta
       
     return item
 
@@ -546,6 +554,13 @@ class Lens(object) :
       # Ensure the singleton has its meta data restored, if it was maintained.
       if singleton_meta_data :
         singleton._meta_data = singleton_meta_data
+
+    # This allows a list of chars to be combined into a string.
+    elif isinstance(item, str) and self.options.combine_chars and self.has_type() and issubclass(self.type, list):
+      # Note, care should be taken to use this only when a list of single chars is used.
+      original_meta = item._meta_data
+      item = enable_meta_data(list(item))
+      item._meta_data = original_meta
 
     return item
 
@@ -1145,6 +1160,11 @@ class Repeat(Lens) :
     assert(lens.get("123abc") == [1])
     assert(lens.put([1,2,3]) == "1")
 
+
+    d("Test combine_chars")
+    lens = Repeat(AnyOf(alphas, type=str), type=list, combine_chars=True)
+    assert(lens.get("abc123") == "abc")
+    assert(lens.put("xyz") == "xyz")
 
 
 class Empty(Lens) :
