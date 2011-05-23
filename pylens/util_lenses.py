@@ -141,56 +141,6 @@ class ZeroOrMore(Optional) :
 
 
 
-class Literal(CombineChars) :
-  """
-  A lens that deals with a constant string, usually that will not be stored.
-  """
-
-  def __init__(self, literal_string, **kargs):
-    """We create this from CombineChars(AnyOf() + ...) for consistency rather than for efficiency."""
-
-    assert(isinstance(literal_string, str) and len(literal_string) > 0)
-    super(Literal, self).__init__(None, **kargs) # Pass None for the lens, which we will build next.
-    
-    # Build up the lens.
-    self.lens = None
-    for char in literal_string :
-      if not self.lens :
-        self.lens = AnyOf(char, store=self.store)
-      else :
-        self.lens += AnyOf(char, store=self.store)
-    
-    self.literal_string = literal_string
-    self.name = self.name or "'%s'" % truncate(literal_string)
-
-    if not self.default :
-      self.default = literal_string
-
-  @staticmethod
-  def TESTSX() :
-    for store in [False, True] :
-      # GET
-      lens = Literal("hello", store=store)
-      concrete_reader = ConcreteInputReader("helloworld")
-      token = lens.get(concrete_reader)
-      d(token)
-      assert((store and token == "hello" or token == None) and concrete_reader.get_remaining() == "world")
-      
-      # PUT
-      concrete_reader.reset()
-      output = lens.put(AbstractTokenReader(store and ["hello"] or []), concrete_reader)
-      d(output)
-      assert(output == "hello" and concrete_reader.get_remaining() == "world")
-      
-      # CREATE
-      output = lens.create(AbstractTokenReader(store and ["hello"] or []))
-      d(output)
-      assert(output == "hello")
-
-    # Test literal as string concatenation - will fail without correct operator overloading.
-    lens = AnyOf("X") + "my_literal"
-    lens = "my_literal" + AnyOf("X")  # Uses Lens.__radd__()
-
 
 class Word(CombineChars) :
   """

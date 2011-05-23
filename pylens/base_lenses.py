@@ -1289,3 +1289,87 @@ class Group(Lens) :
     d("TEST erroneous Group with no type")
     with assert_raises(AssertionError) :
       lens = Group(AnyOf(nums))
+
+
+class Literal(Lens) :
+  """
+  A lens that deals with a constant string, usually that will not be stored.
+  """
+
+  def __init__(self, literal_string, **kargs):
+    assert(isinstance(literal_string, str) and len(literal_string) > 0)
+    super(Literal, self).__init__(**kargs) # Pass None for the lens, which we will build next.
+    self.literal_string = literal_string
+    self.default = self.literal_string
+  
+  def _get(self, concrete_input_reader, current_container) :
+    """
+    Consumes a valid char form the input, returning it if we are a STORE
+    lens.
+    """
+    input_string = None
+    try:
+      input_string = concrete_input_reader.get_string(len(self.literal_string))
+      if input_string != self.literal_string :
+        raise LensException("Expected the literal '%s' but got '%s'." % (self.literal_string, input_string))
+    except EndOfStringException:
+      raise LensException("Expected literal '%s' but at end of string." % (self.literal_string))
+   
+    if self.has_type() :
+      return input_string
+    else :
+      return None
+
+
+  def _put(self, item, concrete_input_reader, current_container) :
+    """
+    If a store lens, tries to output the given char; otherwise outputs
+    original char from concrete input.
+    """
+    # If we are not a store lens, simply return what we would consume from the input.
+    if not self.has_type() :
+      # We should not have been passed an item.
+      assert(not has_value(item))
+      if has_value(concrete_input_reader) :
+        concrete_start_position = concrete_input_reader.get_pos()
+        self._get(concrete_input_reader, current_container)
+        return concrete_input_reader.get_consumed_string(concrete_start_position)
+        
+      else :
+        raise NoDefaultException("Cannot CREATE: a default should have been set on lens %s, or a higher lens." % self)
+    
+    # If this is PUT (vs CREATE) then first consume input.
+    if concrete_input_reader :
+      self.get(concrete_input_reader)
+    
+    if item != self.literal_string :
+      raise LensException("%s can not PUT." % (self, item))
+    
+    return item
+
+
+  def _display_id(self) :
+    """To aid debugging."""
+    if self.name :
+      return self.name
+    return "'%s'" % self.literal_string
+  
+
+
+  @staticmethod
+  def TESTS() :
+    d("GET")
+    lens = Literal("xyz")
+    concrete_reader = ConcreteInputReader("xyzabc")
+    assert(lens.get(concrete_reader) == None and concrete_reader.get_remaining() == "abc")
+    d("PUT")
+    assert(lens.put(None) == "xyz")
+    
+    d("Test as STORE lens, pointless as it is with this lens.")
+    lens = Literal("xyz", type=str)
+    concrete_reader = ConcreteInputReader("xyzabc")
+    assert(lens.get(concrete_reader) == "xyz" and concrete_reader.get_remaining() == "abc")
+    concrete_reader = ConcreteInputReader("xyzabc")
+    assert(lens.put("xyz", concrete_reader) == "xyz" and concrete_reader.get_remaining() == "abc")
+
+

@@ -29,13 +29,101 @@
 # 
 #
 import inspect
-from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
 from exceptions import *
 from containers import *
 from readers import *
 from util import *
 from debug import *
 from base_lenses import *
+
+
+
+# TODO: Update this.
+class Forward(Lens):
+  """
+  Allows forward declaration of a lens, which may be bound later, primarily to
+  allow for lens recursion.  Based on the idea used in pyparsing, since we must
+  define variables before we use them, unless we use some python interpreter
+  pre-processing.
+  """
+  def __init__(self, recursion_limit=100, **kargs):
+    super(Forward, self).__init__(**kargs)
+    d("Creating")
+    self.recursion_limit = recursion_limit
+    self._bound_lens = None
+  
+  def bind_lens(self, lens) :
+    d("Binding to lens %s" % lens)
+    assert not self._bound_lens, "The lens cannot be re-bound."
+    self._bound_lens = self.coerce_to_lens(lens)
+  
+  def _get(self, concrete_input_reader) :
+    assert self._bound_lens, "A lens has yet to be bound."
+    return self._bound_lens._get(concrete_input_reader)
+
+  def _put(self, abstract_data, concrete_input_reader) :
+    assert self._bound_lens, "A lens has yet to be bound."
+    
+    original_limit = sys.getrecursionlimit()
+    if self.recursion_limit :
+      sys.setrecursionlimit(self.recursion_limit)
+    
+    try :
+      output = self._bound_lens._put(abstract_data, concrete_input_reader)
+    except RuntimeError:
+      raise InfiniteRecursionException("You will need to alter your grammar, perhaps changing the order of Or lens operands")
+    finally :
+      sys.setrecursionlimit(original_limit)
+    
+    return output
+
+
+  # Use the lshift operator, as does pyparsing, since we cannot easily override (re-)assignment.
+  def __lshift__(self, other) :
+    assert isinstance(other, BaseLens)
+    self.bind_lens(other)
+
+
+  @staticmethod
+  def TESTSXXX():
+
+    d("GET")
+    lens = Forward()
+    # Now define the lens (must use '<<' rather than '=', since cannot easily
+    # override '=').
+    lens << ("[" + (lens | AnyOf(alphas, type="str")) + "]")
+    item = lens.get("[[h]]")
+    assert(item == "h")
+    return
+    d(token)
+    assert_match(str(token), "...['hello']...")
+    
+    
+    d("PUT")
+    output = lens.put(["monkey"], "[[hello]]")
+    d(output)
+    assert output == "[[monkey]]"
+
+    # Note that this lens results in infinite recursion upon CREATE.
+    d("CREATE")
+    try :
+      output = lens.create(["world"])
+      assert False # should not get here.
+    except InfiniteRecursionException:
+      pass
+    d(output)
+    
+    # If we alter the grammar slightly, we can overcome this.
+    lens = Forward()
+    lens << ("[" + (Word(alphas, store=True) | lens) + "]")
+    output = lens.create(["world"])
+    assert output == "[world]"
+
+
+
+
+
+
 
 #################################################
 # Old stuff - for refactoring.
@@ -447,7 +535,7 @@ class Recurse(CombinatorLens):
     assert output == "[[monkey]]"
 
 
-class Forward(CombinatorLens):
+class xForward(CombinatorLens):
   """
   Allows forward declaration of a lens, which may be bound later, primarily to
   allow for lens recursion.  Based on the idea used in pyparsing, since we must
