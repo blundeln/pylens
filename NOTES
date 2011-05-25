@@ -1,7 +1,7 @@
-RESEARCH NOTES
+RESEARCH NOTES - for my questions and musings
+  - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - Think about how general class will be a container.
   - Add bad tests that we know do not work and which are not run for commit.
-  - Re-organise these notes!
   
   ------------- Misc ideas
   - Look in to using something like coverage.py 

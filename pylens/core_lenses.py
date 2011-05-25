@@ -29,6 +29,7 @@
 # 
 #
 import inspect
+import sys
 from exceptions import *
 from containers import *
 from readers import *
@@ -50,26 +51,26 @@ class Forward(Lens):
     super(Forward, self).__init__(**kargs)
     d("Creating")
     self.recursion_limit = recursion_limit
-    self._bound_lens = None
   
   def bind_lens(self, lens) :
     d("Binding to lens %s" % lens)
-    assert not self._bound_lens, "The lens cannot be re-bound."
-    self._bound_lens = self.coerce_to_lens(lens)
+    assert_msg(len(self.lenses) == 0, "The lens cannot be re-bound.")
+    self.set_sublens(lens)
   
-  def _get(self, concrete_input_reader) :
-    assert self._bound_lens, "A lens has yet to be bound."
-    return self._bound_lens._get(concrete_input_reader)
+  def _get(self, *args, **kargs) :
+    assert_msg(len(self.lenses) == 1, "A lens has yet to be bound.")
+    return self.lenses[0]._get(*args, **kargs)
 
-  def _put(self, abstract_data, concrete_input_reader) :
-    assert self._bound_lens, "A lens has yet to be bound."
+  def _put(self, *args, **kargs) :
+    assert_msg(len(self.lenses) == 1, "A lens has yet to be bound.")
     
+    # Ensure the recursion limit is set before we start this.
     original_limit = sys.getrecursionlimit()
     if self.recursion_limit :
       sys.setrecursionlimit(self.recursion_limit)
     
     try :
-      output = self._bound_lens._put(abstract_data, concrete_input_reader)
+      output = self.lenses[0]._put(*args, **kargs)
     except RuntimeError:
       raise InfiniteRecursionException("You will need to alter your grammar, perhaps changing the order of Or lens operands")
     finally :
@@ -80,47 +81,45 @@ class Forward(Lens):
 
   # Use the lshift operator, as does pyparsing, since we cannot easily override (re-)assignment.
   def __lshift__(self, other) :
-    assert isinstance(other, BaseLens)
+    assert_msg(isinstance(other, Lens), "Can bind only to a lens.")
     self.bind_lens(other)
 
 
   @staticmethod
-  def TESTSXXX():
+  def TESTS():
 
+    # TODO: Need to think about semantics of this and how it will work with groups.
     d("GET")
     lens = Forward()
     # Now define the lens (must use '<<' rather than '=', since cannot easily
     # override '=').
-    lens << ("[" + (lens | AnyOf(alphas, type="str")) + "]")
-    item = lens.get("[[h]]")
-    assert(item == "h")
-    return
-    d(token)
-    assert_match(str(token), "...['hello']...")
+    lens << "[" + (AnyOf(alphas, type=str) | lens) + "]"
     
+    # Ensure the lens is enclosed in a container lens.
+    lens = Group(lens, type=list)
+    
+    got = lens.get("[[[h]]]")
+    assert(got == ["h"])
     
     d("PUT")
-    output = lens.put(["monkey"], "[[hello]]")
-    d(output)
-    assert output == "[[monkey]]"
+    got[0] = "p"
+    output = lens.put(got)
+    assert(output == "[[[p]]]")
 
     # Note that this lens results in infinite recursion upon CREATE.
     d("CREATE")
-    try :
-      output = lens.create(["world"])
-      assert False # should not get here.
-    except InfiniteRecursionException:
-      pass
-    d(output)
+    output = lens.put(["k"])
+    assert(output == "[k]")
     
-    # If we alter the grammar slightly, we can overcome this.
-    lens = Forward()
-    lens << ("[" + (Word(alphas, store=True) | lens) + "]")
-    output = lens.create(["world"])
-    assert output == "[world]"
-
-
-
+    # If we alter the grammar slightly, we will get an infinite recursion error,
+    # since the lens could recurse to an infinite depth before considering the
+    # AnyOf() lens.
+    lens = Forward() 
+    lens << "[" + (lens | AnyOf(alphas, type=str)) + "]"
+    lens = Group(lens, type=list)
+    with assert_raises(InfiniteRecursionException) :
+      output = lens.put(["k"])
+    
 
 
 

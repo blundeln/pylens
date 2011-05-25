@@ -432,6 +432,9 @@ class Lens(object) :
       # Otherwise, we PUT with no abstract data (e.g. for non-store sublenses)
       return lens.put(None, concrete_input_reader, None)
 
+  def set_sublens(self, sublens) :
+    """Used if only a single sublens is required (e.g. the Forward lens)."""
+    self.lenses = [self._preprocess_lens(sublens)]
 
   def extend_sublenses(self, new_sublenses) :
     """
