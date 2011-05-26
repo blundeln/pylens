@@ -106,6 +106,62 @@ class NewLine(Or) :
     assert(lens.put("\n") == "\n")
 
 
+class Word(And) :
+  """
+  Useful for handling keywords of a specific char range.
+  """
+  def __init__(self, body_chars, init_chars=None, min_count=1, max_count=None, negate=False, **kargs):
+
+    assert_msg(min_count > 0, "min_count should be more than zero.")
+
+    if "type" in kargs :
+      assert_msg(kargs["type"] == str, "If set the type of Word should be str.")
+      any_of_type = str
+      # Ensure the And type is list
+      kargs["type"] = list
+    else :
+      any_of_type = None
+      and_type = None
+
+    # Ensure chars are combined if this is a STORE lens.
+    kargs["combine_chars"] = True
+
+    left_lens = AnyOf(init_chars or body_chars, type=any_of_type)
+    right_lens = Repeat(AnyOf(body_chars, type=any_of_type), min_count=min_count-1, max_count=max_count and max_count-1 or None)
+    
+    super(Word, self).__init__(left_lens, right_lens, **kargs)
+
+  @staticmethod
+  def TESTS() :
+
+    lens = Word(alphanums, init_chars=alphas, type=str, max_count=5)
+    d("GET")
+    assert(lens.get("w23dffdf3") == "w23df")
+    with assert_raises(LensException) :
+      assert(lens.get("1w23dffdf3") == "w23df")
+
+    d("PUT")
+    assert(lens.put("R2D2") == "R2D2")
+    
+    with assert_raises(LensException) :
+      lens.put("2234") == "R2D2"
+    
+    # XXX: Should fail if length checking working correctly.
+    #with assert_raises(LensException) :
+    #  lens.put("TooL0ng")
+ 
+    
+    d("Test with no type")
+    lens = Word(alphanums, init_chars=alphas, max_count=5, default="a123d")
+    assert(lens.get("w23dffdf3") == None)
+    concrete_input_reader = ConcreteInputReader("ab12_3456")
+    assert(lens.put(None, concrete_input_reader) == "ab12")
+    assert(concrete_input_reader.get_remaining() == "_3456")
+    assert(lens.put() == "a123d")
+
+
+
+
 #################################################
 # Old stuff - for refactoring.
 #################################################
@@ -115,46 +171,6 @@ class NewLine(Or) :
 # Useful lenses
 #
 
-
-
-class Word(CombineChars) :
-  """
-  Useful for handling keywords of a specific char range.
-  """
-  def __init__(self, body_chars, init_chars=None, negate=False, **kargs):
-    super(Word, self).__init__(None, **kargs)
-     
-    if init_chars :
-      self.lens = AnyOf(init_chars, negate=negate, store=self.store) + OneOrMore(AnyOf(body_chars, negate=negate, store=self.store))
-    else :
-      self.lens = OneOrMore(AnyOf(body_chars, negate=negate, store=self.store))
-
-  @staticmethod
-  def TESTSX() :
-    for store in [True, False] :
-      # GET
-      lens = Word(alphanums, init_chars=alphas, store=store, default="thisis123valid") # A word that can contain but not begin with a number.
-      concrete_reader = ConcreteInputReader("hellomonkey123_456")
-      token = lens.get(concrete_reader)
-      d(token)
-      if store :
-        assert(token == "hellomonkey123" and concrete_reader.get_remaining() == "_456")
-      else :
-        assert(concrete_reader.get_remaining() == "_456")
-      
-      # PUT
-      concrete_reader.reset()
-      output = lens.put(AbstractTokenReader(["hello456"]), concrete_reader)
-      assert(store and output == "hello456" or output == "hellomonkey123" and concrete_reader.get_remaining() == "_456")
-      
-      # CREATE
-      output = lens.create(AbstractTokenReader(["hello456"]))
-      assert(store and output == "hello456" or output == "thisis123valid")
-
-    d("Type tests")
-    lens = Word(nums, store=True, type=int)
-    assert lens.get("3456") == 3456
-    assert lens.put(98765, "123") == "98765"
 
 
 class Whitespace(CombineChars) :

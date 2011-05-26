@@ -357,7 +357,9 @@ class Lens(object) :
       # Now, the item could be a container (e.g. a list, dict, or some other
       # AbstractContainer), so to save the _put definition from having to wrap
       # it for stateful consumption of items, let's do it here.
-      
+     
+      # TODO: We need to check that the container, if from an item, has been fully consumed
+      # here and raise an LensException if it has not.
       item_as_container = ContainerFactory.wrap_container(item, container_lens=self)
       if item_as_container :
         # The item is now represented as a consumable container.
@@ -892,7 +894,9 @@ class AnyOf(Lens) :
     if concrete_input_reader :
       self.get(concrete_input_reader)
     
-    lens_assert(isinstance(item, str) and len(item) == 1 and self._is_valid_char(item), "Invalid item '%s', expected %s." % (item, self._display_id()))
+    
+    if not (isinstance(item, str) and len(item) == 1 and self._is_valid_char(item)) :
+      raise LensException("Invalid item '%s', expected %s." % (item, self._display_id()))
     return item
 
 
