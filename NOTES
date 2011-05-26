@@ -4,6 +4,8 @@ RESEARCH NOTES - for my questions and musings
   - Add bad tests that we know do not work and which are not run for commit.
   
   ------------- Misc ideas
+  - Do we need to differntiate beween low and high level lenses so we know if
+    an item should not be passed to a lens.
   - How to handle printing debug contexts of lenses before their constructor.
   - Note that some lenses cannot take certain types, though should we just let casting errors to indicate this at runtime?
   - Look in to using something like coverage.py 

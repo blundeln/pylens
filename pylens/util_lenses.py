@@ -91,6 +91,20 @@ class List(And) :
     assert(lens.put([6,2,6,7,4,8]) == "6,2,6,7,4,8")
 
 
+class NewLine(Or) :
+  """Matches a newline char or the end of text, so extends the Or lens."""
+  def __init__(self, **kargs) :
+    super(NewLine, self).__init__("\n", Empty(mode=Empty.END_OF_TEXT), **kargs)
+
+  @staticmethod
+  def TESTS() :
+    lens = NewLine()
+    assert(lens.get("\n") == None)
+    assert(lens.get("") == None)
+    with assert_raises(LensException) :
+      lens.get("abc")
+    assert(lens.put("\n") == "\n")
+
 
 #################################################
 # Old stuff - for refactoring.
@@ -101,29 +115,6 @@ class List(And) :
 # Useful lenses
 #
 
-
-class NewLine(Or) :
-  """Matches a newline char or the end of text, so extends the Or lens."""
-  def __init__(self, **kargs) :
-    super(NewLine, self).__init__(Literal("\n", **kargs), Empty(mode=Empty.END_OF_TEXT))
-
-  @staticmethod
-  def TESTSX() :
-    lens = NewLine()
-    assert lens.put(AbstractTokenReader([]), "\n") == "\n"
-    output = lens.create(AbstractTokenReader([]))
-    assert output == "\n"
-    
-    lens = NewLine(store=True)
-    token = lens.get("\n")
-    assert token == "\n"
-    
-    output = lens.put(AbstractTokenReader(["\n"]), "\n")
-    d("'%s'" % output)
-    assert output == "\n"
-    
-    output = lens.create(AbstractTokenReader(["\n"]))
-    assert output == "\n"
 
 
 class Word(CombineChars) :

@@ -292,6 +292,10 @@ class Lens(object) :
       
       # Use default (for CREATE)
       if concrete_input_reader == None and has_value(self.default) :
+        # XXX: Note sure about this - need to think about the more general
+        # problem.
+        #if has_value(item):
+        #  raise LensException("%s should definitely not have been passed an item '%s' since a non-store lens with a default." % (self, item))
         return str(self.default)
       
       # Otherwise do a PUT proper, passing through our arguments, for example
@@ -1334,7 +1338,7 @@ class Literal(Lens) :
     # If we are not a store lens, simply return what we would consume from the input.
     if not self.has_type() :
       # We should not have been passed an item.
-      assert(not has_value(item))
+      assert_msg(not has_value(item), "%s did not expected to be passed an item - is a non-store lens" % self)
       if has_value(concrete_input_reader) :
         concrete_start_position = concrete_input_reader.get_pos()
         self._get(concrete_input_reader, current_container)
@@ -1370,7 +1374,13 @@ class Literal(Lens) :
     assert(lens.get(concrete_reader) == None and concrete_reader.get_remaining() == "abc")
     d("PUT")
     assert(lens.put(None) == "xyz")
-    
+  
+    # XXX: Need to think more about this, and what it impacts.
+    # Should flag that we mistakenly passed an item to a non-store low-level
+    # lens that could not possibly us it.
+    #with assert_raises(LensException) :
+    #  lens.put("xyz")
+
     d("Test as STORE lens, pointless as it is with this lens.")
     lens = Literal("xyz", type=str)
     concrete_reader = ConcreteInputReader("xyzabc")
