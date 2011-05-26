@@ -50,7 +50,6 @@ class Lens(object) :
   """Base lens, which handles most of the complexity."""
   
   def __init__(self, type=None, name=None, default=None, **kargs) :
-    
     # Set python type of this lens.  If a lens has a type it is effectively a
     # STORE lens, as described in the literature.
     self.type = type
@@ -81,6 +80,7 @@ class Lens(object) :
     # label, so assume the user wanted a lens type of str.
     if not has_value(self.type) and (self.options.is_label or self.options.label) :
       self.type = str
+
 
 
   def get(self, concrete_input, current_container=None) :
@@ -426,11 +426,13 @@ class Lens(object) :
 
   def container_put(self, lens, concrete_input_reader, current_container) :
     """Reciprocal of container_get."""
-    if current_container :
+    if lens.has_type() :
+      assert_msg(has_value(current_container), "Lens %s expected an enclosing container from which to pluck an item." % lens)
       return current_container.consume_and_put_item(lens, concrete_input_reader)
     else :
-      # Otherwise, we PUT with no abstract data (e.g. for non-store sublenses)
-      return lens.put(None, concrete_input_reader, None)
+      # Otherwise, we pass through arguments (e.g. for non-store sublenses or
+      # lens that enclose STORE lenses)
+      return lens.put(None, concrete_input_reader, current_container)
 
   def set_sublens(self, sublens) :
     """Used if only a single sublens is required (e.g. the Forward lens)."""
@@ -1353,7 +1355,8 @@ class Literal(Lens) :
 
   def _display_id(self) :
     """To aid debugging."""
-    if self.name :
+    # Name is only set after Lens constructor called.
+    if hasattr(self, "name") and has_value(self.name) :
       return self.name
     return "'%s'" % self.literal_string
   

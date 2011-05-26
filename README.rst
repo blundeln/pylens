@@ -36,7 +36,12 @@ richer abstractions of data (i.e. using native language objects) for use with
 lenses, but that, since we do not use an FSA like Augeas and Boomerang,
 ambiguity checking is not yet supported, though I'm interested in exploring
 how we can implement some kind of certainty of non-ambiguity into the
-framework, if not full ambiguity checking.  For more details see the work
+framework, if not full ambiguity checking.
+
+The main idea here is to increase flexibility of the framework at the price of
+weaker type-checking, leaving part of that responsibility to the lens authors.
+
+For more details see the work
 relating to lenses/bi-directional-programming of Nate Foster et al. (link
 below).
 

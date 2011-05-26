@@ -38,25 +38,69 @@ from debug import *
 from base_lenses import *
 from core_lenses import *
 
-##################################################
-# Useful lenses
-#
+
+class OneOrMore(Repeat) :
+  def __init__(self, *args, **kargs):
+    if "min_count" not in kargs :
+      kargs["min_count"] = 1
+    # Mental note: Don't accidentally write something like super(Repeat...
+    super(OneOrMore, self).__init__(*args, **kargs)
+
+  @staticmethod
+  def TESTS() :
+    # This is really just to check the lens construction.
+    lens = OneOrMore(AnyOf(nums, type=int), type=list)
+    assert(lens.get("123") == [1,2,3])
+
+
+
+class ZeroOrMore(Repeat) :
+  def __init__(self, *args, **kargs):
+    if "min_count" not in kargs :
+      kargs["min_count"] = 0
+    super(ZeroOrMore, self).__init__(*args, **kargs)
+
+
+class Optional(Or) :
+  def __init__(self, lens, **kargs):
+    super(Optional, self).__init__(lens, Empty(), **kargs)
+
+  @staticmethod
+  def TESTS():
+    lens = Optional(AnyOf(alphas, type=str))
+    assert(lens.get("abc") == "a")
+    assert(lens.get("123") == None)
+    assert(lens.put("a") == "a")
+    assert(lens.put(1) == "")
+
 
 class List(And) :
   """Shortcut for defining a lens-delimetered list."""
   def __init__(self, lens, delimiter_lens, **kargs):
+    if "type" not in kargs :
+      kargs["type"] = list
     super(List, self).__init__(lens, ZeroOrMore(delimiter_lens + lens), **kargs)
 
   @staticmethod
-  def TESTSX() :
-    lens = List(Word(alphas, store=True), ",")
-    CONCRETE_STRING = "hello,world,again"
-    token = lens.get(CONCRETE_STRING)
-    d(token)
-    assert_match(str(token), "...['hello', 'world', 'again']...")
-    output = lens.put(["one", "two"], CONCRETE_STRING)
-    d(output)
-    assert output == "one,two"
+  def TESTS() :
+    
+    lens = List(AnyOf(nums, type=int), ",")
+    d("GET")
+    assert(lens.get("1,2,3") == [1,2,3])
+    d("PUT")
+    assert(lens.put([6,2,6,7,4,8]) == "6,2,6,7,4,8")
+
+
+
+#################################################
+# Old stuff - for refactoring.
+#################################################
+
+
+##################################################
+# Useful lenses
+#
+
 
 class NewLine(Or) :
   """Matches a newline char or the end of text, so extends the Or lens."""
@@ -80,66 +124,6 @@ class NewLine(Or) :
     
     output = lens.create(AbstractTokenReader(["\n"]))
     assert output == "\n"
-
-class Optional(Or) :
-  """Wraps an Or with Empty."""
-  def __init__(self, lens, **kargs) :
-    super(Optional, self).__init__(Empty(), lens, **kargs)
- 
-  @staticmethod
-  def TESTSX() :
-    for store in [True] :
-      # GET
-      lens = Optional(Literal("hello123", store=True))
-      concrete_reader = ConcreteInputReader("hello123_end")
-      token = lens.get(concrete_reader)
-      d("token from %s is %s" % (lens, token))
-
-      assert((store and token == "hello123" or token == None) and concrete_reader.get_remaining() == "_end")
-      
-      # This should be happy not to parse the lens, since Empty() will parse it.
-      concrete_reader = ConcreteInputReader("___hello123_end")
-      token = lens.get(concrete_reader)
-      d(token)
-      assert(token == None and concrete_reader.get_remaining() == "___hello123_end")
-      
-      # PUT - we'd like to show that it will put a token if possible, rather than put Empty, which is always possible.
-      concrete_reader = ConcreteInputReader("hello123_end")
-      atr = AbstractTokenReader(["hello123"])
-      output = lens.put(atr, concrete_reader)
-      assert(output == "hello123" and concrete_reader.get_remaining() == "_end")
-      if store:
-        assert not atr.has_more_tokens_with_label(None)
-      else :  
-        assert atr.has_more_tokens_with_label(None)
-     
-      # CREATE
-      output = lens.create(AbstractTokenReader(["hello123"]))
-      if store:
-        assert(output == "hello123")
-      else :  
-        assert(output == "") # Uses default value of Empty(), the first sub-lens
-     
-      output = lens.create(AbstractTokenReader([]))
-      d(output)
-      if store:
-        assert(output == "") # Since it looks for but cannot find suitable token, Empty() is created with default value ''.
-      else :  
-        assert(output == "") # Uses default value of Empty(), the first sub-lens
-
-class ZeroOrMore(Optional) :
-  """Simply wraps Optional(OneOrMore(...))"""
-  def __init__(self, lens, **kargs):
-    super(ZeroOrMore, self).__init__(OneOrMore(lens), **kargs)
-
-  @staticmethod
-  def TESTSX() :
-    # Just test we can build the thing.
-    lens = ZeroOrMore(AnyOf(alphas, store=True))
-    lens.get("abcd123", check_fully_consumed=False)
-    lens.get("123", check_fully_consumed=False)
-
-
 
 
 class Word(CombineChars) :
@@ -223,6 +207,7 @@ class Whitespace(CombineChars) :
     lens = Whitespace(" ", store=True, indent_continuation=True) + Word(alphanums, store=True)
     token = lens.get("   \n hello")
     assert token[1] == "hello"
+
 
 class NullLens(Lens) :
   """
