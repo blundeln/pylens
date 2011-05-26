@@ -38,8 +38,6 @@ from debug import *
 from base_lenses import *
 
 
-
-# TODO: Update this.
 class Forward(Lens):
   """
   Allows forward declaration of a lens, which may be bound later, primarily to
@@ -121,6 +119,85 @@ class Forward(Lens):
       output = lens.put(["k"])
     
 
+class Until(Lens) :
+  """
+  Match anything up until the specified lens.  This is useful for lazy parsing,
+  but not the be overused (e.g. chaining can be bad: Until("X") + Until("Y")!).
+  """
+  
+  def __init__(self, lens, include_lens=False, **kargs):
+    """
+    Arguments:
+      include_lens - Set to true if the specified lens should also be consumed.
+    """
+    super(Until, self).__init__(**kargs)
+    self.set_sublens(lens)
+    self.include_lens = include_lens
+
+  def _get(self, concrete_input_reader, current_container) :
+
+
+    # Position before we start consume chars.
+    initial_position = concrete_input_reader.get_pos()
+    
+    # Parse as many chars as we can until the lens matches something.
+    while not concrete_input_reader.is_fully_consumed() :
+      try :
+        start_state = get_rollbackables_state(concrete_input_reader)
+        self.lenses[0].get(concrete_input_reader)
+        
+        # If we are not to include consumption of the lenes, roll back the state
+        # after successfully getting the lens, since we do not want to include
+        # consumption of the lens.
+        if not self.include_lens :
+          set_rollbackables_state(start_state, concrete_input_reader)
+          
+        break
+      except LensException:
+        pass
+
+    parsed_chars = concrete_input_reader.get_consumed_string(initial_position) 
+
+    if not parsed_chars :
+      raise LensException("Expected to get at least one character!")
+    
+    return parsed_chars
+
+
+  def _put(self, item, concrete_input_reader, current_container) :
+    
+    
+    if not self.has_type() and has_value(item):
+      raise Exception("As a nont-STORE lens, %s did not expect to be passed an item to PUT." % self)
+
+    assert_msg(isinstance(item, str), "Expected to PUT a string.")
+
+    # TODO: We should should check that the lens does not match within the
+    # string if include_lens == False, or perhaps we just leave this to the user
+    # to improve performance.
+
+    # Ensure we consume the input if there is some.
+    if concrete_input_reader :
+      self.get(concrete_input_reader)
+
+    return item
+
+
+  @staticmethod
+  def TESTS() :
+    d("GET")
+    lens = Group("("+Until(")", type=str) + ")", type=list)
+    got = lens.get("(in the middle)")
+    assert(got == ["in the middle"])
+    
+    d("PUT")
+    output = lens.put(["monkey"])
+    assert(output == "(monkey)")
+   
+    assert(lens.get(lens.put(["monkey"])) == ["monkey"])
+    
+    # XXX: Perhaps protect against this, or not?!
+    #assert(lens.get(lens.put(["mon)key"])) == ["monkey"])
 
 
 
@@ -406,218 +483,5 @@ class CombineChars(Lens) :
     concrete_reader.reset()
     output = lens.put("Ed", concrete_reader)
     assert(output == "Ed" and concrete_reader.get_remaining() == "1234")
-
-
-class Until(Lens) :
-  """
-  Match anything up until the specified lens.  This is useful for lazy parsing,
-  but not the be overused (e.g. chaining can be bad: Until("X") + Until("Y")!).
-  """
-  
-  def __init__(self, lens, **kargs):
-    super(Until, self).__init__(**kargs)
-    self.lens = self._preprocess_lens(lens)
-
-  def _get(self, concrete_input_reader) :
-    
-    parsed_chars = ""
-
-    # Parse as many chars as we can until the lens matches something.
-    while not concrete_input_reader.is_fully_consumed() :
-      try :
-        start_state = concrete_input_reader.get_position_state()
-        self.lens.get(concrete_input_reader)
-        # Roll back the state after successfully getting the lens.
-        concrete_input_reader.set_position_state(start_state)
-        break
-      except LensException:
-        pass
-      parsed_chars += concrete_input_reader.get_next_char()
-
-    if not parsed_chars :
-      raise LensException("Expected to get at least one character!")
-    
-    return parsed_chars
-
-
-  def _put(self, abstract_token, concrete_input_reader) :
-    # If this is PUT (vs CREATE) then consume input.
-    # TODO: Could do with some better checking here, to make sure output cannot be parsed by the lens.
-    # Perhaps to verify that we cannot parse the lense within this string.
-    lens_assert(isinstance(abstract_token, str)) # Simple check
-    if concrete_input_reader :
-      self.get(concrete_input_reader)
-    
-    return abstract_token
-
-
-  @staticmethod
-  def TESTSX() :
-    d("Testing")
-    concrete_reader = ConcreteInputReader("(in the middle)")
-    lens = "("+Until(")", store=True) + ")"
-    token = lens.get(concrete_reader, "(in the middle)")
-    d(token)
-    assert concrete_reader.is_fully_consumed()
-    assert token[0] == "in the middle"
-    
-    # PUT and CREATE
-    concrete_reader.reset()
-    for cr in [None, concrete_reader] :
-      atr = AbstractTokenReader(["monkey"])
-      output = lens.put(atr, cr)
-      d(output)
-      assert output == "(monkey)"
-
-
-# XXX: Depricated
-class Recurse(CombinatorLens):
-  """
-  During construction, lenses pass up references to Recurse so that it may bind to
-  the top level lens, though this must be frozen to the local lens definition.
-
-  TODO: Freeze ascension - will use reflection to freeze when find var to which this Recurse binds.
-  TODO: Reconcile different recurse lenses as the same lens (e.g. X + Recurse() + Z | Y + Recurse() + P)
-        Only required if we allow multiple instances in lens definition
-  """
-  def __init__(self, **kargs):
-    super(Recurse, self).__init__(**kargs)
-    self._bound_lens = None
-    return   
-    # Let's find which lens we were initialised under.
-
-    
-
-    frame = inspect.currentframe()
-    frame = frame.f_back
-    d(frame.f_locals)
-    return
-    #d(frame.f_locals["self"])
-    while frame: #"self" in frame.f_locals :
-      if "self" in frame.f_locals :
-        d(frame.f_locals)
-      frame = frame.f_back
-    """for i in range(0, callerLevel) :
-        callerFrame = callerFrame.f_back
-      location = getCallerLocation(callerFrame)
-      message = indent + location+": " + message
-  """
-  
-  def bind_lens(self, lens) :
-    d("Binding to lens %s" % lens)
-    self._bound_lens = lens
-  
-  def _get(self, concrete_input_reader) :
-    assert self._bound_lens, "Recurse was unable to bind to a lens."
-    return self._bound_lens._get(concrete_input_reader)
-
-  def _put(self, abstract_data, concrete_input_reader) :
-    assert self._bound_lens, "Recurse was unable to bind to a lens."
-    return self._bound_lens._put(abstract_data, concrete_input_reader)
- 
-  # TODO: When Recurse binds, it could replace the links with touching lenses.
-  # Or perhaps we override get_next_lenses - perhaps not a problem when it comes to getting char sets
-  # since we will be bound by then.
-  def get_first_lenses(self):
-    return [self]
-  def get_last_lenses(self):
-    return [self]
-
-  @staticmethod
-  def TESTSX() :
-    lens = ("[" + (Recurse() | Word(alphas, store=True)) + "]")
-    token = lens.get("[[hello]]")
-    d(token)
-    assert_match(str(token), "...['hello']...")
-    output = lens.put(["monkey"], "[[hello]]")
-    d(output)
-    assert output == "[[monkey]]"
-
-
-class xForward(CombinatorLens):
-  """
-  Allows forward declaration of a lens, which may be bound later, primarily to
-  allow for lens recursion.  Based on the idea used in pyparsing, since we must
-  define variables before we use them, unless we use some python interpreter
-  pre-processing.
-  """
-  def __init__(self, recursion_limit=100, **kargs):
-    super(Forward, self).__init__(**kargs)
-    d("Creating")
-    self.recursion_limit = recursion_limit
-    self._bound_lens = None
-  
-  def bind_lens(self, lens) :
-    d("Binding to lens %s" % lens)
-    assert not self._bound_lens, "The lens cannot be re-bound."
-    self._bound_lens = self.coerce_to_lens(lens)
-  
-  def _get(self, concrete_input_reader) :
-    assert self._bound_lens, "Unable to bind to a lens."
-    return self._bound_lens._get(concrete_input_reader)
-
-  def _put(self, abstract_data, concrete_input_reader) :
-    assert self._bound_lens, "Unable to bind to a lens."
-    
-    original_limit = sys.getrecursionlimit()
-    if self.recursion_limit :
-      sys.setrecursionlimit(self.recursion_limit)
-    
-    try :
-      output = self._bound_lens._put(abstract_data, concrete_input_reader)
-    except RuntimeError:
-      raise InfiniteRecursionException("You will need to alter your grammar, perhaps changing the order of Or lens operands")
-    finally :
-      sys.setrecursionlimit(original_limit)
-    
-    return output
-
- 
-  # TODO: When Recurse binds, it could replace the links with touching lenses.
-  # Or perhaps we override get_next_lenses - perhaps not a problem when it comes to getting char sets
-  # since we will be bound by then.
-  def get_first_lenses(self):
-    return [self]
-  def get_last_lenses(self):
-    return [self]
-
-  # Use the lshift operator, as does pyparsing, since we cannot easily override (re-)assignment.
-  def __lshift__(self, other) :
-    assert isinstance(other, BaseLens)
-    self.bind_lens(other)
-
-
-  @staticmethod
-  def TESTSX() :
-    d("GET")
-    lens = Forward()
-    # Now define the lens (must use '<<' rather than '=', since cannot easily
-    # override '=').
-    lens << ("[" + (lens | Word(alphas, store=True)) + "]")
-    token = lens.get("[[hello]]")
-    d(token)
-    assert_match(str(token), "...['hello']...")
-    
-    
-    d("PUT")
-    output = lens.put(["monkey"], "[[hello]]")
-    d(output)
-    assert output == "[[monkey]]"
-
-    # Note that this lens results in infinite recursion upon CREATE.
-    d("CREATE")
-    try :
-      output = lens.create(["world"])
-      assert False # should not get here.
-    except InfiniteRecursionException:
-      pass
-    d(output)
-    
-    # If we alter the grammar slightly, we can overcome this.
-    lens = Forward()
-    lens << ("[" + (Word(alphas, store=True) | lens) + "]")
-    output = lens.create(["world"])
-    assert output == "[world]"
-
 
 
