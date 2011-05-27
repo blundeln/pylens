@@ -5,6 +5,7 @@ RESEARCH NOTES - for my questions and musings
     - Perhaps like: with problem_test(): blah
   
   ------------- Misc ideas
+  - Add profiling to test script: -m cProfile
   - Validating incoming items:
     - Do we need to differntiate beween low and high level lenses so we know if
       an item should not be passed to a lens.

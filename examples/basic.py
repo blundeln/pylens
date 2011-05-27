@@ -62,3 +62,34 @@ def simple_list_test() :
   # the ouputted list and that the new items on the end use default spacing
   # that the Whitespace lenses were initialised with.
   assert(output == "monkeys,  rabits,    frogs, badgers, dinosaurs, snails")
+
+def more_complex_structure_test() :
+  INPUT_STRING = """
+  people: [bill, ben]
+
+  animals: [snake, tiger, monkey]
+  food: [beans, eggs]
+"""
+
+  # XXX: WORKING_HERE Note, this is working but is not terminating!
+  thing_list = List(Word(alphas, type=str), Whitespace("") + "," + Whitespace(""), type=None)
+  
+  # Note, WS is simply an abbreviation of the Whitespace lens.
+  # XXX: Have to explicty set type on Word due to nature of its construction.
+  entry = Group(WS("  ") + Word(alphas, is_label=True, type=str) + WS("") + ":" + WS("") + "[" + thing_list + "]" + NewLine(), type=list)
+
+  # Test the parts 
+  #assert(entry.get("  something: [a , b,c,d]\n") == ["a","b","c","d"])
+  
+  blank_line = WS("") + "\n"#NewLine()
+  lens = OneOrMore(entry | blank_line, type=dict)
+  
+  # For debugging: will name lenses by their local variable names.
+  auto_name_lenses(locals())
+ 
+
+  got = lens.get(INPUT_STRING)
+  assert(got == {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
+  return # XXX
+  output = lens.put(got)
+  print(output)

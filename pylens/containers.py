@@ -215,7 +215,7 @@ class ListContainer(AbstractContainer) :
 class DictContainer(ListContainer) :
   """Allows a list of items with labels to be accessed as a native python dict."""
   def __init__(self, items=None, **kargs) :
-   
+  
     # Create new dict if not passed one to wrap.
     if not has_value(items) :
       self.items = enable_meta_data([])

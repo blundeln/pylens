@@ -156,6 +156,7 @@ class Lens(object) :
       
       # Cast the item to our type (usually if it is a string being cast to a
       # simple type, such as int).
+      assert_msg(has_value(item), "Somethings gone wrong: %s is a STORE lens, so we should have got an item." % self)
       if not isinstance(item, self.type) :
         item = self.type(item)
 
@@ -302,7 +303,7 @@ class Lens(object) :
       # our child lens may put an item directly or from the container of use
       # its own default value.
       output = self._put(item, concrete_input_reader, current_container)
-      d("PUT: %s" % output or "NOTHING")
+      d("PUT: '%s'" % output or "NOTHING")
       return output
 
 
@@ -373,7 +374,7 @@ class Lens(object) :
 
       # Now that arguments are set up, call PUT proper on our lens.
       output = self._put(item, concrete_input_reader, current_container)
-      d("PUT: %s" % output or "NOTHING")
+      d("PUT: '%s'" % output or "NOTHING")
       return output
    
     # If instead of an item we have a container, instruct the container to put
@@ -382,7 +383,7 @@ class Lens(object) :
     elif has_value(current_container) :
       assert(isinstance(current_container, AbstractContainer))
       output = current_container.consume_and_put_item(self, concrete_input_reader)
-      d("PUT: %s" % output or "NOTHING")
+      d("PUT: '%s'" % output or "NOTHING")
       return output
 
     # We should have returned by now.

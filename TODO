@@ -2,20 +2,22 @@ TODO
 ----
 
 target: 1.0.0a1
-  - improve code clarity with comments and API docs
-  - Basic lenses using native containers (dict and list)
+  - Add some sample lenses to examples
+   - Make sure they are working - need to stop infinite looping.
   - Installation and packaging code
   - Publish on PIPI
+  - Create arch package
 
 target: 1.0.0a2
-  - Allow label alignment (e.g. if label changes move item)
+  - Allow class containers.
+    - Alter obj attr names to be valid python variables.
 
 target: 1.0.0a3
-  - Allow class containers.
-  - Alter obj attr names to be valid python variables.
+  - Allow label alignment (e.g. if label changes move item)
 
 
 target: future
+  - Must try to avoid deepcopy
   - Use of auto containers for convenience of when none is specified.
   - Make compatible with python 3
   - How to handle default indentation in recursive grammars.

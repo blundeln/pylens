@@ -23,7 +23,8 @@ Usage
 I will work on some better docs, but for now you can look in the following
 source files:
 
-For some examples of how to use pylens, see `Examples <examples>`_
+For some examples of how to use pylens, see `Examples
+<https://github.com/blundeln/pylens/tree/master/examples>`_
 
 For more examples, see the unit tests and longer tests in the following files::
 
