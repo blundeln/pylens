@@ -23,28 +23,29 @@
 # ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# 
 #
-# Author: Nick Blundell <blundeln@gmail.com>
+#
+# Author: Nick Blundell <blundeln [AT] gmail [DOT] com>
 # Organisation: www.nickblundell.org.uk
+# 
+# Description:
+#   Isolates all debugging functions.
 #
-from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
+
+# Optionally include nbdebug functions.
+try :
+  from nbdebug import d, breakpoint, set_indent_function, IN_DEBUG_MODE
+except :
+  d = lambda x: None
+  set_indent_function = None
+  IN_DEBUG_MODE = False
+
 from exceptions import *
 
 # More syntacticaly consistant assert function, for displaying explanations
 def assert_msg(condition, msg) :
   assert condition, msg
-
-# Deprecate this - too confusing.
-def lens_assert(condition, message=None) :
-  """
-  Useful for assertion within lenses that should raise LensException, such that
-  higher-level parsing may be resume, perhaps on an alternate branch.
-  XXX: This might create confusing code though - perhaps best to thorw the exception
-  XXX: Also we can loose the exceptions import.
-  """
-  if not condition :
-    raise LensException(message)
-
 
 class assert_raises:
   """A cleaner way to assert that an exception is thrown from some code."""
@@ -82,36 +83,6 @@ class assert_raises:
         x = []
         x[0] = 2
 
-
-
-def debug_indent_function() :
-  """
-  Nicely indents the debug messages according to the hierarchy of lenses.
-  """ 
-  import inspect
-  # Create a list of all function names in the trace.
-  function_names = []
-
-  # Prepend the callers location to the message.
-  callerFrame = inspect.currentframe()
-  while callerFrame :
-    location = callerFrame.f_code.co_name
-    function_names.append(location)
-    callerFrame = callerFrame.f_back
-
-  indent = 0
-  # Includes 'get' and 'put' since get may be called directly in put (not _put), etc.
-  for name in ["_put", "_get", "put", "get"] :
-    indent += function_names.count(name)
-  indent -= 1
-  indent = max(0, indent)
- 
-  return " "*indent
-
-from nbdebug import set_indent_function
-set_indent_function(debug_indent_function)
-
-
 def auto_name_lenses(local_variables) :
   """
   Gives names to lenses based on their local variable names, which is
@@ -121,3 +92,34 @@ def auto_name_lenses(local_variables) :
   for variable_name, obj in local_variables.iteritems() :
     if isinstance(obj, Lens) :
       obj.name = variable_name
+
+
+# Set an debug message indentation function if the debug library is in use.
+if set_indent_function :
+  
+  def debug_indent_function() :
+    """
+    Nicely indents the debug messages according to the hierarchy of lenses.
+    """ 
+    import inspect
+    # Create a list of all function names in the trace.
+    function_names = []
+
+    # Prepend the callers location to the message.
+    callerFrame = inspect.currentframe()
+    while callerFrame :
+      location = callerFrame.f_code.co_name
+      function_names.append(location)
+      callerFrame = callerFrame.f_back
+
+    indent = 0
+    # Includes 'get' and 'put' since get may be called directly in put (not _put), etc.
+    for name in ["_put", "_get", "put", "get"] :
+      indent += function_names.count(name)
+    indent -= 1
+    indent = max(0, indent)
+   
+    return " "*indent
+
+  set_indent_function(debug_indent_function)
+
