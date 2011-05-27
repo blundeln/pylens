@@ -489,7 +489,7 @@ class Lens(object) :
     elif inspect.isclass(lens_operand) and hasattr(lens_operand, "__lens__") :   
       lens_operand = Group(lens_operand.__lens__, type=lens_operand)
     
-    assert isinstance(lens_operand, Lens), "Unable to coerce %s to a lens" % lens_operand
+    assert_msg(isinstance(lens_operand, Lens), "Unable to coerce %s to a lens" % lens_operand)
     return lens_operand
 
   def _preprocess_lens(self, lens) :
@@ -641,7 +641,7 @@ class Lens(object) :
 class And(Lens) :
   """A lens that is formed from the ANDing of two sub-lenses."""
 
-  def __init__(self, left_lens, right_lens, **kargs):
+  def __init__(self, *lenses, **kargs):
    
     # Must always remember to invoke the parent lens, so it can initialise
     # common arguments.
@@ -649,7 +649,7 @@ class And(Lens) :
 
     # Flatten sub-lenses that are also Ands, so we don't have too much nesting,
     # which makes debugging lenses a nightmare.
-    for lens in [left_lens, right_lens] :
+    for lens in lenses :
       if isinstance(lens, self.__class__) :
         self.extend_sublenses(lens.lenses)
       else :
@@ -718,11 +718,11 @@ class Or(Lens) :
   This is the OR of two lenses.
   """
   
-  def __init__(self, left_lens, right_lens, **kargs):
+  def __init__(self, *lenses, **kargs):
     super(Or, self).__init__(**kargs)
 
     # Flatten sub-lenses that are also Ors, so we don't have too much nesting, which makes debugging lenses a nightmare.
-    for lens in [left_lens, right_lens] :
+    for lens in lenses :
       if isinstance(lens, self.__class__) :
         self.extend_sublenses(lens.lenses)
       else :

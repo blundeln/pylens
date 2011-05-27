@@ -114,7 +114,7 @@ class Word(And) :
 
     assert_msg(min_count > 0, "min_count should be more than zero.")
 
-    if "type" in kargs :
+    if "type" in kargs and has_value(kargs["type"]):
       assert_msg(kargs["type"] == str, "If set the type of Word should be str.")
       any_of_type = str
       # Ensure the And type is list
@@ -161,6 +161,75 @@ class Word(And) :
 
 
 
+class Whitespace(Or) :
+  """
+  Whitespace helper lens, that knows how to handle (logically) continued lines with '\\n'
+  or that preclude an indent which are usefil for certain config files.
+  """
+  
+  def __init__(self, default=" ", space_chars=" \t", slash_continuation=False, indent_continuation=False, **kargs):
+    # Ensure default gets passed up to parent class - we use default to
+    # determine if this lens is optional
+
+    if "type" in kargs and has_value(kargs["type"]):
+      # XXX: Could adapt this for storing spaces, though to be useful would need
+      # to construct in such a way as to combine chars.
+      assert_msg(False, "This lens cannot be used as a STORE lens")
+      
+    # XXX: This could be used later when we wish to make this a STORE lens.
+    word_type = None
+
+    # TODO: Could also use default to switch on, say, indent_continuation.
+
+    # Set-up a lens the literally matches space.
+    spaces = Word(space_chars, type=word_type)
+    
+    or_lenses = []
+    
+    # Optionally, augment with a slash continuation lens.
+    if slash_continuation :
+      or_lenses.append(Optional(spaces) + "\\\n" + Optional(spaces))
+
+
+    # Optionally, augment with a indent continuation lens.
+    if indent_continuation :
+      or_lenses.append(Optional(spaces) + "\n" + spaces)
+
+    # Lastly, add the straighforward spaces lens - since otherwise this would match before the others.
+    or_lenses.append(spaces)
+
+    # If the user set the default as the empty space, the Empty must also be a valid lens.
+    if default == "" :
+      or_lenses.append(Empty())
+
+    # Set up kargs for Or.
+    kargs["default"] = default
+    super(Whitespace, self).__init__(*or_lenses, **kargs)
+
+  @staticmethod
+  def TESTS() :
+    
+    # Simple whitespace.
+    lens = Whitespace(" ")
+    concrete_input_reader = ConcreteInputReader("  \t  xyz")
+    assert(lens.get(concrete_input_reader) == None and concrete_input_reader.get_remaining() == "xyz")
+    assert(lens.put() == " ")
+    
+    # Test that the Empty lens is valid when the default space is set to empty string (i.e. not space).
+    lens = Whitespace("")
+    assert(lens.get("xyz") == None)
+    assert(lens.put() == "")
+
+    # With slash continuation.
+    lens = Whitespace(" ", slash_continuation=True)
+    concrete_input_reader = ConcreteInputReader("  \t\\\n  xyz")
+    assert(lens.get(concrete_input_reader) == None and concrete_input_reader.get_remaining() == "xyz")
+
+    # With indent continuation.
+    lens = Whitespace(" ", indent_continuation=True)
+    concrete_input_reader = ConcreteInputReader("  \n xyz")
+    assert(lens.get(concrete_input_reader) == None and concrete_input_reader.get_remaining() == "xyz")
+
 
 #################################################
 # Old stuff - for refactoring.
@@ -172,48 +241,6 @@ class Word(And) :
 #
 
 
-
-class Whitespace(CombineChars) :
-  """
-  Whitespace helper lens, that knows how to handle continued lines with '\\n'
-  or that preclude an indent.
-  """
-  
-  def __init__(self, default=" ", space_chars=" \t", slash_continuation=False, indent_continuation=False, **kargs):
-    # Ensure default gets passed up to parent class - we use default to
-    # determine if this lens is optional
-    kargs["default"] = default
-    super(Whitespace, self).__init__(None, **kargs)
-      
-    # Set-up a lens the literally matches space.
-    spaces = OneOrMore(AnyOf(space_chars, store=self.store))
-    self.lens = spaces
-    
-    # Optionally, augment with a slash continuation lens.
-    if slash_continuation :
-      self.lens |= Optional(spaces) + "\\\n" + Optional(spaces)
-    
-    # Optionally, augment with a indent continuation lens.
-    if indent_continuation :
-      self.lens |= Optional(spaces) + "\n" + spaces 
-    
-    # If the default string is empty, then make the space optional.
-    if default == "" :
-      self.lens = Optional(self.lens)
-  
-  @staticmethod
-  def TESTSX() :
-    lens = Whitespace(" ", store=True) + Word(alphanums, store=True)
-    token = lens.get("  \thello")
-    assert token[1] == "hello"
-    
-    lens = Whitespace(" ", store=True, slash_continuation=True) + Word(alphanums, store=True)
-    token = lens.get("  \t\\\n  hello")
-    assert token[1] == "hello"
-    
-    lens = Whitespace(" ", store=True, indent_continuation=True) + Word(alphanums, store=True)
-    token = lens.get("   \n hello")
-    assert token[1] == "hello"
 
 
 class NullLens(Lens) :
