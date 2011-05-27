@@ -30,7 +30,7 @@
 # Organisation: www.nickblundell.org.uk
 #
 # Description:
-#  Abstract token collection classes
+#  Consumable containers for abstract storage of model items.
 #
 import inspect
 import copy
@@ -38,6 +38,7 @@ from debug import *
 from exceptions import *
 from util import *
 from item import *
+from rollback import *
 
 # Item alignment modes for containers.
 SOURCE = "SOURCE"
@@ -46,131 +47,6 @@ LABEL = "LABEL"
 
 LARGE_INTEGER = 0xffffffff
 
-class Rollbackable(object) :
-  """
-  A class that can have its state rolled back, to undo modifications.
-  A blanket deepcopy is not ideal, though we can explore more efficient
-  solutions later (e.g. copy-before-modify).
-  """
-
-  # XXX: Do we always need to copy on get AND set? Have to careful that original state is not set.
-  # XXX: Basically need to make sure that original state cannot be modified
-  # XXX: Perhaps add copy-flag
-  def _get_state(self) :
-    return copy.deepcopy(self.__dict__)
-
-  def _set_state(self, state) :
-    self.__dict__ = copy.deepcopy(state)
-
-
-  def __eq__(self, other):
-    """So we can easily compare if two objects have state of equal value."""
-    # TODO: To use this is expensive and should be replaced by a more efficient
-    # TODO:   dirty-flag scheme.
-    return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
-
-  @staticmethod
-  def TESTS():
-
-    class SomeClass(Rollbackable):
-      def __init__(self, x, y) :
-        self.x, self.y = x, y
-
-    o = SomeClass(1, [3,4])
-    state1 = o._get_state()
-    o.x = 3
-    o.y.append(16)
-    assert(o.x == 3)
-    assert(o.y == [3,4,16])
-
-    o._set_state(state1)
-    assert(o.x == 1)
-    assert(o.y == [3,4])
-
-    # Test value comparision.
-    o1 = SomeClass(1, [3,4])
-    o2 = SomeClass(1, [3,4])
-    assert(o1 == o2)
-    o2.y[1] = 9
-    assert(o1 != o2)
-    o2.y[1] = 4
-    assert(o1 == o2)
-
-
-
-#
-# Utility functions for getting and setting the state of multiple rollbackables.
-#
-
-def get_rollbackables_state(*rollbackables) :
-  """Handy function to get the state of multiple rollbackables, conviently ignoring those with value None."""
-  # Note: rollbackables must be in same order for get and set.
-  rollbackables_state = []
-  for rollbackable in rollbackables :
-    if isinstance(rollbackable, Rollbackable) :
-      rollbackables_state.append(rollbackable._get_state())
-
-  #d(str(rollbackables_state))
-  return rollbackables_state
-
-def set_rollbackables_state(new_rollbackables_state, *rollbackables) :
-  state_index = 0
-  for rollbackable in rollbackables:
-    if isinstance(rollbackable, Rollbackable) :
-      rollbackable._set_state(new_rollbackables_state[state_index])
-      state_index += 1
-
-
-# Allows rollback of reader state using the 'with' statement.
-class automatic_rollback:
-  
-  def __init__(self, *rollbackables) :
-    # Store the rollbackables. Note, for convenience, allow rollbackables to be None (i.e. store only Reader instances)
-    self.rollbackables = rollbackables
-  
-  def __enter__(self) :
-    # Store the start state of each reader.
-    self.start_state = get_rollbackables_state(*self.rollbackables)
-  
-  def __exit__(self, type, value, traceback) :
-    # If a RollbackException is thrown, revert all of the rollbackables.
-    if type and issubclass(type, RollbackException) :
-      set_rollbackables_state(self.start_state, *self.rollbackables)
-      d("Rolled back rollbackables to: %s." % str(self.rollbackables))
-    
-    # Note, by not returning True, we do not supress the exception, which gives
-    # us maximum flexibility.
-
-
-  @staticmethod
-  def TESTS() :
-    
-    class SomeClass(Rollbackable):
-      def __init__(self, x, y) :
-        self.x, self.y = x, y
-
-    o_1 = SomeClass(1, [3,4])
-    o_2 = None                # Important that we can handle None to simplify code.
-    o_3 = SomeClass(1, [3,4])
-   
-    try :
-      with automatic_rollback(o_1, o_2, o_3):
-        o_1.x = 3
-        o_3.y.append(16)
-        assert(o_1.x == 3)
-        assert(o_3.y == [3,4,16])
-        raise LensException() # In practice we will usually use LensException
-    except LensException:
-      pass # Don't wish to stop test run.
-       
-    # Check we rolled back.
-    assert(o_1.x == 1)
-    assert(o_3.y == [3,4])
-
-
-#
-# Containers
-#
 
 class AbstractContainer(Rollbackable) :
   """
@@ -181,7 +57,7 @@ class AbstractContainer(Rollbackable) :
   """
 
   def __init__(self, lens=None) :
-    assert_msg(has_value(lens), "A new container must be passed a lens.")
+    assert_msg(has_value(lens), "A new container must be passed the lens that creates it.")
     self.lens = lens
     self.label = None
 
@@ -229,7 +105,7 @@ class AbstractContainer(Rollbackable) :
     candidates = self.get_put_candidates(lens, concrete_input_reader)
     for candidate in candidates :
       try :
-        # TODO : Overkill to copy initial state every time within automatic_rollback.
+        # XXX : Overkill to copy initial state every time within automatic_rollback.
         with automatic_rollback(concrete_input_reader) :
           output = lens.put(candidate, concrete_input_reader, None)
           self.remove_item(candidate)
@@ -237,7 +113,6 @@ class AbstractContainer(Rollbackable) :
       except LensException:
         pass
 
-    
     # Didn't PUT any token.
     raise NoTokenToConsumeException()
 
@@ -260,15 +135,17 @@ class AbstractContainer(Rollbackable) :
     """Unwrap to native python type where appropriate: e.g. for list and dict.""" 
     raise NotImplementedError()
 
+  def is_fully_consumed(self) :
+    # TODO: Need to think about best way to do this.
+    raise NotImplementedError()
+    
 
 
-
-# TODO: This will become BasicContainer which will be speciliased lightly by ListContainer and DictContainer
-class BasicContainer(AbstractContainer) :
-  """Basic container, extended by ListContainer and DictContainer"""
+class ListContainer(AbstractContainer) :
+  """Most basic container, for storing items in a list."""
 
   def __init__(self, items=None, **kargs) :
-    super(BasicContainer, self).__init__(**kargs)
+    super(ListContainer, self).__init__(**kargs)
 
     # Create new list if not passed one to wrap.
     if not has_value(items) :
@@ -334,10 +211,9 @@ class BasicContainer(AbstractContainer) :
   def __str__(self) :
     return str(self.items)
 
-class ListContainer(BasicContainer) :
-  pass
 
-class DictContainer(BasicContainer) :
+class DictContainer(ListContainer) :
+  """Allows a list of items with labels to be accessed as a native python dict."""
   def __init__(self, items=None, **kargs) :
    
     # Create new dict if not passed one to wrap.
@@ -382,106 +258,9 @@ class DictContainer(BasicContainer) :
     return items_as_dict
 
 
-class xxDictContainer(AbstractContainer) :
-  """Stores items in a dict."""
-
-  def __init__(self, dictionary=None, **kargs) :
-    super(DictContainer, self).__init__(**kargs)
-    # Use list if passed; otherwise create a new list.
-    if has_value(dictionary) :
-      assert isinstance(dictionary, dict)
-      self.dictionary = {}
-      for key, item in dictionary.iteritems() :
-        self.dictionary[key] = enable_meta_data(item)
-        # Store the current label in the item's meta data.
-        self.dictionary[key]._meta_data.actual_label = key
-    else :
-      self.dictionary = {}
-
-
-  def store_item(self, item, lens, concrete_input_reader) :
-    
-    key = None
-    
-    # Handle static labels (i.e. defined directly on the lens)
-    if lens.options.label :
-      if lens.options.label in self.dictionary :
-        raise CannotStoreException("Label '%s' is already in use" % lens.options.label)
-      key = lens.options.label
-    if hasattr(item, "get_label") and has_value(item.get_label()) :
-      key = item.get_label()
-
-    if key :
-      self.dictionary[key] = item
-      return
-
-    raise CannotStoreException("I do not know how to store this lens item: %s" % item)
-
-
-  def get_put_candidates(self, lens, concrete_input_reader) :
-    
-    container_alignment_mode = self.lens.options.alignment or SOURCE
-
-    candidates = []
-    
-    # There is no choice for a static label.
-    if has_value(lens.options.label) :
-      if lens.options.label in self.dictionary:
-        candidates = [self.dictionary[lens.options.label]]
-      
-    else :
-      if container_alignment_mode == SOURCE :
-        def get_key(item) :
-          if has_value(item._meta_data.concrete_start_position) :
-            return item._meta_data.concrete_start_position
-          return LARGE_INTEGER # To ensure new items go on the end.
-        candidates = sorted(self.dictionary.values(), key = get_key)
-      # TODO: LABEL mode
-      else :
-        raise Exception("Unknown alignment mode: %s" % container_alignment_mode)
-    
-    return candidates
- 
-  def remove_item(self, item) :
-    self.dictionary = {key: value for key, value in self.dictionary.iteritems() if value is not item}
-
-
-  def unwrap(self):
-    return self.dictionary
-
-  def __str__(self) :
-    return str(self.dictionary)
-
-  @staticmethod
-  def TESTS() :
-
-    from pylens.base_lenses import Group, AnyOf, alphas, nums
-
-    # TODO: Update these
-    return
-
-    #
-    # Test use of static labels.
-    #
-
-    lens = Group(AnyOf(nums, type=int, label="number") + AnyOf(alphas, type=str, label="character"), type=dict)
-    assert(lens.get("1a") == {"number":1, "character":"a"})
-    assert(lens.put({"number":4, "character":"q"}, "1a") == "4q")
-    #assert(lens.create({"number":4, "character":"q"}) == "4q")
-    with assert_raises(NoTokenToConsumeException) :
-      lens.put({"number":4, "wrong_label":"q"}, "1a")
-    
-    #
-    # Test use of dynamic labels.
-    #
-
-    # TODO:
-
-
 
 class ContainerFactory:
   """Creates appropriate containers for native python types."""
- 
 
   @staticmethod
   def get_container_class(incoming_type) :

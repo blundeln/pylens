@@ -231,17 +231,6 @@ class Whitespace(Or) :
     assert(lens.get(concrete_input_reader) == None and concrete_input_reader.get_remaining() == "xyz")
 
 
-#################################################
-# Old stuff - for refactoring.
-#################################################
-
-
-##################################################
-# Useful lenses
-#
-
-
-
 
 class NullLens(Lens) :
   """
@@ -253,5 +242,4 @@ class NullLens(Lens) :
   def _put(self, abstract_token, concrete_input_reader) :
     raise LensException("NullLens always fails, and is useful as a filler for the incremental writing of lenses.")
 
-
-
+  # He, he. I won't test this one.
