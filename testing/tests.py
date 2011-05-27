@@ -37,6 +37,168 @@
 
 from pylens import *
 
+
+def auto_list_test() :
+  lens = Repeat(AnyOf(nums, type=int), type=list, auto_list=True)
+  d("GET")
+  assert(lens.get("123") == [1,2,3])
+  assert(lens.get("1") == 1)
+  
+  d("PUT")
+  assert(lens.put([5,6,7]) == "567")
+  assert(lens.put(5) == "5")
+
+  # Test list_source_meta_data preservation - assertion will fail if not preserved.
+  assert(lens.put(lens.get("1")) == "1")
+
+
+def dict_test() :
+
+  
+  # Test use of static labels.
+  lens = Group(AnyOf(nums, type=int, label="number") + AnyOf(alphas, type=str, label="character"), type=dict, alignment=SOURCE)
+  d("GET")
+  assert(lens.get("1a") == {"number":1, "character":"a"})
+  d("PUT")
+  assert(lens.put({"number":4, "character":"q"}, "1a") == "4q")
+  with assert_raises(NoTokenToConsumeException) :
+    lens.put({"number":4, "wrong_label":"q"}, "1a")
+  
+ 
+  # Test dynamic labels
+  key_value_lens = Group(AnyOf(alphas, type=str, is_label=True) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list)
+  lens = Repeat(key_value_lens, type=dict, alignment=SOURCE)
+
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  d(got)
+  assert(got == {"a":[3], "c":[2], "z":[7]})
+  
+  d("PUT")
+  output = lens.put({"b":[9], "x":[5]})
+  d(output)
+  assert(output in ["b*9x*5","x*5b*9"]) # Could be any order.
+
+  d("Test manipulation")
+  got = lens.get("a+3c-2z*7")
+  del got["c"]
+  output = lens.put(got)
+  assert(output == "a+3z*7") # Should have kept SOURCE alignment.
+
+  d("Test with auto list, which should keep source state")
+  key_value_lens = Group(AnyOf(alphas, type=str, is_label=True) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list, auto_list=True)
+  lens = Repeat(key_value_lens, type=dict, alignment=SOURCE)
+
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  d(got)
+  assert(got == {"a":3, "c":2, "z":7})
+  d("PUT")
+  output = lens.put(got)
+  assert(output == "a+3c-2z*7")
+ 
+  # For now this will loose some concrete, but later we will consider user-implied alignment
+  # or at least label alignment rather than source alignment.
+  d("Test auto_list with modification.")
+  got = lens.get("a+3c-2z*7")
+  got["c"] = 4
+  output = lens.put(got)
+  assert(output == "a+3z*7c*4")
+
+
+
+def list_test() :
+
+  lens = Repeat(AnyOf(nums, type=int), type=list)
+  d("GET")
+  assert(lens.get("123") == [1,2,3])
+  
+  d("PUT")
+  assert(lens.put([5,6,7]) == "567")
+
+  d("GET-PUT")
+  assert(lens.put(lens.get("1")) == "1")
+
+
+def model_ordered_matching_list_test() :
+  
+  lens = Repeat(
+    Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list),
+    type=list, alignment=MODEL)
+
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  assert(got == [["a",3],["c",2],["z",7]])
+
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "c-2z*7a+3")
+
+  d("With deletion and creation")
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+  # Now remove the middle item
+  del got[1] # z*7
+  # And add a new item
+  got.append(["m",6])
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "c-2a+3m*6")
+
+
+
+def source_ordered_matching_list_test() :
+
+  lens = Repeat(
+    Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list),
+    type=list, alignment=SOURCE)
+
+  d("Without deletion")
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  assert(got == [["a",3],["c",2],["z",7]])
+
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "a+3c-2z*7")
+
+  d("With deletion and creation")
+  d("GET")
+  got = lens.get("a+3c-2z*7")
+  # Move the front item to the end - should affect positional ordering.
+  got.append(got.pop(0))
+  # Now remove the middle item
+  del got[1] # z*7
+  # And add a new item
+  got.append(["m",6])
+
+  output = lens.put(got)
+  d(output)
+  assert(output == "a+3c-2m*6")
+
+
+
+
+
+
+
+
+
+
+
+#####################################################
+# Pre-refactoring tests
+#####################################################
+
 def deb_testx() :
 
   INPUT = """Build-Depends: debhelper (>= 7.0.0),
@@ -371,153 +533,6 @@ def api_testx():
   output = create(fred)
   d(output)
   assert(output == "Person:name=fred;surname=flintstone" or output == "Person:surname=flintstone;name=fred")
-
-
-def list_test() :
-
-  lens = Repeat(AnyOf(nums, type=int), type=list)
-  d("GET")
-  assert(lens.get("123") == [1,2,3])
-  
-  d("PUT")
-  assert(lens.put([5,6,7]) == "567")
-
-  d("GET-PUT")
-  assert(lens.put(lens.get("1")) == "1")
-
-def model_ordered_matching_list_test() :
-  
-  lens = Repeat(
-    Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list),
-    type=list, alignment=MODEL)
-
-  d("GET")
-  got = lens.get("a+3c-2z*7")
-  assert(got == [["a",3],["c",2],["z",7]])
-
-  # Move the front item to the end - should affect positional ordering.
-  got.append(got.pop(0))
-
-  output = lens.put(got)
-  d(output)
-  assert(output == "c-2z*7a+3")
-
-  d("With deletion and creation")
-  d("GET")
-  got = lens.get("a+3c-2z*7")
-  # Move the front item to the end - should affect positional ordering.
-  got.append(got.pop(0))
-  # Now remove the middle item
-  del got[1] # z*7
-  # And add a new item
-  got.append(["m",6])
-
-  output = lens.put(got)
-  d(output)
-  assert(output == "c-2a+3m*6")
-
-
-
-def source_ordered_matching_list_test() :
-
-  lens = Repeat(
-    Group(AnyOf(alphas, type=str) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list),
-    type=list, alignment=SOURCE)
-
-  d("Without deletion")
-  d("GET")
-  got = lens.get("a+3c-2z*7")
-  assert(got == [["a",3],["c",2],["z",7]])
-
-  # Move the front item to the end - should affect positional ordering.
-  got.append(got.pop(0))
-
-  output = lens.put(got)
-  d(output)
-  assert(output == "a+3c-2z*7")
-
-  d("With deletion and creation")
-  d("GET")
-  got = lens.get("a+3c-2z*7")
-  # Move the front item to the end - should affect positional ordering.
-  got.append(got.pop(0))
-  # Now remove the middle item
-  del got[1] # z*7
-  # And add a new item
-  got.append(["m",6])
-
-  output = lens.put(got)
-  d(output)
-  assert(output == "a+3c-2m*6")
-
-
-def dict_test() :
-
-  
-  # Test use of static labels.
-  lens = Group(AnyOf(nums, type=int, label="number") + AnyOf(alphas, type=str, label="character"), type=dict, alignment=SOURCE)
-  d("GET")
-  assert(lens.get("1a") == {"number":1, "character":"a"})
-  d("PUT")
-  assert(lens.put({"number":4, "character":"q"}, "1a") == "4q")
-  with assert_raises(NoTokenToConsumeException) :
-    lens.put({"number":4, "wrong_label":"q"}, "1a")
-  
- 
-  # Test dynamic labels
-  key_value_lens = Group(AnyOf(alphas, type=str, is_label=True) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list)
-  lens = Repeat(key_value_lens, type=dict, alignment=SOURCE)
-
-  d("GET")
-  got = lens.get("a+3c-2z*7")
-  d(got)
-  assert(got == {"a":[3], "c":[2], "z":[7]})
-  
-  d("PUT")
-  output = lens.put({"b":[9], "x":[5]})
-  d(output)
-  assert(output in ["b*9x*5","x*5b*9"]) # Could be any order.
-
-  d("Test manipulation")
-  got = lens.get("a+3c-2z*7")
-  del got["c"]
-  output = lens.put(got)
-  assert(output == "a+3z*7") # Should have kept SOURCE alignment.
-
-  d("Test with auto list, which should keep source state")
-  key_value_lens = Group(AnyOf(alphas, type=str, is_label=True) + AnyOf("*+-", default="*") + AnyOf(nums, type=int), type=list, auto_list=True)
-  lens = Repeat(key_value_lens, type=dict, alignment=SOURCE)
-
-  d("GET")
-  got = lens.get("a+3c-2z*7")
-  d(got)
-  assert(got == {"a":3, "c":2, "z":7})
-  d("PUT")
-  output = lens.put(got)
-  assert(output == "a+3c-2z*7")
- 
-  # For now this will loose some concrete, but later we will consider user-implied alignment
-  # or at least label alignment rather than source alignment.
-  d("Test auto_list with modification.")
-  got = lens.get("a+3c-2z*7")
-  got["c"] = 4
-  output = lens.put(got)
-  assert(output == "a+3z*7c*4")
-
-
-def auto_list_test() :
-  lens = Repeat(AnyOf(nums, type=int), type=list, auto_list=True)
-  d("GET")
-  assert(lens.get("123") == [1,2,3])
-  assert(lens.get("1") == 1)
-  
-  d("PUT")
-  assert(lens.put([5,6,7]) == "567")
-  assert(lens.put(5) == "5")
-
-  # Test list_source_meta_data preservation - assertion will fail if not preserved.
-  assert(lens.put(lens.get("1")) == "1")
-  
 
 
 def experimental_testx() :
