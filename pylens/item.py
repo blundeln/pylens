@@ -30,6 +30,9 @@
 # Organisation: www.nickblundell.org.uk
 # 
 # Description:
+#  Classes and functions relating to abstract items, specically allowing meta
+#  data to be added to native python types for tracking an item's concrete
+#  origin. 
 # 
 #
 
@@ -45,25 +48,7 @@ class str_wrapper(str) :pass
 class int_wrapper(int) :pass
 class float_wrapper(float) :pass
 class list_wrapper(list) :pass
-#class unordered_list_wrapper(unordered_list) :pass
 class dict_wrapper(dict) :pass
-
-#
-# Custom types.
-#
-
-
-
-# Use this for user convenience, when we like to manipulate single item lists
-# as single items and auto convert those single items to and from lists at the
-# edge of the API.
-class auto_list(list_wrapper) : pass
-
-# Signifies that a lens will use an UnorderedListContainer.
-class unordered_list(list_wrapper): pass
-
-
-
 
 def item_has_meta(item) :
   return hasattr(item, META_ATTRIBUTE) 
