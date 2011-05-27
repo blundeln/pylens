@@ -861,7 +861,7 @@ class AnyOf(Lens) :
     """
     char = None
     try:
-      char = concrete_input_reader.get_next_char()
+      char = concrete_input_reader.consume_char()
       if not self._is_valid_char(char) :
         raise LensException("Expected char %s but got '%s'" % (self._display_id(), truncate(char)))
     except EndOfStringException:
@@ -1252,7 +1252,7 @@ class Empty(Lens) :
     lens = Empty(mode=Empty.START_OF_TEXT)
     concrete_reader = ConcreteInputReader("hello")
     # Progress the input reader so lens does not match.
-    concrete_reader.get_next_char()
+    concrete_reader.consume_char()
     with assert_raises(LensException) : 
       lens.get(concrete_reader)
     
@@ -1261,7 +1261,7 @@ class Empty(Lens) :
     # This should throw an Exception
     with assert_raises(LensException) : 
       lens.get(concrete_reader)
-    concrete_reader.get_next_char()
+    concrete_reader.consume_char()
     # This should succeed quietly.
     lens.get(concrete_reader)
 
@@ -1322,7 +1322,7 @@ class Literal(Lens) :
     """
     input_string = None
     try:
-      input_string = concrete_input_reader.get_string(len(self.literal_string))
+      input_string = concrete_input_reader.consume_string(len(self.literal_string))
       if input_string != self.literal_string :
         raise LensException("Expected the literal '%s' but got '%s'." % (self.literal_string, input_string))
     except EndOfStringException:
