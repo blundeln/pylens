@@ -40,6 +40,10 @@ def simple_list_test() :
   
   # This works like a standard parser (i.e. it extracts an abstract
   # representation of the string structure.
+  # Note that, when we set a type on a lens, this instructs the lens to
+  # extract and put back items of that python type from and to the string
+  # structure.  In this case we wish to extract the animal names as strings to
+  # store in a list, whereas we wish to discard the whitespace and delimiters.
   lens = List(Word(alphas, type=str), Whitespace("") + "," + Whitespace(" "))
   got = lens.get(INPUT_STRING)
   d(got)
