@@ -650,7 +650,8 @@ class And(Lens) :
     # Flatten sub-lenses that are also Ands, so we don't have too much nesting,
     # which makes debugging lenses a nightmare.
     for lens in lenses :
-      if isinstance(lens, self.__class__) :
+      # Note, isinstance would be too vague - Word() was absorbed due to this.
+      if lens.__class__ == self.__class__ :
         self.extend_sublenses(lens.lenses)
       else :
         self.extend_sublenses([lens])
@@ -723,7 +724,8 @@ class Or(Lens) :
 
     # Flatten sub-lenses that are also Ors, so we don't have too much nesting, which makes debugging lenses a nightmare.
     for lens in lenses :
-      if isinstance(lens, self.__class__) :
+      # Note, isinstance would be too vague - see my note in And.
+      if lens.__class__ == self.__class__ :
         self.extend_sublenses(lens.lenses)
       else :
         self.extend_sublenses([lens])

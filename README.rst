@@ -20,11 +20,17 @@ keeping the idea of simple, in-language parser definition.
 Usage
 -----------------------------------------------------
 
-I will work on this, but for now, to get a feel for how it works, see the unit
-tests and longer tests in the following files::
+I will work on some better docs, but for now you can look in the following
+source files:
 
-  pylens/*_lenses.py
+For some examples of how to use pylens, see::
+
+  `Examples <examples>`_
+
+For more examples, see the unit tests and longer tests in the following files::
+
   testing/tests.py
+  pylens/*_lenses.py
 
 Status
 -----------------------------------------------------

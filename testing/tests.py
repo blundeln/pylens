@@ -196,7 +196,7 @@ def source_ordered_matching_list_test() :
 
 
 #####################################################
-# Pre-refactoring tests
+# Pre-refactoring tests - IGNORE these
 #####################################################
 
 def deb_testx() :
