@@ -208,8 +208,18 @@ class ListContainer(AbstractContainer) :
     self.items._meta_data.label = self.label
     return self.items
 
+  def _get_state(self, copy_state=True) :
+    state = [copy_state and copy.copy(self.items) or self.items, self.label]
+    return state
+      
+
+  def _set_state(self, state, copy_state=True) :
+    self.items = copy_state and copy.copy(state[0]) or state[0]
+    self.label = state[1]
+
   def __str__(self) :
     return str(self.items)
+  __repr__ = __str__
 
 
 class DictContainer(ListContainer) :

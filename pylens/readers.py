@@ -55,10 +55,10 @@ class ConcreteInputReader(Rollbackable):
   def reset(self) :
     self.set_pos(0)
 
-  def _get_state(self) :
+  def _get_state(self, copy_state=True) :
     return self.get_pos()
 
-  def _set_state(self, state) :
+  def _set_state(self, state, copy_state=True) :
     self.set_pos(state)
 
   def get_consumed_string(self, start_pos=0) :

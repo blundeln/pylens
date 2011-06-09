@@ -748,64 +748,64 @@ class Or(Lens) :
         
     raise LensException("We should have GOT one of the lenses.")
 
-
   def _put(self, item, concrete_input_reader, current_container) :
     """
-    The goal here is to PUT into one of the possible sub-lenses, though to
-    succeed we can either:
-      - PUT into the current concrete with one of the lenses (I call this
-        a straight PUT)
-      - or consume from input with one lens and put with another (I call this
-        a cross-PUT)
+    It is important to realise that here we can either do a:
+      - straight PUT, where the lens both consumes input and PUTs an item
+      - cross PUT, where one lens consumes input and another PUTS an item
 
-    Either way, we go with the first to succeed in terms of lens order, so
-    again the choice of lens order is important for the lens designer.
+    Also, it is useful to consider a lens l = A | Empty(), since if we first try
+    straight PUT with each lens, the Empty lens will always succeed, possibly
+    resulting in input not being consumed correctly by lens A.  This case
+    influences my redesign of this algorithm.
     """
+
     # Algorithm
     #
-    # Try a straight put (i.e. consuming with same lens that puts)
-    # Then try cross-put
-    #   consume with one lens
-    #   put with another, without passing on input reader
-    
-    # First we try a straight PUT (i.e. the lens both consumes from input and puts from the container)
-    for lens in self.lenses :
+    # For lens_a in lenses
+    #   Try straight put with lens_a -> return if succeed
+    #   lens_a.get_and_discard(input)
+    #
+    #   For lens_b in lenses, lens_b != lens_a
+    #     lens.put(input=None)
+
+    # Store the initial state.
+    initial_state = get_rollbackables_state(concrete_input_reader, current_container)
+
+    for lens_a in self.lenses:
+      # Try a straight put on the lens - this will also succeed if there is no
+      # input.
       try :
-        with automatic_rollback(concrete_input_reader, current_container) :
-          return lens.put(item, concrete_input_reader, current_container)
+        with automatic_rollback(concrete_input_reader, current_container, initial_state=initial_state) :
+          return lens_a.put(item, concrete_input_reader, current_container)
       except LensException:
         pass
+     
+      # If we have a concrete_input_reader, we will next attempt a cross PUT.
+      if not concrete_input_reader :
+        continue
 
-    # Now, if we fail a straight put, we must GET with one lens (to consume
-    # input, not to store any items), then PUT with another; so we must make
-    # sure to revert the container after a successful GET.  It is tempting here
-    # to create a dummy container rather than copying it, but we might later
-    # define lenses that can alter their behaviour based on the current state of
-    # the container.
-    GET_succeeded = False
-    for lens in self.lenses :
+        
+      # Try to consume input with the lens_a
       try :
-        with automatic_rollback(concrete_input_reader, current_container) :
-          lens.get_and_discard(concrete_input_reader, current_container)
-          GET_succeeded = True
-          break
+        with automatic_rollback(concrete_input_reader, current_container, initial_state=initial_state) :
+          lens_a.get_and_discard(concrete_input_reader, current_container)
       except LensException:
-        pass
+        continue
 
-    if not GET_succeeded:
-      raise LensException("Cross-put GET failed.")
+      # If the GET suceeded with lens_a, try to PUT with one of the other
+      # lenses.
+      for lens_b in self.lenses:
+        if lens_a is lens_b:
+          continue
 
-    # Now we must put with one of the other lenses, though without passing the
-    # (already consumed) input.
-    for lens in self.lenses :
-      try :
-        with automatic_rollback(current_container) :
-          return lens.put(item, None, current_container)
-      except LensException:
-        pass
+        try :
+          with automatic_rollback(concrete_input_reader, current_container, initial_state=initial_state) :
+            return lens_b.put(item, None, current_container)
+        except LensException:
+          pass
 
-    raise LensException("We failed to PUT at least one of the lenses.")
-    
+
 
   def _display_id(self) :
     """For debugging clarity."""
@@ -831,11 +831,9 @@ class Or(Lens) :
 
     # Test cross put
     concrete_input_reader = ConcreteInputReader("abc")
-    assert(lens.put(4, concrete_input_reader) == "4" and concrete_input_reader.get_remaining() == "bc")
+    assert(lens.put(4, concrete_input_reader) == "4")
+    assert(concrete_input_reader.get_remaining() == "bc")
     
-    # d("CREATE")
-    # TODO: Need to think of a more complex lens to properly test this vs. put.
-
     d("Test with default values")
     lens = AnyOf(alphas, type=str) | AnyOf(nums, default=3)
     assert(lens.put() == "3")
@@ -844,6 +842,29 @@ class Or(Lens) :
     # And whilst we are at it, check the outer lens default overrides the inner lens.
     lens.default = "x"
     assert(lens.put() == "x")
+
+    d("Test sensible handling of Empty lens.")
+    # Actually, this issue (if not fixed) will manifest only if we use container.
+    lens = AnyOf(alphas, type=str) | Empty()
+    concrete_input_reader = ConcreteInputReader("b4")
+    assert(lens.put("4", concrete_input_reader) == "" and concrete_input_reader.get_remaining() == "4")
+
+    d("Test sensible handling of Empty lens with container.")
+    lens = Group((AnyOf(alphas, type=str) | Empty()) + AnyOf(nums, type=int), type=list)
+    concrete_input_reader = ConcreteInputReader("a4")
+    got = lens.get(concrete_input_reader)
+    assert(got == ["a", 4])
+    
+    # We expect that: put char that is not in alphas, so Empty used, yet full string consumed.
+    # This is an important test that OR works as expected (i.e. according to the
+    # ordering of operand lenses) with a lens such as
+    # Empty()
+    concrete_input_reader.reset()
+    del got[0] # Important that we use 'got' so input is aligned.
+    assert(lens.put(got, concrete_input_reader) == "4")
+    assert(concrete_input_reader.is_fully_consumed())
+    
+
     
 
 
@@ -859,7 +880,7 @@ class AnyOf(Lens) :
  
   def _get(self, concrete_input_reader, current_container) :
     """
-    Consumes a valid char form the input, returning it if we are a STORE
+    Consumes a valid char from the input, returning it if we are a STORE
     lens.
     """
     char = None
@@ -993,13 +1014,19 @@ class Repeat(Lens) :
     # Try to get as many as we can, up to a maximum if set.
     no_succeeded = 0
     while(True) :
+      # Instantiate the rollback context, so we can later check if any state was changed.
+      rollback_context = automatic_rollback(concrete_input_reader, current_container, check_for_state_change=True)
       try :
-        with automatic_rollback(concrete_input_reader, current_container) :
+        with rollback_context :
           self.container_get(lens, concrete_input_reader, current_container)
           no_succeeded += 1
       except LensException :
         break
 
+      # Break out if no state changed (input or container state)
+      if not rollback_context.some_state_changed :
+        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
+      
       # Don't get more than maximim
       if has_value(self.max_count) and no_succeeded == self.max_count :
         break
@@ -1043,8 +1070,12 @@ class Repeat(Lens) :
     # reader to None).
     effective_concrete_reader = concrete_input_reader
     while True :
+      # Instantiate the rollback context, so we can later check if any state was changed.
+      rollback_context = automatic_rollback(effective_concrete_reader, current_container, check_for_state_change=True)
+      do_check = True
       try :
-        with automatic_rollback(effective_concrete_reader, current_container) :
+        with rollback_context:
+        #  with automatic_rollback(effective_concrete_reader, current_container) :
           output += self.container_put(lens, effective_concrete_reader, current_container)
           no_succeeded += 1
       except LensException:
@@ -1055,10 +1086,18 @@ class Repeat(Lens) :
           # XXX: Note, this is not actually flexed in the tests, but will be
           # when we add LABEL alignment.
           effective_concrete_reader = None
+          do_check = False
           continue
         else :
+          # XXX: WORKING HERE!
+          # XXX: Hmmm, need to think about when we expect something to be
+          # consumed inspite of the effective_concrete_reader idea.
           break
 
+      # Break out if no state changed (input or container state)
+      if do_check and not rollback_context.some_state_changed :
+        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
+      
       # Later on, for the GETs to adhere to max_count, we need to know how many
       # were PUT with outer input consumption vs. without.
       if has_value(effective_concrete_reader) :
@@ -1136,12 +1175,6 @@ class Repeat(Lens) :
     input_reader = ConcreteInputReader("87654321")
     assert(lens.put([1,2,3,4], input_reader) == "1234" and input_reader.get_remaining() == "321")
 
-    d("Test infinity problem")
-    lens = Repeat(Empty(), min_count=3, max_count=None, infinity_limit=10)
-    with assert_raises(InfiniteIterationException) :
-      lens.get("anything")
-    with assert_raises(InfiniteIterationException) :
-      lens.put(None)
     
     d("Test non-typed lenses.")
     lens = Repeat(AnyOf(nums))
@@ -1160,11 +1193,6 @@ class Repeat(Lens) :
     lens = Repeat(AnyOf(nums), default="54321")
     assert(lens.put() == "54321")
     
-    d("Test the functionality with default value on sub-lens.")
-    lens = Repeat(AnyOf(nums, default=4), infinity_limit=10)
-    # This will give us: "44444444444444444......"
-    with assert_raises(InfiniteIterationException) :
-      lens.put()
 
     d("Test putting back what we got (i.e. with source meta)")
     lens = Repeat(AnyOf(nums, type=int), type=list)
@@ -1182,6 +1210,28 @@ class Repeat(Lens) :
     assert(lens.get("abc123") == "abc")
     assert(lens.put("xyz") == "xyz")
 
+    #
+    # Infinite looping tests
+    #
+
+    #d("Test infinity problem")
+    #lens = Repeat(Empty(), min_count=3, max_count=None, infinity_limit=10)
+    #got = lens.get("")
+    
+    #return
+
+    d("Test infinity problem")
+    lens = Repeat(Empty(), min_count=3, max_count=None, infinity_limit=10)
+    with assert_raises(InfiniteIterationException) :
+      lens.get("anything")
+    with assert_raises(InfiniteIterationException) :
+      lens.put(None)
+    
+    d("Test the functionality with default value on sub-lens.")
+    lens = Repeat(AnyOf(nums, default=4), infinity_limit=10)
+    # This will give us: "44444444444444444......"
+    with assert_raises(InfiniteIterationException) :
+      lens.put()
 
 class Empty(Lens) :
   """
@@ -1219,14 +1269,18 @@ class Empty(Lens) :
 
   def _put(self, item, concrete_input_reader, current_container) :
     
-    # We should not be passed an item if we are a non-store lens.
-    if not self.has_type() and has_value(item) :
-      raise LensException("Did not expect a non-store lens to be passed an item")
-
-    # Here we can put only the empty string token, though if this lens does not
-    # store an item, the default value of "" will intercept this function being called.
-    if not (isinstance(item, str) and item == "") :
-      raise LensException("Expected to PUT an empty string")
+    if self.has_type() :
+      if not (has_value(item) and isinstance(item, str) and item == "") :
+        raise LensException("Expected to PUT an empty string")
+    else :  
+      # Should not have been passed an item.
+      if has_value(item) :
+        raise LensException("Did not expect a non-store lens to be passed an item")
+        
+      # We could be called if there is concrete input, such that our default did not intercept.
+      assert_msg(has_value(concrete_input_reader), "_put() should never be called on a non-store Empty lens without concrete input.")
+      
+    # Here goes nothing!
     return ""
 
 
@@ -1327,9 +1381,9 @@ class Literal(Lens) :
     try:
       input_string = concrete_input_reader.consume_string(len(self.literal_string))
       if input_string != self.literal_string :
-        raise LensException("Expected the literal '%s' but got '%s'." % (self.literal_string, input_string))
+        raise LensException("Expected the literal '%s' but got '%s'." % (escape_for_display(self.literal_string), escape_for_display(input_string)))
     except EndOfStringException:
-      raise LensException("Expected literal '%s' but at end of string." % (self.literal_string))
+      raise LensException("Expected literal '%s' but at end of string." % (escape_for_display(self.literal_string)))
    
     if self.has_type() :
       return input_string
@@ -1369,7 +1423,7 @@ class Literal(Lens) :
     # Name is only set after Lens constructor called.
     if hasattr(self, "name") and has_value(self.name) :
       return self.name
-    return "'%s'" % self.literal_string
+    return "'%s'" % escape_for_display(self.literal_string)
   
 
 
