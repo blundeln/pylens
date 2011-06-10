@@ -1043,52 +1043,91 @@ class Repeat(Lens) :
         break
 
     if no_got < self.min_count :
-      raise LensException("Expected at least %s successful GETs" % (self.min_count))
+      raise TooFewIterationsException("Expected at least %s successful GETs" % (self.min_count))
     
-    return
-
-    # Try to get as many as we can, up to a maximum if set.
-    no_got = 0
-    while(True) :
-      # Instantiate the rollback context, so we can later check if any state was changed.
-      rollback_context = automatic_rollback(concrete_input_reader, current_container, check_for_state_change=True)
-      try :
-        with rollback_context :
-          self.container_get(lens, concrete_input_reader, current_container)
-          no_got += 1
-      except LensException :
-        break
-
-      # Break out if no state changed (input or container state)
-      if not rollback_context.some_state_changed :
-        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
-      
-      # Don't get more than maximim
-      if has_value(self.max_count) and no_got == self.max_count :
-        break
-
-      # Check for infinite iteration (i.e. if lens does not progress state)
-      if has_value(self.infinity_limit) and no_got >= self.infinity_limit :
-        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned, or perhaps you need to increase infinity_limit")
-
-    # Something with the algorthm has gone wrong if this fails.
-    if has_value(self.max_count) :
-      assert(no_got <= self.max_count)
-
-    if no_got < self.min_count :
-      raise LensException("Expected at least %s successful GETs" % (self.min_count))
-    
-
 
   def _put(self, item, concrete_input_reader, current_container) :
     """Calls a sequence of PUTs on the sub-lens."""
 
+    # Algorithm
+    #
+    # - First we try to PUT with the lenses (first using input if it is available)
+    # - Then, we must check that the minumum items have been consumed from input:
+    # we may have PUT all new items (i.e. without input consumption) so still
+    # need to call GET for a minimum number of times.
+    # - In both cases we must break out if a lens changes no state.
+
     # For brevity.
     lens = self.lenses[0]
 
+    no_got = 0    # For checking how many items of input were consumed
+    no_put = 0    # For checking how many items were PUT.
+    output = ""
+
+    # This simplifies our algorithm.
+    if concrete_input_reader :
+      input_readers = [concrete_input_reader, None]
+    else :
+      input_readers = [None]
+
+    #
+    # Handle the PUT/CREATEs
+    #
+
+    for input_reader in input_readers :
+      
+      # Allows a higher level break from within the while loop.
+      break_for_loop = False
+
+      while True :
+        # Call PUT on the lens and break this while loop if no state changed or we
+        # get a LensException.  Also, break the for loop if we PUT max count.
+        rollback_context = automatic_rollback(input_reader, current_container, check_for_state_change=True)
+        try :
+          with rollback_context:
+            put = self.container_put(lens, input_reader, current_container)
+        except LensException:
+          break
+
+        if not rollback_context.some_state_changed :
+          d("Lens %s changed no state during this iteration, so we must break out - or spin for ever" % lens)
+          break
+
+        output += put
+        no_put += 1
+        
+        # If the succeeded when we used an input reader, we must have consumed
+        # input with the lens.
+        if has_value(input_reader) :
+          no_got += 1
+
+        # We have PUT enough items now.
+        if no_put == self.max_count :
+          d("We have put enough items now, so breaking out.")
+          break_for_loop = True
+          break
+      
+      if break_for_loop :
+        break
+
+    
+    #
+    # Now consume and discard input if necessary.
+    #
+
+    # TODO
+    # can also add an assertion, since if put min, should have got min also.
+
+
+    if no_put < self.min_count :
+      raise TooFewIterationsException("Expected at least %s successful PUTs but put only %s" % (self.min_count, no_put))
+   
+    #assert(no_got >= self.min_count)
+
+    return output
+
     no_succeeded = 0
     no_put = 0
-    output = ""
 
     # Algorithm
     #
@@ -1190,7 +1229,7 @@ class Repeat(Lens) :
     lens = Repeat(AnyOf(nums, type=int), min_count=3, max_count=5, type=list)
     d("GET")
     assert(lens.get("1234") == [1,2,3,4])
-    with assert_raises(LensException) :
+    with assert_raises(TooFewIterationsException) :
       lens.get("12")
     assert(lens.get("12345678") == [1,2,3,4,5])
 
@@ -1203,7 +1242,7 @@ class Repeat(Lens) :
     input_reader = ConcreteInputReader("987654321")
     assert(lens.put([1,2,3,4,5,6], input_reader) == "12345" and input_reader.get_remaining() == "4321")
     
-    # Put more than there wereo originally.
+    # Put more than there were originally.
     input_reader = ConcreteInputReader("981abc")
     assert(lens.put([1,2,3,4,5,6], input_reader) == "12345" and input_reader.get_remaining() == "abc")
     

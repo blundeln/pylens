@@ -77,6 +77,7 @@ class LensException(RollbackException):
 # problem with the lens definition or just a failed parsing branch)
 class NoTokenToConsumeException(LensException): pass
 class NoDefaultException(LensException): pass
+class TooFewIterationsException(LensException): pass
 
 # Thrown when it looks like a lens may iterate infinitely.
 class InfiniteIterationException(LensException) : pass   #XXX Deprecated
