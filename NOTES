@@ -1,12 +1,13 @@
 RESEARCH NOTES - for my questions and musings
-  - Update Repeat to allow abstract deletion and state consumption checking.
-    - Should break out when no state changes - not necessarily halt.
   - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - Think about how general class will be a container.
   - Add bad tests that we know do not work and which are not run for commit.
     - Perhaps like: with problem_test(): blah
   - Tests: might actually be useful to break tests up within classes.
-
+  - LABEL mode
+    - need to ensure in repeat put is done on sublens | Empty() so will at least consumed input if no put
+    - then can make source order mode more accurate by matching exact source position of gotten items.
+    - need to test with deletion from a dict.
   ------------- Misc ideas
   - Add profiling to test script: -m cProfile
   - Validating incoming items:

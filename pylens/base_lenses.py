@@ -984,26 +984,19 @@ class Repeat(Lens) :
   Applies a repetition of the givien lens (i.e. kleene-star).
   """
 
-  # XXX: infinity_limit will be deprecated.
-  def __init__(self, lens, min_count=1, max_count=None, infinity_limit=1000, **kargs):
+  def __init__(self, lens, min_count=1, max_count=None, **kargs):
     """
     Arguments:
       lens - the lens to repeat
       min_count - the min repetitions
       max_count - maximum repetitions (must be > 0 if set)
-      infinity_limit - For the sake of simplicity, rather than trying to
-      determine if a grammar may repeat infinitely (e.g. Repeat(Empty()).get()
-      being a simple example) we allow a looping limit to be set, with the aim
-      of signalling that a lens should be redesigned.
     """
     super(Repeat, self).__init__(**kargs)
     assert(min_count >= 0)
     if has_value(max_count) :
       assert(max_count > min_count)
-      assert(infinity_limit > max_count)
     
     self.min_count, self.max_count = min_count, max_count
-    self.infinity_limit = infinity_limit
     self.extend_sublenses([lens])
 
 
@@ -1076,7 +1069,7 @@ class Repeat(Lens) :
 
     for input_reader in input_readers :
       
-      # Allows a higher level break from within the while loop.
+      # Allows the while loop to request breakout from outer for loop.
       break_for_loop = False
 
       while True :
@@ -1087,6 +1080,8 @@ class Repeat(Lens) :
           with rollback_context:
             put = self.container_put(lens, input_reader, current_container)
         except LensException:
+          # TODO: To support deletion (i.e. when no item matches this input, wrap lens as: lens | Empty()
+          # Infact we should not expect a LensException - only break out when no state changes.
           break
 
         if not rollback_context.some_state_changed :
@@ -1096,14 +1091,14 @@ class Repeat(Lens) :
         output += put
         no_put += 1
         
-        # If the succeeded when we used an input reader, we must have consumed
+        # If the lens succeeded when we used an input reader, we assume we consumed
         # input with the lens.
         if has_value(input_reader) :
           no_got += 1
 
         # We have PUT enough items now.
         if no_put == self.max_count :
-          d("We have put enough items now, so breaking out.")
+          d("We have put a maximum number of items now, so breaking out.")
           break_for_loop = True
           break
       
@@ -1112,20 +1107,24 @@ class Repeat(Lens) :
 
     
     #
-    # Now consume and discard input if necessary.
+    # Now consume and discard any remaining input if necessary (i.e. if we put
+    # fewer than we had originally).  This is basically the same implentation of
+    # get, though we discard any items and continue to track no_got for the puts above.
     #
 
-    # TODO
-    # can also add an assertion, since if put min, should have got min also.
     if concrete_input_reader and no_got < self.max_count:
+      
+      # Store the initial container state, so we can discard changes later.
+      container_state = get_rollbackables_state(current_container)
+      
+      # Iterate over the input with our lens, consuming as much of it as
+      # possible.
       while(True) :
         # Instantiate the rollback context, so we can later check if any state was changed.
-        # Don't need to rollback container, since get_and_discard will do that.
-        rollback_context = automatic_rollback(concrete_input_reader, check_for_state_change=True)
+        rollback_context = automatic_rollback(concrete_input_reader, current_container, check_for_state_change=True)
         try :
           with rollback_context :
-            # XXX: Wasteful to keep getting start state, can prolly store initial state before loop.
-            lens.get_and_discard(concrete_input_reader, current_container)
+            self.container_get(lens, concrete_input_reader, current_container)
           
           # If the lens changed no state, then we must break, otherwise continue
           # for ever.
@@ -1140,109 +1139,18 @@ class Repeat(Lens) :
             break
         except LensException :
           break
+      
+      # Now discard any items added by the lens.
+      set_rollbackables_state(container_state, current_container)
 
 
     if no_put < self.min_count :
       raise TooFewIterationsException("Expected at least %s successful PUTs but put only %s" % (self.min_count, no_put))
-   
-    # Should try to consume max from input.
-    #assert(no_got >= self.min_count)
-
-    return output
-
-    no_succeeded = 0
-    no_put = 0
-
-    # Algorithm
-    #
-    # Note, it is tempting first to do GETs then PUTs to simplify this algorithm, though we would
-    # loose positional info from input that might be useful in matching up
-    # items.
-    #
-    # - Firstly, try to PUT as many items as we have, trying first with input
-    # (for LABEL alignment, which is yet to be implemented) then without input.
-    # Then mop up any remaining input with GET (i.e. if there are fewer abstract items)
-
-    # To facilitate potential re-alignment of items within the container logic (e.g. perhaps for key
-    # matching), this first tries to PUT by passing the outer concrete input (if
-    # any) before trying to PUT without (by effectively setting the concrete
-    # reader to None).
-    effective_concrete_reader = concrete_input_reader
-    while True :
-      # Instantiate the rollback context, so we can later check if any state was changed.
-      rollback_context = automatic_rollback(effective_concrete_reader, current_container, check_for_state_change=True)
-      do_check = True
-      try :
-        with rollback_context:
-        #  with automatic_rollback(effective_concrete_reader, current_container) :
-          output += self.container_put(lens, effective_concrete_reader, current_container)
-          no_succeeded += 1
-      except LensException:
-        # If we fail and the effective_concrete_reader is set, we may now
-        # attempt some PUTs without outer input, by setting the reader to None for the next
-        # iteration.
-        if has_value(effective_concrete_reader) :
-          # XXX: Note, this is not actually flexed in the tests, but will be
-          # when we add LABEL alignment.
-          effective_concrete_reader = None
-          do_check = False
-          continue
-        else :
-          # XXX: WORKING HERE!
-          # XXX: Hmmm, need to think about when we expect something to be
-          # consumed inspite of the effective_concrete_reader idea.
-          break
-
-      # Break out if no state changed (input or container state)
-      if do_check and not rollback_context.some_state_changed :
-        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
-      
-      # Later on, for the GETs to adhere to max_count, we need to know how many
-      # were PUT with outer input consumption vs. without.
-      if has_value(effective_concrete_reader) :
-        no_put = no_succeeded
-
-      # Don't get more than maximim
-      if has_value(self.max_count) and no_succeeded == self.max_count :
-        break
-
-      # Check for infinite iteration (i.e. if lens does not progress state)
-      if has_value(self.infinity_limit) and no_succeeded >= self.infinity_limit :
-        raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
-    
-    # Something with algorthm has gone badly wrong if this fails.
-    if has_value(self.max_count) :
-      assert(no_succeeded <= self.max_count)
-
-    if no_succeeded < self.min_count :
-      raise LensException("Expected at least %s successful GETs" % (self.min_count))
   
-   
-    # Finally, the items we PUT may be fewer than the number of concrete
-    # structures, so we GET and discard as many as required or as possible.
-    if has_value(concrete_input_reader) :
-      
-      # Determine how many we need to get to consume max from input.
-      if has_value(self.max_count) :
-        no_to_get = self.max_count - no_put
-        assert(no_to_get >= 0)
-      
-      # Do this without get_and_discard to avoid excessive state copying: we
-      # only need to make one copy of the original container state.
-      no_got = 0
-      state = get_rollbackables_state(current_container)
-      while True :
-        try :
-          with automatic_rollback(concrete_input_reader) :
-            self.container_get(lens, concrete_input_reader, current_container)
-            no_got += 1
-        except LensException:
-          break
-
-        if has_value(self.max_count) and no_got == no_to_get :
-          break
-      # Now discard any items added by the lens.
-      set_rollbackables_state(state, current_container)
+    # Sanity check.
+    if concrete_input_reader:
+      # This should not happen... I think.
+      assert(no_got >= self.min_count)
 
     return output
 
@@ -1261,12 +1169,11 @@ class Repeat(Lens) :
     # Test max_count
     assert(lens.get("12345678") == [1,2,3,4,5])
 
-    d("PUT")
-    # Put as many as were there originally.
+    test_description("Put as many as were there originally.")
     input_reader = ConcreteInputReader("98765")
     assert(lens.put([1,2,3,4,5], input_reader) == "12345" and input_reader.get_remaining() == "")
     
-    # Put a maximum (5) of the items (6)
+    test_description("Put a maximum (5) of the items (6)")
     input_reader = ConcreteInputReader("987654321")
     assert(lens.put([1,2,3,4,5,6], input_reader) == "12345" and input_reader.get_remaining() == "4321")
     
@@ -1278,7 +1185,7 @@ class Repeat(Lens) :
     assert(lens.put(got, input_reader) == "9831" and input_reader.get_remaining() == "abc")
 
 
-    test_description("PUT fewer than got originally, but consume only max from the input.")
+    test_description("PUT fewer than got originally, but consume up to max from the input.")
     input_reader = ConcreteInputReader("87654321")
     got = lens.get(input_reader)
     del got[2]   # Remove the 6
@@ -1287,7 +1194,7 @@ class Repeat(Lens) :
     assert(input_reader.get_remaining() == "321")
 
     test_description("Test non-typed lenses.")
-    lens = Repeat(AnyOf(nums))
+    lens = Repeat(AnyOf(nums, default=8))
     input_reader = ConcreteInputReader("12345abc")
     d(lens.get(input_reader) == None and input_reader.get_remaining() == "abc")
     input_reader.reset()
@@ -1295,7 +1202,7 @@ class Repeat(Lens) :
     assert(lens.put(None, input_reader, None) == "12345" and input_reader.get_remaining() == "abc")
 
     test_description("Test the functionality without default values.")
-    # Should fail, since lens has no default
+    # Should fail, since lens has no default, so could put infinite items.
     with assert_raises(LensException) :
       lens.put()
 
@@ -1311,27 +1218,17 @@ class Repeat(Lens) :
     d("Test for completeness")
     lens = Repeat(AnyOf(nums, type=int), type=list, min_count=0, max_count=1)
     assert(lens.get("abc") == []) # No exception thrown since min_count == 0
-    assert(lens.get("123abc") == [1])
-    assert(lens.put([1,2,3]) == "1")
-
+    assert(lens.get("123abc") == [1])  # Since max_count == 1
+    assert(lens.put([1,2,3]) == "1") # Since max_count == 1
 
     d("Test combine_chars")
     lens = Repeat(AnyOf(alphas, type=str), type=list, combine_chars=True)
     assert(lens.get("abc123") == "abc")
     assert(lens.put("xyz") == "xyz")
 
-    #
-    # Infinite looping tests
-    #
-
-    #d("Test infinity problem")
-    #lens = Repeat(Empty(), min_count=3, max_count=None, infinity_limit=10)
-    #got = lens.get("")
-    
-    #return
 
     d("Test infinity problem")
-    lens = Repeat(Empty(), min_count=3, max_count=None, infinity_limit=10)
+    lens = Repeat(Empty(), min_count=3, max_count=None)
     # Will fail to get anything since Empty lens changes no state.
     with assert_raises(LensException) :
       lens.get("anything")
@@ -1340,10 +1237,11 @@ class Repeat(Lens) :
       lens.put(None)
     
     d("Test the functionality with default value on sub-lens.")
-    lens = Repeat(AnyOf(nums, default=4), infinity_limit=10)
+    lens = Repeat(AnyOf(nums, default=4))
     # Should faile since no input or items are consumed by the lens.
     with assert_raises(LensException) :
       lens.put()
+
 
 class Empty(Lens) :
   """
