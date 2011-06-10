@@ -67,12 +67,10 @@ def more_complex_structure_test() :
   INPUT_STRING = """
   people: [bill, ben]
 
-  animals: [snake, tiger, monkey]
+  animals: [snake,tiger,monkey]
   food: [beans, eggs]
 """
 
-  return
-  # XXX: WORKING_HERE Note, this is working but is not terminating!
   thing_list = List(Word(alphas, type=str), Whitespace("") + "," + Whitespace(""), type=None)
   
   # Note, WS is simply an abbreviation of the Whitespace lens.
@@ -83,16 +81,14 @@ def more_complex_structure_test() :
   assert(entry.get("  something: [a , b,c,d]\n") == ["a","b","c","d"])
  
 
-  # XXX: Issue for GET with NewLine -> can indefinitely match at end of text.
-  # XXX: State comparison does not seem to stop this.
   blank_line = WS("") + NewLine()
-  lens = OneOrMore(entry | blank_line, type=dict)
+  lens = OneOrMore(entry | blank_line, type=dict, alignment=SOURCE)
   
   # For debugging: will name lenses by their local variable names.
   auto_name_lenses(locals())
 
   got = lens.get(INPUT_STRING)
-  return
   assert(got == {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
+  got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
   print(output)
