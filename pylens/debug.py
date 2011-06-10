@@ -47,6 +47,11 @@ from exceptions import *
 def assert_msg(condition, msg) :
   assert condition, msg
 
+def test_description(msg) :
+  """A debug message that will stand out."""
+  msg = "========= " + msg + " ========="
+  return d(msg)
+
 class assert_raises:
   """A cleaner way to assert that an exception is thrown from some code."""
   

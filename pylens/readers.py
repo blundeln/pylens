@@ -114,7 +114,7 @@ class ConcreteInputReader(Rollbackable):
       return "END_OF_STRING"
 
     display_string = self.string[self.position:]
-    return truncate(display_string)
+    return "'" + truncate(display_string) + "'"
   __repr__ = __str__
 
   @staticmethod

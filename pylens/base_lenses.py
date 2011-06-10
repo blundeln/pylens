@@ -1043,7 +1043,7 @@ class Repeat(Lens) :
         break
 
     if no_got < self.min_count :
-      raise TooFewIterationsException("Expected at least %s successful GETs" % (self.min_count))
+      raise TooFewIterationsException("Expected at least %s successful GETs but got only %s" % (self.min_count, no_got))
     
 
   def _put(self, item, concrete_input_reader, current_container) :
@@ -1117,11 +1117,35 @@ class Repeat(Lens) :
 
     # TODO
     # can also add an assertion, since if put min, should have got min also.
+    if concrete_input_reader and no_got < self.max_count:
+      while(True) :
+        # Instantiate the rollback context, so we can later check if any state was changed.
+        # Don't need to rollback container, since get_and_discard will do that.
+        rollback_context = automatic_rollback(concrete_input_reader, check_for_state_change=True)
+        try :
+          with rollback_context :
+            # XXX: Wasteful to keep getting start state, can prolly store initial state before loop.
+            lens.get_and_discard(concrete_input_reader, current_container)
+          
+          # If the lens changed no state, then we must break, otherwise continue
+          # for ever.
+          if not rollback_context.some_state_changed :
+            d("Lens %s changed no state during this iteration, so we must break out - or spin for ever" % lens)
+            break
+          
+          no_got += 1
+
+          # Don't get more than maximim
+          if has_value(self.max_count) and no_got == self.max_count :
+            break
+        except LensException :
+          break
 
 
     if no_put < self.min_count :
       raise TooFewIterationsException("Expected at least %s successful PUTs but put only %s" % (self.min_count, no_put))
    
+    # Should try to consume max from input.
     #assert(no_got >= self.min_count)
 
     return output
@@ -1225,12 +1249,16 @@ class Repeat(Lens) :
 
   @staticmethod
   def TESTS() :
-    
+   
+    # Note, for some of these tests we need to ensure we PUT rather than CREATE
+    # the lists so we can flex the code when input is aligned.
+
     lens = Repeat(AnyOf(nums, type=int), min_count=3, max_count=5, type=list)
     d("GET")
     assert(lens.get("1234") == [1,2,3,4])
     with assert_raises(TooFewIterationsException) :
       lens.get("12")
+    # Test max_count
     assert(lens.get("12345678") == [1,2,3,4,5])
 
     d("PUT")
@@ -1242,16 +1270,23 @@ class Repeat(Lens) :
     input_reader = ConcreteInputReader("987654321")
     assert(lens.put([1,2,3,4,5,6], input_reader) == "12345" and input_reader.get_remaining() == "4321")
     
-    # Put more than there were originally.
+    test_description("Put more than there were originally.")
     input_reader = ConcreteInputReader("981abc")
-    assert(lens.put([1,2,3,4,5,6], input_reader) == "12345" and input_reader.get_remaining() == "abc")
-    
-    # Put fewer than originally, but consume only max from the input.
-    input_reader = ConcreteInputReader("87654321")
-    assert(lens.put([1,2,3,4], input_reader) == "1234" and input_reader.get_remaining() == "321")
+    got = lens.get(input_reader)
+    got.insert(2, 3)
+    input_reader.reset()
+    assert(lens.put(got, input_reader) == "9831" and input_reader.get_remaining() == "abc")
 
-    
-    d("Test non-typed lenses.")
+
+    test_description("PUT fewer than got originally, but consume only max from the input.")
+    input_reader = ConcreteInputReader("87654321")
+    got = lens.get(input_reader)
+    del got[2]   # Remove the 6
+    input_reader.reset()
+    assert(lens.put(got, input_reader) == "8754")
+    assert(input_reader.get_remaining() == "321")
+
+    test_description("Test non-typed lenses.")
     lens = Repeat(AnyOf(nums))
     input_reader = ConcreteInputReader("12345abc")
     d(lens.get(input_reader) == None and input_reader.get_remaining() == "abc")
@@ -1259,12 +1294,12 @@ class Repeat(Lens) :
     # Lens should make use of outer input, since not supplied by an item.
     assert(lens.put(None, input_reader, None) == "12345" and input_reader.get_remaining() == "abc")
 
-    d("Test the functionality without default values.")
+    test_description("Test the functionality without default values.")
     # Should fail, since lens has no default
     with assert_raises(LensException) :
       lens.put()
 
-    d("Test the functionality with default value on Repeat.")
+    test_description("Test the functionality with default value on Repeat.")
     lens = Repeat(AnyOf(nums), default="54321")
     assert(lens.put() == "54321")
     
