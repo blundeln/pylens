@@ -984,6 +984,7 @@ class Repeat(Lens) :
   Applies a repetition of the givien lens (i.e. kleene-star).
   """
 
+  # XXX: infinity_limit will be deprecated.
   def __init__(self, lens, min_count=1, max_count=None, infinity_limit=1000, **kargs):
     """
     Arguments:
@@ -1005,21 +1006,56 @@ class Repeat(Lens) :
     self.infinity_limit = infinity_limit
     self.extend_sublenses([lens])
 
+
   def _get(self, concrete_input_reader, current_container) :
     """Calls a sequence of GETs on the sub-lens."""
 
+    # Algorithm
+    #
+    # Loop until max count reached or lens fails to alter input state (which
+    # could happen indefinitely.
+
     # For brevity.
     lens = self.lenses[0]
-    
-    # Try to get as many as we can, up to a maximum if set.
-    no_succeeded = 0
+   
+    # For tracking how many successful GETs
+    no_got = 0
+
     while(True) :
       # Instantiate the rollback context, so we can later check if any state was changed.
       rollback_context = automatic_rollback(concrete_input_reader, current_container, check_for_state_change=True)
       try :
         with rollback_context :
           self.container_get(lens, concrete_input_reader, current_container)
-          no_succeeded += 1
+        
+        # If the lens changed no state, then we must break, otherwise continue
+        # for ever.
+        if not rollback_context.some_state_changed :
+          d("Lens %s changed no state during this iteration, so we must break out - or spin for ever" % lens)
+          break
+        
+        no_got += 1
+
+        # Don't get more than maximim
+        if has_value(self.max_count) and no_got == self.max_count :
+          break
+      except LensException :
+        break
+
+    if no_got < self.min_count :
+      raise LensException("Expected at least %s successful GETs" % (self.min_count))
+    
+    return
+
+    # Try to get as many as we can, up to a maximum if set.
+    no_got = 0
+    while(True) :
+      # Instantiate the rollback context, so we can later check if any state was changed.
+      rollback_context = automatic_rollback(concrete_input_reader, current_container, check_for_state_change=True)
+      try :
+        with rollback_context :
+          self.container_get(lens, concrete_input_reader, current_container)
+          no_got += 1
       except LensException :
         break
 
@@ -1028,18 +1064,18 @@ class Repeat(Lens) :
         raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned")
       
       # Don't get more than maximim
-      if has_value(self.max_count) and no_succeeded == self.max_count :
+      if has_value(self.max_count) and no_got == self.max_count :
         break
 
       # Check for infinite iteration (i.e. if lens does not progress state)
-      if has_value(self.infinity_limit) and no_succeeded >= self.infinity_limit :
+      if has_value(self.infinity_limit) and no_got >= self.infinity_limit :
         raise InfiniteIterationException("Lens may iterate indefinitely - must be redesigned, or perhaps you need to increase infinity_limit")
 
     # Something with the algorthm has gone wrong if this fails.
     if has_value(self.max_count) :
-      assert(no_succeeded <= self.max_count)
+      assert(no_got <= self.max_count)
 
-    if no_succeeded < self.min_count :
+    if no_got < self.min_count :
       raise LensException("Expected at least %s successful GETs" % (self.min_count))
     
 
@@ -1222,15 +1258,17 @@ class Repeat(Lens) :
 
     d("Test infinity problem")
     lens = Repeat(Empty(), min_count=3, max_count=None, infinity_limit=10)
-    with assert_raises(InfiniteIterationException) :
+    # Will fail to get anything since Empty lens changes no state.
+    with assert_raises(LensException) :
       lens.get("anything")
-    with assert_raises(InfiniteIterationException) :
+    # Likewise.
+    with assert_raises(LensException) :
       lens.put(None)
     
     d("Test the functionality with default value on sub-lens.")
     lens = Repeat(AnyOf(nums, default=4), infinity_limit=10)
-    # This will give us: "44444444444444444......"
-    with assert_raises(InfiniteIterationException) :
+    # Should faile since no input or items are consumed by the lens.
+    with assert_raises(LensException) :
       lens.put()
 
 class Empty(Lens) :

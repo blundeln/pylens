@@ -1,10 +1,12 @@
 RESEARCH NOTES - for my questions and musings
   - Update Repeat to allow abstract deletion and state consumption checking.
+    - Should break out when no state changes - not necessarily halt.
   - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - Think about how general class will be a container.
   - Add bad tests that we know do not work and which are not run for commit.
     - Perhaps like: with problem_test(): blah
-  
+  - Tests: might actually be useful to break tests up within classes.
+
   ------------- Misc ideas
   - Add profiling to test script: -m cProfile
   - Validating incoming items:

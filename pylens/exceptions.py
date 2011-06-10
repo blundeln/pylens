@@ -37,10 +37,6 @@ from debug import *
 # Thrown when tentative object state should be rolled back.
 class RollbackException(Exception): pass
 
-# Thrown when it looks like a lens may iterate infinitely, and so should be
-# re-designed.
-class InfiniteIterationException(Exception) : pass
-
 
 class LensException(RollbackException):
   """
@@ -81,6 +77,9 @@ class LensException(RollbackException):
 # problem with the lens definition or just a failed parsing branch)
 class NoTokenToConsumeException(LensException): pass
 class NoDefaultException(LensException): pass
+
+# Thrown when it looks like a lens may iterate infinitely.
+class InfiniteIterationException(LensException) : pass   #XXX Deprecated
 
 class InfiniteRecursionException(Exception): pass
 class CannotStoreException(Exception): pass
