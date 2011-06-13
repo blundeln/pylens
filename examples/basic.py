@@ -35,8 +35,126 @@
 from pylens import *
 from pylens.debug import d # Like print(...)
 
+
+def fundamentals_test() :
+
+  """
+  If you are familiar with parsing of strings, then you will quickly pick up the
+  concept of bi-directional programming (i.e. essentially parsing and then
+  unparsing strings to and from, in this case, some python structure).  A lens
+  defines a grammar (or part of) to define this bi-directional transformation.
+
+  An important concept of a lens is that we need to define which parts of the
+  original string structure we are interested in manipulating in our python
+  structure and which we are not.  For example, later on we will write a lens to
+  extract words from some comma-separated list structure into a python list,
+  disregarding uninteresting artifacts such as delimiters and whitespace.
+  However, when we later wish to recreate the string structure to include our
+  pythonic modifications, we would like to restore those non-python-model
+  artifacts where possible and create new such artifacts where we have added to
+  the original string structure (i.e. we appended a list, so now will need to
+  generate a new comma and perhaps some space when reflecting that change in the
+  string structure).  In lens-speak we talk about converting
+  structures between concrete (i.e. original, flat string form) and abstract
+  (i.e. native language types and classes in which we can easily manipulate the
+  data)
+  forms.
+
+  Since the grammar works for both parsing and un-parsing, we describe parsing
+  as GETing (the abstract structure) and un-parsing as PUTing (the modified
+  abstract structure back into an appropriate concrete structure).
+  """
+  
+  # This lens, though in itself not so interesting, demonstrates the interface of a lens and
+  # some fundamental properties.  This lens will GET and PUT a single character
+  # if it falls withing the set of 'nums' (simply a predefined set of chars
+  # '1234..89'); otherwise it will fail.
+  #
+  # There are two main types of lenses: those that STORE items into the abstract
+  # structure and those that discard them (i.e. NON-STORE).  Whenever we set a
+  # type on a lens it becomes a STORE lens.  In this case, we wish to store the
+  # matched character as a python int, an obvious choice if we are dealing with
+  # the set of digit characters.
+  lens = AnyOf(nums, type=int)
+  
+  # So when we call GET on the lens with an input string "123" we extract a 1.
+  my_number = lens.get("1")
+  assert(my_number == 1)
+
+  # Then, perhaps after modifying the piece of data we extracted, we PUT it
+  # back (into its original string form).
+  my_number += 5
+  assert(lens.put(my_number) == "6")
+
+  # Okay, that doesn't look too useful yet, but stick with me.
+  # Now let's see how a similar though non-store lens behaves - see the
+  # assertions.  I will explain the 'default' arg shortly.
+  lens = AnyOf(alphas, default="x")   # alphas is the set of alphabhetic chars.
+
+  # Since this is a non-store lens, we extract nothing for our abstract
+  # structure, though the character will still be consumed from the concrete
+  # input string.
+  assert(lens.get("b") == None)
+  
+  # Now, we have no abstact item to PUT (i.e. None as first arg), though if we
+  # pass the original input string as the second arg it will be copied to generate
+  # new (concrete) output for this lens.
+  assert(lens.put(None, "b") == "b")
+
+  # But suppose we have no original input, since we may be extending the
+  # concrete string somehow.  In this case, if the lens has a default value set,
+  # it will output that; otherwise it will fail.
+  # In the lens literature, this special case of PUT is refered to as CREATE,
+  # since we are creating new artifacts in the concrete structure.
+  assert(lens.put(None) == "x")
+
+  # These are the fundamentals of this lens framework and become very useful when
+  # we aggregate smaller lenses into more complex ones.
+  
+def joining_lenses_test() :
+  
+  # We can use the And lens to concatenate several lenses.  Note that, here we
+  # specify the And's type as a python list, otherwise we will have nothing into
+  # which the extracted values of the two AnyOf lenses can be stored.
+  # Also here we introduce the Literal lens, which conveniently handles literal (i.e.
+  # constant strings).
+  lens = And(AnyOf(alphas, type=str), Literal("---"), AnyOf(nums, type=int), type=list)
+  
+  # Get the list.
+  my_list = lens.get("b---3")
+  assert(my_list == ["b",3])
+
+  # Modify it
+  my_list[0] = "n"
+  my_list[1] -= 2
+
+  # Put it back into string form.
+  assert(lens.put(my_list) == "n---1")
+
+  # Or, CREATE afresh without first GETing
+  assert(lens.put(["g", 7]) == "g---7")
+
+  # We might also wish to repeat such a lens indefinitely.
+  repeated_lens = Repeat(lens, type=list)
+  assert(repeated_lens.get("d---4f---8s---2") == [["d", 4], ["f", 8], ["s", 2]])
+
+  # Note that there are some syntax shortcuts (a la pyparsing) we can use when
+  # defining lenses.
+  lens = Group(AnyOf(alphas, type=str) + "---" + AnyOf(nums, type=int), type=list)
+  # Here:
+  #  - A + B + C -> And(A, B, C)
+  #  - "---" -> Literal("---")
+  # And since we use '+', we use the convenience lens 'Group' to set some
+  # parameters of the And lens it contains - in this case we set the type to
+  # list.
+  
+  
+  # Let's confirm this works identically to our first lens.
+  assert(lens.get("b---3") == ["b",3])
+
+
 def simple_list_test() :
-  INPUT_STRING = "monkeys,  monsters,    rabits, frogs, badgers"
+  INPUT_STRING = "monkeys,  monsters,    rabbits, frogs, badgers"
   
   # This works like a standard parser (i.e. it extracts an abstract
   # representation of the string structure.
@@ -44,10 +162,10 @@ def simple_list_test() :
   # extract and put back items of that python type from and to the string
   # structure.  In this case we wish to extract the animal names as strings to
   # store in a list, whereas we wish to discard the whitespace and delimiters.
-  lens = List(Word(alphas, type=str), Whitespace("") + "," + Whitespace(" "))
+  lens = List(Word(alphas, type=str), Whitespace("") + "," + Whitespace(" ", optional=True))
   got = lens.get(INPUT_STRING)
   d(got)
-  assert(got == ["monkeys", "monsters", "rabits", "frogs", "badgers"])
+  assert(got == ["monkeys", "monsters", "rabbits", "frogs", "badgers"])
 
   # But the idea of a lens (a bi-directional parsing element) is that once we
   # have modified that abstract model, we can write it back, preserving
@@ -59,9 +177,9 @@ def simple_list_test() :
   d(output)
 
   # Notice, from my assert statement, that additional spacing was preserved in
-  # the ouputted list and that the new items on the end use default spacing
+  # the outputted list and that the new items on the end use default spacing
   # that the Whitespace lenses were initialised with.
-  assert(output == "monkeys,  rabits,    frogs, badgers, dinosaurs, snails")
+  assert(output == "monkeys,  rabbits,    frogs, badgers, dinosaurs, snails")
 
 def more_complex_structure_test() :
   INPUT_STRING = """
@@ -71,11 +189,18 @@ def more_complex_structure_test() :
   food: [beans, eggs]
 """
 
-  thing_list = List(Word(alphas, type=str), Whitespace("") + "," + Whitespace(""), type=None)
+  # This lens defines the comma separator of the list lens we will use it in
+  # next.  The first arg of Whitespace is the default value to use when CREATING
+  # with this lens.
+  comma_separator = Whitespace("") + "," + Whitespace(" ", optional=True)
+  
+  
+  # This defines the comma-separated list lens, specifying that we wish to store
+  # the items (which contain only the alphabhetic characters) as strings.
+  item_list = List(Word(alphas, type=str), comma_separator, type=None)
   
   # Note, WS is simply an abbreviation of the Whitespace lens.
-  # XXX: Have to explicty set type on Word due to nature of its construction.
-  entry = Group(WS("  ") + Word(alphas, is_label=True, type=str) + WS("") + ":" + WS("") + "[" + thing_list + "]" + NewLine(), type=list)
+  entry = Group(WS("  ") + Word(alphas, is_label=True) + WS("") + ":" + WS("") + "[" + item_list + "]" + NewLine(), type=list)
 
   # Test the parts 
   assert(entry.get("  something: [a , b,c,d]\n") == ["a","b","c","d"])
@@ -91,4 +216,4 @@ def more_complex_structure_test() :
   assert(got == {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
   got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
-  print(output)
+  d(output)

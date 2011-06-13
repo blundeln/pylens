@@ -114,6 +114,10 @@ class Word(And) :
 
     assert_msg(min_count > 0, "min_count should be more than zero.")
 
+    # For convenience, enable type if label or is_label is set on this lens.
+    if "is_label" in kargs or "label" in kargs :
+      kargs["type"] = str
+
     if "type" in kargs and has_value(kargs["type"]):
       assert_msg(kargs["type"] == str, "If set the type of Word should be str.")
       any_of_type = str
@@ -164,10 +168,10 @@ class Word(And) :
 class Whitespace(Or) :
   """
   Whitespace helper lens, that knows how to handle (logically) continued lines with '\\n'
-  or that preclude an indent which are usefil for certain config files.
+  or that preclude an indent which are useful for certain config files.
   """
   
-  def __init__(self, default=" ", space_chars=" \t", slash_continuation=False, indent_continuation=False, **kargs):
+  def __init__(self, default=" ", optional=False, space_chars=" \t", slash_continuation=False, indent_continuation=False, **kargs):
     # Ensure default gets passed up to parent class - we use default to
     # determine if this lens is optional
 
@@ -199,7 +203,7 @@ class Whitespace(Or) :
     or_lenses.append(spaces)
 
     # If the user set the default as the empty space, the Empty must also be a valid lens.
-    if default == "" :
+    if default == "" or optional:
       or_lenses.append(Empty())
 
     # Set up kargs for Or.
@@ -230,6 +234,7 @@ class Whitespace(Or) :
     concrete_input_reader = ConcreteInputReader("  \n xyz")
     assert(lens.get(concrete_input_reader) == None and concrete_input_reader.get_remaining() == "xyz")
 
+WS = Whitespace # Abreviation.
 
 
 class NullLens(Lens) :

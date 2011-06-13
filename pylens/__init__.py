@@ -35,11 +35,12 @@ from util_lenses import *
 
 
 # Some lens abbreviations, for short-hand lens definitions.
+# TODO: move these to where classes defined.
 ZM  = ZeroOrMore
 OM  = OneOrMore
 O   = Optional
 G   = Group
-WS  = Whitespace
+#WS  = Whitespace
 
 
 ##################################
