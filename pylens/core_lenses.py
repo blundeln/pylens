@@ -136,25 +136,39 @@ class Until(Lens) :
 
   def _get(self, concrete_input_reader, current_container) :
 
-
-    # Position before we start consume chars.
+    # Remember the input position before we start to consume chars.
     initial_position = concrete_input_reader.get_pos()
     
-    # Parse as many chars as we can until the lens matches something.
-    while not concrete_input_reader.is_fully_consumed() :
+    stopping_lens = self.lenses[0]
+   
+    while True :
+      start_state = get_rollbackables_state(concrete_input_reader)
       try :
-        start_state = get_rollbackables_state(concrete_input_reader)
-        self.lenses[0].get(concrete_input_reader)
-        
+        stopping_lens.get(concrete_input_reader)
+
         # If we are not to include consumption of the lenes, roll back the state
         # after successfully getting the lens, since we do not want to include
         # consumption of the lens.
         if not self.include_lens :
+          d("Rollbacked from %s" % get_rollbackables_state(concrete_input_reader))
           set_rollbackables_state(start_state, concrete_input_reader)
-          
+          d("Rollbacked to %s" % get_rollbackables_state(concrete_input_reader))
+        else :
+          pass
+
         break
-      except LensException:
-        pass
+      
+      except LensException :
+        # We have not reached the stopping lens in input yet, so we rollback and then carry on.
+        d("stopping_lens failed soi continuing.")
+        set_rollbackables_state(start_state, concrete_input_reader)
+      
+      # Advance the input reader by one char - this will form part of our lens' GOTen string.
+      try :
+        concrete_input_reader.consume_char()
+      except EndOfStringException:
+        # Break if we reach the end of the input.
+        break
 
     parsed_chars = concrete_input_reader.get_consumed_string(initial_position) 
 
@@ -189,13 +203,16 @@ class Until(Lens) :
     lens = Group("("+Until(")", type=str) + ")", type=list)
     got = lens.get("(in the middle)")
     assert(got == ["in the middle"])
-    
+
     d("PUT")
     output = lens.put(["monkey"])
     assert(output == "(monkey)")
    
+    test_description("Try with include_lens=True")
     assert(lens.get(lens.put(["monkey"])) == ["monkey"])
-    
-    # XXX: Perhaps protect against this, or not?!
-    #assert(lens.get(lens.put(["mon)key"])) == ["monkey"])
+    lens = Group("("+Until(")", type=str, include_lens=True), type=list)
+    got = lens.get("(in the middle)")
+    assert(got == ["in the middle)"])
 
+    # XXX: Perhaps protect against this, or perhaps leave to lens user to worry about?!
+    #assert(lens.get(lens.put(["mon)key"])) == ["monkey"])

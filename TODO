@@ -2,7 +2,6 @@ TODO
 ----
 
 target: 1.0.0a1
-  - Add some sample lenses to examples making sure the higher level stuff works smoothly
   - Installation and packaging code
   - Publish on PIPI
   - Create arch package

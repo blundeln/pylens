@@ -43,6 +43,7 @@ import unittest
 from pylens import *
 from tests import *
 from examples.basic import *
+from examples.advanced import *
 
 from nbdebug import d
 

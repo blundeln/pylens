@@ -81,7 +81,9 @@ class AbstractContainer(Rollbackable) :
     # that was GOT from a sub-lens
     item = lens.get(concrete_input_reader, self)
     if has_value(item) :
-      if lens.options.is_label :
+      # Note, we check the actual item for is_label rather than the lens that
+      # returned it, since the is_label lens may actually be a sublens.
+      if item._meta_data.is_label :
         self.set_label(item) # Store item as label.
       else :
         # Set a static label on the item if the lens defines one.

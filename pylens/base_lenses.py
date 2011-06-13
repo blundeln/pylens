@@ -545,7 +545,11 @@ class Lens(object) :
       original_meta = item._meta_data
       item = enable_meta_data("".join(item))
       item._meta_data = original_meta
-      
+ 
+    # Mark if this item is to be used AS a label.
+    if self.options.is_label :
+      item._meta_data.is_label = True
+
     return item
 
 
@@ -1385,12 +1389,15 @@ class Literal(Lens) :
   """
   A lens that deals with a constant string, usually that will not be stored.
   """
+  
+  # TODO: Add case insensitivity.
 
   def __init__(self, literal_string, **kargs):
     assert(isinstance(literal_string, str) and len(literal_string) > 0)
-    super(Literal, self).__init__(**kargs) # Pass None for the lens, which we will build next.
+    super(Literal, self).__init__(**kargs)
     self.literal_string = literal_string
-    self.default = self.literal_string
+    if not self.has_type() :
+      self.default = self.literal_string
   
   def _get(self, concrete_input_reader, current_container) :
     """
