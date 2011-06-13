@@ -110,7 +110,8 @@ def fundamentals_test() :
 
   # These are the fundamentals of this lens framework and become very useful when
   # we aggregate smaller lenses into more complex ones.
-  
+ 
+
 def joining_lenses_test() :
   
   # We can use the And lens to concatenate several lenses.  Note that, here we
@@ -143,7 +144,8 @@ def joining_lenses_test() :
   lens = Group(AnyOf(alphas, type=str) + "---" + AnyOf(nums, type=int), type=list)
   # Here:
   #  - A + B + C -> And(A, B, C)
-  #  - "---" -> Literal("---")
+  #  - "---" -> Literal("---"), where possible literal strings will be
+  #    interpreted within aggregate lenses as the Literal lens.
   # And since we use '+', we use the convenience lens 'Group' to set some
   # parameters of the And lens it contains - in this case we set the type to
   # list.
@@ -151,6 +153,46 @@ def joining_lenses_test() :
   
   # Let's confirm this works identically to our first lens.
   assert(lens.get("b---3") == ["b",3])
+
+
+def conditional_lenses_test() :
+
+  # But we also need to allow for alternative branching in realistic grammar
+  # parsing (and unparsing), so here we can use the Or lens.
+  lens = Repeat(AnyOf(nums, type=int) | AnyOf(alphas, type=str) | "*", type=list)
+  # Here the syntax A | B | C  is shorthand for Or(A, B, C).
+ 
+  # So we store ints or alphabhetical chars - bit not the (non-store) stars.
+  my_list = lens.get("1a*2b*3**d*45*6e78")
+  assert(my_list == [1, 'a', 2, 'b', 3, 'd', 4, 5, 6, 'e', 7, 8])
+
+  # Lets modify our list to demonstrate how non-store input is preserved - note
+  # where the stars are in the modified output string.
+  my_list[0] = 'x'
+  my_list[1] = 9
+  my_list[4] += 4 # 3 -> 7
+  assert(lens.put(my_list) == "x9*2b*7**d*45*6e78")
+  # In practical terms, this translates to the preservation of important
+  # artifacts of, say, configuration files, such as comments, whitespace,
+  # indentation, etc. that whilst not important to us when modifying the
+  # semantics of the structure are extremely important for manual maintenance of
+  # such files --- in fact, this is the main motivation behaind the thoery of
+  # lenses, namely how to make surgical changes to concrete structures to
+  # reflect semantic changes.
+
+  # Note that the order of lenses is important when using Or: in both the GET
+  # and PUT direction, the first-most lens is favoured, so as a general rule of
+  # thumb you should put the longest matching lenses first if there is any
+  # possibility of overlap in what they match (i.e. one lens may match what is
+  # the prefix of what another lens matches), for example: 'cheese' | 'cheeseshop' should be
+  # re-ordered to 'cheeseshop' | 'cheese'.  This is ultimately down to the
+  # behaviour that the lens author desires.
+
+
+def useful_lenses_test() :
+  pass
+
+  # Optional, Word, List, NewLine, Whitespace, OneOrMore, ZeroOrMore
 
 
 def simple_list_test() :
@@ -181,6 +223,7 @@ def simple_list_test() :
   # that the Whitespace lenses were initialised with.
   assert(output == "monkeys,  rabbits,    frogs, badgers, dinosaurs, snails")
 
+
 def more_complex_structure_test() :
   INPUT_STRING = """
   people: [bill, ben]
@@ -193,7 +236,6 @@ def more_complex_structure_test() :
   # next.  The first arg of Whitespace is the default value to use when CREATING
   # with this lens.
   comma_separator = Whitespace("") + "," + Whitespace(" ", optional=True)
-  
   
   # This defines the comma-separated list lens, specifying that we wish to store
   # the items (which contain only the alphabhetic characters) as strings.
@@ -216,4 +258,7 @@ def more_complex_structure_test() :
   assert(got == {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
   got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
-  d(output)
+
+
+# TODO Recursion examples
+# TODO Class examples.
