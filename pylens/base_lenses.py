@@ -288,6 +288,13 @@ class Lens(object) :
         item_label_string = item_label_string,
       ))
 
+    def _report_output(output) :
+      """Reports output prior to return - just for debugging."""
+      if has_value(output) :
+        d("PUT: '%s'" % output)
+      else :
+        d("PUT: NOTHING")
+
     # Handle cases where our lens does not directly store an item.
     if not self.has_type() :
       
@@ -297,13 +304,15 @@ class Lens(object) :
         # problem.
         #if has_value(item):
         #  raise LensException("%s should definitely not have been passed an item '%s' since a non-store lens with a default." % (self, item))
-        return str(self.default)
+        default = str(self.default)
+        if IN_DEBUG_MODE : _report_output(default)
+        return default
       
       # Otherwise do a PUT proper, passing through our arguments, for example
       # our child lens may put an item directly or from the container of use
       # its own default value.
       output = self._put(item, concrete_input_reader, current_container)
-      d("PUT: '%s'" % output or "NOTHING")
+      if IN_DEBUG_MODE : _report_output(output)
       return output
 
 
@@ -374,7 +383,7 @@ class Lens(object) :
 
       # Now that arguments are set up, call PUT proper on our lens.
       output = self._put(item, concrete_input_reader, current_container)
-      d("PUT: '%s'" % output or "NOTHING")
+      if IN_DEBUG_MODE : _report_output(output)
       return output
    
     # If instead of an item we have a container, instruct the container to put
@@ -383,7 +392,7 @@ class Lens(object) :
     elif has_value(current_container) :
       assert(isinstance(current_container, AbstractContainer))
       output = current_container.consume_and_put_item(self, concrete_input_reader)
-      d("PUT: '%s'" % output or "NOTHING")
+      if IN_DEBUG_MODE : _report_output(output)
       return output
 
     # We should have returned by now.
@@ -805,6 +814,7 @@ class Or(Lens) :
         except LensException:
           pass
 
+    raise LensException("We should have PUT one of the lenses.")
 
 
   def _display_id(self) :
