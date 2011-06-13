@@ -9,6 +9,14 @@ RESEARCH NOTES - for my questions and musings
     - then can make source order mode more accurate by matching exact source position of gotten items.
     - need to test with deletion from a dict.
   ------------- Misc ideas
+  - Currently lens will succeed if not all items in repeat put, so need to
+    check for consumption, where possible - perhaps a function of container
+    that can optionally be implemented. 
+  - NewLine issue to think about.
+    Since last item in list may have no newline, appended items will not be
+    seprated by a newline - perhaps we can force NewLine to ouput "\n" rather
+    than "" in such cases. Also, think more generally about this.
+  
   - Add profiling to test script: -m cProfile
   - Validating incoming items:
     - Do we need to differntiate beween low and high level lenses so we know if

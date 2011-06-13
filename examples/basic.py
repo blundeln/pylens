@@ -63,6 +63,9 @@ def fundamentals_test() :
   Since the grammar works for both parsing and un-parsing, we describe parsing
   as GETing (the abstract structure) and un-parsing as PUTing (the modified
   abstract structure back into an appropriate concrete structure).
+
+  Another way to think of this is as a kind of serialisation that is based on an
+  arbitrary grammar.
   """
   
   # This lens, though in itself not so interesting, demonstrates the interface of a lens and
@@ -155,6 +158,15 @@ def joining_lenses_test() :
   assert(lens.get("b---3") == ["b",3])
 
 
+  # Sometimes we wish to combine aggregated single character lenses into a
+  # string, which can be done with the combine_chars argument of an approprietly
+  # constructed lens with type list.
+  lens = Repeat(AnyOf(alphas, type=str) + "---" + AnyOf(nums, type=str), type=list, combine_chars=True)
+  assert(lens.get("g---2n---4c---6") == "g2n4c6")
+  assert(lens.put("b8m2s8l2") == "b---8m---2s---8l---2")
+
+
+
 def conditional_lenses_test() :
 
   # But we also need to allow for alternative branching in realistic grammar
@@ -190,21 +202,38 @@ def conditional_lenses_test() :
 
 
 def useful_lenses_test() :
-  pass
 
-  # Optional, Word, List, NewLine, Whitespace, OneOrMore, ZeroOrMore
+  # It is very easy to extend pylens with new lenses but I've created a few
+  # already based on common parser patterns and on those useful parsing classes
+  # in pyparsing.
+
+  # Here is a demo of some, explained below.
+  lens = Repeat(Whitespace("\t") + Word(alphanums+"_", init_chars=alphanums, type=str) + WS("", optional=True) + NewLine(), type=list)
+  variables = lens.get("\tvariable_1    \n     variable_2\n variable_3\n")
+  assert(variables == ["variable_1", "variable_2", "variable_3"])
+  # Whitespace(default_output): Optionally matches one or more common whitespace chars.
+  # WS(): Just an shortcur alias of Whitespace.
+  # Word(body_chars[, init_chars]): for matching keywords of certain body and
+  #   initial characters.
+  # NewLine(): Matches the end of a line but also optionally the end of the input string.
+
+  variables.extend(["variable_4", "variable_5"])
+  output = lens.put(variables)
+  assert(output == "\tvariable_1    \n     variable_2\n variable_3\n\tvariable_4\n\tvariable_5\n")
+  
+  # For others, look in the pylens/*_lenses.py files, and look at their
+  # accompanying test cases.
+
 
 
 def simple_list_test() :
   INPUT_STRING = "monkeys,  monsters,    rabbits, frogs, badgers"
   
-  # This works like a standard parser (i.e. it extracts an abstract
-  # representation of the string structure.
-  # Note that, when we set a type on a lens, this instructs the lens to
-  # extract and put back items of that python type from and to the string
-  # structure.  In this case we wish to extract the animal names as strings to
-  # store in a list, whereas we wish to discard the whitespace and delimiters.
-  lens = List(Word(alphas, type=str), Whitespace("") + "," + Whitespace(" ", optional=True))
+  # Here is an example of the List lens, which allows us to specify a lens for
+  # the item and a lens for the delimiter.  In this case we wish to extract the
+  # animal names as strings to store in a list, whereas we wish to discard the
+  # whitespace and delimiters.
+  lens = List(Word(alphas, type=str), WS("") + "," + WS(" ", optional=True))
   got = lens.get(INPUT_STRING)
   d(got)
   assert(got == ["monkeys", "monsters", "rabbits", "frogs", "badgers"])
@@ -233,32 +262,48 @@ def more_complex_structure_test() :
 """
 
   # This lens defines the comma separator of the list lens we will use it in
-  # next.  The first arg of Whitespace is the default value to use when CREATING
-  # with this lens.
-  comma_separator = Whitespace("") + "," + Whitespace(" ", optional=True)
+  # next.  For convenience, the first arg of Whitespace is the default value to
+  # use when CREATING with this lens.
+  comma_separator = WS("") + "," + WS(" ", optional=True)
   
   # This defines the comma-separated list lens, specifying that we wish to store
   # the items (which contain only the alphabhetic characters) as strings.
   item_list = List(Word(alphas, type=str), comma_separator, type=None)
   
-  # Note, WS is simply an abbreviation of the Whitespace lens.
+  # Recall, WS is simply an abbreviation of the Whitespace lens.
   entry = Group(WS("  ") + Word(alphas, is_label=True) + WS("") + ":" + WS("") + "[" + item_list + "]" + NewLine(), type=list)
 
   # Test the parts 
   assert(entry.get("  something: [a , b,c,d]\n") == ["a","b","c","d"])
  
-
+  # Let's also allow for blank lines.
   blank_line = WS("") + NewLine()
+
+  # Now put the lens together, and set the type to dict, so we can make use of
+  # the labels.  Note that, especially with dictionaries, there are a few
+  # possibilities of realigning them with the source: based on label strings,
+  # original location within the source, and abstract ordering (i.e. arbitrary
+  # for python dicts).
+  # TODO: I will write more on alignment soon.
   lens = OneOrMore(entry | blank_line, type=dict, alignment=SOURCE)
   
   # For debugging: will name lenses by their local variable names.
   auto_name_lenses(locals())
 
+  # Let's GET it, modify it, then PUT it back as a string.
   got = lens.get(INPUT_STRING)
   assert(got == {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
   got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
+  d(output)
+  assert(output == """
+  people: [bill, ben]
+
+  animals: [snake,tiger,monkey]
+  food: [beans, eggs]
+  newthing:[thinga, thingb]\n""")
 
 
+# TODO: Alignment mode examples.
 # TODO Recursion examples
 # TODO Class examples.

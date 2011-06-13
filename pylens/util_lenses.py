@@ -96,6 +96,9 @@ class NewLine(Or) :
   def __init__(self, **kargs) :
     super(NewLine, self).__init__("\n", Empty(mode=Empty.END_OF_TEXT), **kargs)
 
+  # TODO: Ensure it puts a \n regardless of being at end of file, to allow
+  # appending. Could hook put
+
   @staticmethod
   def TESTS() :
     lens = NewLine()
@@ -186,7 +189,7 @@ class Whitespace(Or) :
     # TODO: Could also use default to switch on, say, indent_continuation.
 
     # Set-up a lens the literally matches space.
-    spaces = Word(space_chars, type=word_type)
+    spaces = Word(space_chars, type=word_type, name="spaces")
     
     or_lenses = []
     

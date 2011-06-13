@@ -185,7 +185,7 @@ class automatic_rollback:
     if self.check_for_state_change :
       # Not changing this state, so no need to copy it.
       current_state = get_rollbackables_state(*self.rollbackables, copy_state=False)
-      d("State: start: %s current: %s" % (self.start_state, current_state))
+      #d("State: start: %s current: %s" % (self.start_state, current_state))
       self.some_state_changed = current_state != self.start_state
 
     # Note, by not returning True, we do not supress the exception, which gives
