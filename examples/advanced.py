@@ -63,20 +63,31 @@ def debctrl_test() :
   comma_sep = WS("", indent_continuation=True) + "," + WS("\n  ", indent_continuation=True)
   option_sep = WS(" ", indent_continuation=True, optional=True) + "|" + WS(" ", indent_continuation=True, optional=True)
   
-  package_options = List(Group(Word(alphanums+"-", init_chars=alphas, type=str) + Optional(WS(" ") + "(" + Until(")", type=str) + ")"), type=list), option_sep)
+  package_options = List(
+                      Group(
+                        Word(alphanums+"-", init_chars=alphas, label="name") +
+                        Optional(WS(" ") + "(" + Until(")", label="version") + ")"),
+                        type=dict
+                      ),
+                      option_sep, type=list
+                    )
   
   # It is helpful to test the components incrementally.
   package_options.get("perl-modules (>= 5.10) | libmodule-build-perl") 
 
-  depends_list = List(package_options, comma_sep, type=None)
+  depends_list = List(package_options, comma_sep, type=list) # XXX
   
   # It is helpful to test the components incrementally.
   depends_list.type = list # Just for testing we make this a container type.
-  depends_list.get("""debhelper (>= 7.0.0),                                                                                                                 
-#                 perl-modules (>= 5.10) | libmodule-build-perl                                                                                         
-#Build""")
+  test_description("HERE")
+  auto_name_lenses(locals())
+  got = depends_list.get("""debhelper (>= 7.0.0) | cheese,                                                                                                                 
+                 perl-modules (>= 5.10) | libmodule-build-perl                                                                                         
+Build""")
+  # XXX: First item is not being wrapped in a list!
+  d(got[0])
   depends_list.type = None  
-  #return
+  return
 
   depends_entry = Group(depends_entry_label + colon + depends_list + WS("") + NewLine(), type=list)
   
@@ -93,6 +104,8 @@ def debctrl_test() :
   
   got = lens.get(DEB_CTRL)
   d(got)
+  d("XXXXX: %s" % got["Build-Depends-Indep"])
+  return
   del got["Build-Depends"]
   #got["Build-Depends-Indep"][1:2] = []
 

@@ -90,6 +90,18 @@ class List(And) :
     d("PUT")
     assert(lens.put([6,2,6,7,4,8]) == "6,2,6,7,4,8")
 
+    # It was getting flattened due to And within And!
+    test_description("Test a bug I found with nested lists.")
+    INPUT = "1|2,3|4,5|6"
+    lens = List(
+             List(AnyOf(nums, type=int), "|", name="inner_list"),
+             ",", name="outer_list"
+           )
+    got = lens.get(INPUT)
+    assert_equal(got, [[1,2],[3,4],[5,6]])
+    got.insert(2, [6,7])
+    assert_equal(lens.put(got), "1|2,3|4,6|7,5|6")
+
 
 class NewLine(Or) :
   """Matches a newline char or the end of text, so extends the Or lens."""

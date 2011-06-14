@@ -136,6 +136,8 @@ class Lens(object) :
     # this will be None if we are not a container-type lens (e.g. a dict or
     # list).
     new_container = self._create_container()
+    if new_container :
+      d("Created container")
 
     # If we are a container-type lens, replace the current container of
     # sub-lenses with our own container (new_container).
@@ -183,7 +185,7 @@ class Lens(object) :
       if has_value(item) :
         d("GOT: %s %s" % (item, item._meta_data.label and "[label: '%s']" % (item._meta_data.label) or ""))
       else :
-        d("GOT: NOTHING")
+        d("GOT: NOTHING (to store)")
     
     # Pre-process outgoing item.
     item = self._process_outgoing_item(item)
@@ -665,7 +667,8 @@ class And(Lens) :
     # which makes debugging lenses a nightmare.
     for lens in lenses :
       # Note, isinstance would be too vague - Word() was absorbed due to this.
-      if lens.__class__ == self.__class__ :
+      # Also, self.class == lens.__class__ still too vague -> Collapsed my nested lists!
+      if lens.__class__ == And and self.__class__ == And:
         self.extend_sublenses(lens.lenses)
       else :
         self.extend_sublenses([lens])
@@ -739,7 +742,7 @@ class Or(Lens) :
     # Flatten sub-lenses that are also Ors, so we don't have too much nesting, which makes debugging lenses a nightmare.
     for lens in lenses :
       # Note, isinstance would be too vague - see my note in And.
-      if lens.__class__ == self.__class__ :
+      if lens.__class__ == Or and self.__class__ == Or:
         self.extend_sublenses(lens.lenses)
       else :
         self.extend_sublenses([lens])
