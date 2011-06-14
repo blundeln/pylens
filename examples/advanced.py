@@ -47,10 +47,19 @@ Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
                      liblog-log4perl-perl (>= 1.11)
 """
 
-def debctrl_test() :
-  """An example based on the Augeas user guide."""
 
-  # We build up the lens, starting with the easier parts, testing snippets as we go.
+def debctrl_test() :
+  """An example based on an example from the Augeas user guide."""
+
+  # As a whole, this is a fairly complex lens, though as you work though it you
+  # should see that the steps are fairly consistant.
+  # This lens demonstrates the use of labels and the auto_list lens modifier. I
+  # also use incremental testing throughout, which should help you to follow
+  # it.
+
+  # We build up the lens starting with the easier parts, testing snippets as we go.
+  # Recall, when we set is_label we imply the lens has type=str (i.e is a STORE
+  # lens)
   simple_entry_label =  Literal("Source", is_label=True)     \
                       | Literal("Section", is_label=True)    \
                       | Literal("Maintainer", is_label=True)
@@ -160,11 +169,26 @@ def debctrl_test() :
   # This names all of the lenses based on their variable names, to improve clarity of debug logs.
   auto_name_lenses(locals())
   
+  # Now lets get the config file snippet as an abstract form we can easily
+  # manipulate.
   got = lens.get(DEB_CTRL)
-  d(got)
-  return
+  
+  # Now let's modify it a bit
   del got["Build-Depends"]
-  #got["Build-Depends-Indep"][1:2] = []
-
+  
+  # Lets insert some more dependancies.
+  got["Build-Depends-Indep"].insert(2, 
+    [{"name":"cheese", "version":"3.3"}, {"name":"spam"}]
+  )
   output = lens.put(got)
-  d(output)
+  
+  # Now lets check the output.
+  assert_equal(output, """Source: libconfig-model-perl
+Section: perl
+Maintainer: Debian Perl Group <pkg-perl-maintainers@xx>
+Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
+                     cheese (3.3) | spam, libconfig-tiny-perl,
+                     libexception-class-perl,
+                     libparse-recdescent-perl (>= 1.90.0),
+  liblog-log4perl-perl (>= 1.11)
+""")
