@@ -49,13 +49,38 @@ Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
 
 def debctrl_test() :
   """An example based on the Augeas user guide."""
+
+  # We build up the lens, starting with the easier parts, testing snippets as we go.
   simple_entry_label =  Literal("Source", is_label=True)     \
                       | Literal("Section", is_label=True)    \
                       | Literal("Maintainer", is_label=True)
 
   colon = WS("") + ":" + WS(" ", optional=True)
+  # We lazily use the Until lens here, but you could parse the value further if you liked.
+  # Note, auto_list unwraps a list if there is a single item, for convenience.
+  # It is useful when we wish to associated a single item with a labelled
+  # group.
   simple_entry = Group(simple_entry_label + colon + Until(NewLine(), type=str) + NewLine(), type=list, auto_list=True)
- 
+
+  # Test the simple_entry lens
+  got = simple_entry.get("Maintainer: Debian Perl Group <pkg-perl-maintainers@xx>\n")
+  
+  # Just to highlight the effect of auto_list on a list type lens.
+  if simple_entry.options.auto_list : 
+    assert_equal(got, "Debian Perl Group <pkg-perl-maintainers@xx>")
+  else :
+    assert_equal(got, ["Debian Perl Group <pkg-perl-maintainers@xx>"])
+    
+  # An insight into how pylens stores meta data on items to assist storage.
+  assert_equal(got._meta_data.label, "Maintainer")
+  
+  # Now try to PUT with the lens.
+  # Notice how, since we are creating a new item with the lens, we must pass a
+  # label to the lens, which is considered out-of-band of the item (i.e. it is
+  # meta data).
+  assert_equal(simple_entry.put("some value", label="Source"), "Source: some value\n")
+  return
+
   # Note the order of these: longest match first, since they share a prefix.
   depends_entry_label = Literal("Build-Depends-Indep", is_label=True)     \
                       | Literal("Build-Depends", is_label=True)
@@ -87,7 +112,6 @@ Build""")
   # XXX: First item is not being wrapped in a list!
   d(got[0])
   depends_list.type = None  
-  return
 
   depends_entry = Group(depends_entry_label + colon + depends_list + WS("") + NewLine(), type=list)
   
