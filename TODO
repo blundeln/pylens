@@ -8,12 +8,18 @@ target: 1.0.0a1
   - Also publish nbdebug to help people with debugging.
 
 target: 1.0.0a2
-  - Regex lens?
-  - Allow class containers.
+  - More example lenses.
+  - Regex lens? Might as well since we have a cheeky Until lens
+  - Allow the definition of arbitrary type containers.
+    - This is what I have been heading towards.
     - Alter obj attr names to be valid python variables.
 
-target: 1.0.0a3
-  - Allow label alignment (e.g. if label changes move item)
+target: 1.0.0b1
+  - Allow label alignment proper (e.g. if label changes move item)
+
+target: 1.0.0rc1
+  - Polish code (mainly comments, etc.)
+  - Docs, site and bug tracker set up for launch.
 
 
 target: future
