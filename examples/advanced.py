@@ -56,12 +56,17 @@ def debctrl_test() :
                       | Literal("Maintainer", is_label=True)
 
   #
-  # Some general lenses
+  # Some general lenses for non-store artifacts of the string structure.
   #
   colon = WS("") + ":" + WS(" ", optional=True)
   comma_sep = WS("", indent_continuation=True) + "," + WS("\n  ", indent_continuation=True)
   option_sep = WS(" ", indent_continuation=True, optional=True) + "|" + WS(" ", indent_continuation=True, optional=True)
-  
+
+
+  #
+  # simple_entry lens
+  #
+
   # We lazily use the Until lens here, but you could parse the value further if you liked.
   # Note, auto_list unwraps a list if there is a single item, for convenience.
   # It is useful when we wish to associated a single item with a labelled
@@ -86,24 +91,41 @@ def debctrl_test() :
   # meta data).
   assert_equal(simple_entry.put("some value", label="Source"), "Source: some value\n")
 
+
+  #
+  # depends_entry lens
+  #
+
   # Note the order of these: longest match first, since they share a prefix.
   depends_entry_label = Literal("Build-Depends-Indep", is_label=True)     \
                       | Literal("Build-Depends", is_label=True)
   
-  
+  # Here is an interesting lens, so let me explain it.
+  # Each dependancy may be either a single application or a list of alternative
+  # applications (separated by a '|'), so we use an List lens and set it as an
+  # auto_list.
+  # Since the application may have an optional version string, we store the application
+  # info in a dict using labels for the app name and version string.
   package_options = List(
                       Group(
                         Word(alphanums+"-", init_chars=alphas, label="name") +
                         Optional(WS(" ") + "(" + Until(")", label="version") + ")"),
                         type=dict
                       ),
-                      option_sep, type=list
+                      option_sep,
+                      auto_list=True,
                     )
   
-  # It is helpful to test the components incrementally.
-  package_options.get("perl-modules (>= 5.10) | libmodule-build-perl") 
+  got = package_options.get("perl-modules (>= 5.10) | libmodule-build-perl") 
+  assert_equal(got, [{"name":"perl-modules", "version":">= 5.10"}, {"name":"libmodule-build-perl"}])
+  # Then test auto_list ensures the list is unwrapped for a single item.
+  assert_equal(package_options.get("perl-modules (>= 5.10)"), {"name":"perl-modules", "version":">= 5.10"})
+  
+  assert_equal(package_options.put({"version":"3.4", "name":"some-app"}), "some-app (3.4)")
+  assert_equal(package_options.put([{"version":"3.4", "name":"some-app"}, {"version":"< 1.2", "name":"another-app"}]), "some-app (3.4) | another-app (< 1.2)")
 
-  depends_list = List(package_options, comma_sep, type=list) # XXX
+  # Now we wrap the package options in a comma separated list.
+  depends_list = List(package_options, comma_sep, type=None)
   
   # It is helpful to test the components incrementally.
   depends_list.type = list # Just for testing we make this a container type.

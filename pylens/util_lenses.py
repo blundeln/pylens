@@ -75,6 +75,8 @@ class Optional(Or) :
 
 
 class List(And) :
+  # XXX: Perhaps we shouldn't default to a list type - since it is a bit
+  # obscure.
   """Shortcut for defining a lens-delimetered list."""
   def __init__(self, lens, delimiter_lens, **kargs):
     if "type" not in kargs :
