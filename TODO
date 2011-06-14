@@ -2,7 +2,6 @@ TODO
 ----
 
 target: 1.0.0a1
-  - Last complex example
   - Installation and packaging code
   - Publish on PIPI
   - Create arch package
