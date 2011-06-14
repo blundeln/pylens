@@ -55,7 +55,13 @@ def debctrl_test() :
                       | Literal("Section", is_label=True)    \
                       | Literal("Maintainer", is_label=True)
 
+  #
+  # Some general lenses
+  #
   colon = WS("") + ":" + WS(" ", optional=True)
+  comma_sep = WS("", indent_continuation=True) + "," + WS("\n  ", indent_continuation=True)
+  option_sep = WS(" ", indent_continuation=True, optional=True) + "|" + WS(" ", indent_continuation=True, optional=True)
+  
   # We lazily use the Until lens here, but you could parse the value further if you liked.
   # Note, auto_list unwraps a list if there is a single item, for convenience.
   # It is useful when we wish to associated a single item with a labelled
@@ -79,14 +85,11 @@ def debctrl_test() :
   # label to the lens, which is considered out-of-band of the item (i.e. it is
   # meta data).
   assert_equal(simple_entry.put("some value", label="Source"), "Source: some value\n")
-  return
 
   # Note the order of these: longest match first, since they share a prefix.
   depends_entry_label = Literal("Build-Depends-Indep", is_label=True)     \
                       | Literal("Build-Depends", is_label=True)
   
-  comma_sep = WS("", indent_continuation=True) + "," + WS("\n  ", indent_continuation=True)
-  option_sep = WS(" ", indent_continuation=True, optional=True) + "|" + WS(" ", indent_continuation=True, optional=True)
   
   package_options = List(
                       Group(
