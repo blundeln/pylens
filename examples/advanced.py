@@ -124,36 +124,44 @@ def debctrl_test() :
   assert_equal(package_options.put({"version":"3.4", "name":"some-app"}), "some-app (3.4)")
   assert_equal(package_options.put([{"version":"3.4", "name":"some-app"}, {"version":"< 1.2", "name":"another-app"}]), "some-app (3.4) | another-app (< 1.2)")
 
-  # Now we wrap the package options in a comma separated list.
+  # Now we wrap the package options in a comma separated list.  Notice how we do
+  # not set the type to list, since we wish these items to be stored in a higher
+  # level list, to avoid excessive list nesting.
   depends_list = List(package_options, comma_sep, type=None)
+
+  # It might be over the top, but let's make sure this part works too.
+  # Note that, for the isolated test of this lens we must set a type on it,
+  # otherwise the sub-lenses will have nothing in which to store their extracted
+  # items.
+  depends_list.type = list
+  got = depends_list.get("""debhelper (>= 7.0.0) | cheese,\n \t  perl-modules (>= 5.10) , libmodule-build-perl | monkey (1.2)""")
+  assert_equal(got, [
+    [{"name":"debhelper", "version":">= 7.0.0"}, {"name":"cheese"}],
+    {"name":"perl-modules", "version":">= 5.10"},    # Not in list due to auto_list.
+    [{"name":"libmodule-build-perl"}, {"name":"monkey", "version":"1.2"}],
+  ])
   
-  # It is helpful to test the components incrementally.
-  depends_list.type = list # Just for testing we make this a container type.
-  test_description("HERE")
-  auto_name_lenses(locals())
-  got = depends_list.get("""debhelper (>= 7.0.0) | cheese,                                                                                                                 
-                 perl-modules (>= 5.10) | libmodule-build-perl                                                                                         
-Build""")
-  # XXX: First item is not being wrapped in a list!
-  d(got[0])
+  # Now lets try to PUT (actually CREATE a new) our abstract structure into a string.
+  output = depends_list.put([
+    [{"name":"beans", "version":">= 1.2"}, {"name":"eggs"}, {"name":"spam", "version":"<= 2.4"}],
+    {"name":"cheese", "version":"3.3"},
+  ])
+  assert_equal(output, "beans (>= 1.2) | eggs | spam (<= 2.4),\n  cheese (3.3)")
+  
+  # Remember to remove the type now that it has been tested in isolation.
   depends_list.type = None  
 
+  # Now put the dependancy entry togather.
   depends_entry = Group(depends_entry_label + colon + depends_list + WS("") + NewLine(), type=list)
   
-  # Test
-#  depends_entry.get("""Build-Depends: debhelper (>= 7.0.0),                                                                                                                 
-#                 perl-modules (>= 5.10) | libmodule-build-perl                                                                                         
-#Build""")
-#  return
-  
-  
+  # And now we have our final lens.
   lens = Repeat(simple_entry | depends_entry, type=dict, alignment=SOURCE)
   
+  # This names all of the lenses based on their variable names, to improve clarity of debug logs.
   auto_name_lenses(locals())
   
   got = lens.get(DEB_CTRL)
   d(got)
-  d("XXXXX: %s" % got["Build-Depends-Indep"])
   return
   del got["Build-Depends"]
   #got["Build-Depends-Indep"][1:2] = []
