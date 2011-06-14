@@ -49,17 +49,52 @@ Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
 
 def debctrl_test() :
   """An example based on the Augeas user guide."""
-  return
   simple_entry_label =  Literal("Source", is_label=True)     \
                       | Literal("Section", is_label=True)    \
                       | Literal("Maintainer", is_label=True)
 
-  simple_entry = Group(simple_entry_label + WS("") + ":" + WS(" ", optional=True) + Until(NewLine(), type=str) + NewLine(), type=list, auto_list=True)
+  colon = WS("") + ":" + WS(" ", optional=True)
+  simple_entry = Group(simple_entry_label + colon + Until(NewLine(), type=str) + NewLine(), type=list, auto_list=True)
+ 
+  # Note the order of these: longest match first, since they share a prefix.
+  depends_entry_label = Literal("Build-Depends-Indep", is_label=True)     \
+                      | Literal("Build-Depends", is_label=True)
   
-  depends_entry_label = Literal("Build-Depends", is_label=True)     \
-                      | Literal("Build-Depends-Indep", is_label=True)
-  #list_separator = WS("") + ","
-  depends_entry = None
+  comma_sep = WS("", indent_continuation=True) + "," + WS("\n  ", indent_continuation=True)
+  option_sep = WS(" ", indent_continuation=True, optional=True) + "|" + WS(" ", indent_continuation=True, optional=True)
   
-  lens = Repeat(simple_entry | depends_entry, type=dict)
+  package_options = List(Group(Word(alphanums+"-", init_chars=alphas, type=str) + Optional(WS(" ") + "(" + Until(")", type=str) + ")"), type=list), option_sep)
+  
+  # It is helpful to test the components incrementally.
+  package_options.get("perl-modules (>= 5.10) | libmodule-build-perl") 
+
+  depends_list = List(package_options, comma_sep, type=None)
+  
+  # It is helpful to test the components incrementally.
+  depends_list.type = list # Just for testing we make this a container type.
+  depends_list.get("""debhelper (>= 7.0.0),                                                                                                                 
+#                 perl-modules (>= 5.10) | libmodule-build-perl                                                                                         
+#Build""")
+  depends_list.type = None  
+  #return
+
+  depends_entry = Group(depends_entry_label + colon + depends_list + WS("") + NewLine(), type=list)
+  
+  # Test
+#  depends_entry.get("""Build-Depends: debhelper (>= 7.0.0),                                                                                                                 
+#                 perl-modules (>= 5.10) | libmodule-build-perl                                                                                         
+#Build""")
+#  return
+  
+  
+  lens = Repeat(simple_entry | depends_entry, type=dict, alignment=SOURCE)
+  
+  auto_name_lenses(locals())
+  
   got = lens.get(DEB_CTRL)
+  d(got)
+  del got["Build-Depends"]
+  #got["Build-Depends-Indep"][1:2] = []
+
+  output = lens.put(got)
+  d(output)
