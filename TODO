@@ -1,11 +1,6 @@
 TODO
 ----
 
-target: 1.0.0a1
-  - Installation and packaging code
-  - Publish on PIPI
-  - Create arch package
-
 target: 1.0.0a2
   - More example lenses.
   - Regex lens? Might as well since we have a cheeky Until lens

@@ -2,7 +2,11 @@
 Pylens Installation
 =========================================================
 
-TODO: Use some python installation system, such as setuptools
+To install::
+
+  $easy_install pylens
+
+Or use the standard installation process, downloading the latest version from: http://pypi.python.org/pypi/pylens/
 
 Testing
 =========================================================
