@@ -1,7 +1,7 @@
 TODO
 ----
 
-target: 1.0.0a2
+target: 1.0.0a3
   - More example lenses.
   - Regex lens? Might as well since we have a cheeky Until lens
   - Allow the definition of arbitrary type containers.

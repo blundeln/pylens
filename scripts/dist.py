@@ -25,28 +25,30 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 #
-from distutils.core import setup
+#
+# Author: Nick Blundell <blundeln [AT] gmail [DOT] com>
+# Organisation: www.nickblundell.org.uk
+# 
+# Description:
+# 
+#
 
-from pylens import version
+from nbdebug import d
 
-data_files = []
+def run(command) :
+  d(command)
 
-setup(
-  name='pylens',
-  version=version.VERSION,
-  author='Nick Blundell',
-  author_email='blundeln [AT] gmail [DOT] com',
-  url='http://www.nickblundell.org.uk',
-  license='BSD',
-  description="Pylens - Object Serialisation through a Lens",
-  #long_description=open('README.rst').read(),
-  requires = [
-    "python (< 3.0)",
-  ],
-  # See http://pypi.python.org/pypi?%3Aaction=list_classifiers
-  classifiers = [
-    "Topic :: Text Processing",
-  ],
-  packages=['pylens'],
-  data_files=data_files,
-)
+def main() :
+  # rm -rf ~/.local/lib/python2.7/site-packages/pylens*
+  # python2 setup.py sdist
+  # cd dist
+  # tar xzf pylens-1.0.0a2.tar.gz
+  # cd pylens-1....
+  # python2 setup.py install --user
+  # cd ../../examples
+  # NBDEBUG="" python2 advanced.py
+  pass
+  
+
+if __name__ == "__main__" :
+  main()

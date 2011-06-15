@@ -8,6 +8,8 @@ To install::
 
 Or use the standard installation process, downloading the latest version from: http://pypi.python.org/pypi/pylens/
 
+Alternatively, you can get the source from github and install it.
+
 Testing
 =========================================================
 
