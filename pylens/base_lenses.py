@@ -551,6 +551,9 @@ class Lens(object) :
     # Mark if this item is to be used AS a label.
     if self.options.is_label :
       item._meta_data.is_label = True
+    # Mark the item to have a static label.
+    elif has_value(self.options.label) :
+      item._meta_data.label = self.options.label
 
     return item
 

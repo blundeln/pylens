@@ -47,6 +47,7 @@ def main() :
   # python2 setup.py install --user
   # cd ../../examples
   # NBDEBUG="" python2 advanced.py
+  # Then perhaps upload: python2 setup.py sdist upload
   pass
   
 

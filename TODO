@@ -1,14 +1,14 @@
 TODO
 ----
 
-target: 1.0.0a3
-  - More example lenses.
-  - Regex lens? Might as well since we have a cheeky Until lens
+target: 1.0.0b1
   - Allow the definition of arbitrary type containers.
     - This is what I have been heading towards.
     - Alter obj attr names to be valid python variables.
+  - More example lenses.
+  - Regex lens? Might as well since we have a cheeky Until lens
 
-target: 1.0.0b1
+target: 1.0.0b2
   - Allow label alignment proper (e.g. if label changes move item)
 
 target: 1.0.0rc1

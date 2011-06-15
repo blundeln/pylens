@@ -174,7 +174,7 @@ def conditional_lenses_test() :
   lens = Repeat(AnyOf(nums, type=int) | AnyOf(alphas, type=str) | "*", type=list)
   # Here the syntax A | B | C  is shorthand for Or(A, B, C).
  
-  # So we store ints or alphabhetical chars - bit not the (non-store) stars.
+  # So we store ints or alphabhetical chars - but not the (non-store) stars.
   my_list = lens.get("1a*2b*3**d*45*6e78")
   assert(my_list == [1, 'a', 2, 'b', 3, 'd', 4, 5, 6, 'e', 7, 8])
 
@@ -212,7 +212,7 @@ def useful_lenses_test() :
   variables = lens.get("\tvariable_1    \n     variable_2\n variable_3\n")
   assert(variables == ["variable_1", "variable_2", "variable_3"])
   # Whitespace(default_output): Optionally matches one or more common whitespace chars.
-  # WS(): Just an shortcur alias of Whitespace.
+  # WS(): Just a shortcut alias of Whitespace.
   # Word(body_chars[, init_chars]): for matching keywords of certain body and
   #   initial characters.
   # NewLine(): Matches the end of a line but also optionally the end of the input string.
@@ -240,7 +240,7 @@ def simple_list_test() :
 
   # But the idea of a lens (a bi-directional parsing element) is that once we
   # have modified that abstract model, we can write it back, preserving
-  # artifacts of the original string, or creating default artificats for new
+  # artifacts of the original string, or creating default artifacts for new
   # data.
   del got[1] # Remove 'monsters'
   got.extend(["dinosaurs", "snails"])

@@ -86,11 +86,9 @@ class AbstractContainer(Rollbackable) :
       if item._meta_data.is_label :
         self.set_label(item) # Store item as label.
       else :
-        # Set a static label on the item if the lens defines one.
-        if has_value(lens.options.label) :
-          item._meta_data.label = lens.options.label
         self.store_item(item, lens, concrete_input_reader)
- 
+
+
   def consume_and_put_item(self, lens, concrete_input_reader) :
     """Called by lenses that put items from the container into sub-lenses (e.g. And)."""
     assert(lens.has_type())
