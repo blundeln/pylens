@@ -29,9 +29,7 @@ from distutils.core import setup
 
 from pylens import version
 
-data_files = [
-  
-]
+data_files = []
 
 setup(
   name='pylens',
@@ -39,9 +37,9 @@ setup(
   author='Nick Blundell',
   author_email='blundeln [AT] gmail [DOT] com',
   url='http://www.nickblundell.org.uk',
-  license='GPL',
+  license='BSD',
   description=open('README.rst').read().split("\n")[0],
-  long_description=open('README.rst').read(),
+  #long_description=open('README.rst').read(),
   requires = [
     "python (< 3.0)",
   ],

@@ -204,3 +204,9 @@ Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
   }
   output = lens.put(data)
   assert_equal(output, """Source: Just a simple entry\nBuild-Depends-Indep: cheese (1.2) | nbdebug,\n  someapp (<= 1.1)\n""")
+
+
+
+# Useful for testing an installation.
+if __name__ == "__main__" :
+  debctrl_test()
