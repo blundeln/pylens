@@ -5,7 +5,6 @@ target: 1.0.0a1
   - Installation and packaging code
   - Publish on PIPI
   - Create arch package
-  - Also publish nbdebug to help people with debugging.
 
 target: 1.0.0a2
   - More example lenses.

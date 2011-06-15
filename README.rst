@@ -3,7 +3,7 @@ Pylens - Object Serialisation through a Lens
 
 Author: Nick Blundell (http://www.nickblundell.org.uk)
 
-This started of as an attempt to implement the extremely useful idea of lenses
+This started off as an attempt to implement the extremely useful idea of lenses
 (bi-directional parsers) within the context of object serialisation, with the
 aim of simplifying lens definition and creating intuitive abstractions of data
 in flat file formats (e.g. UNIX configuration files) within a native scripting

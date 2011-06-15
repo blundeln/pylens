@@ -53,7 +53,7 @@ def test_description(msg) :
   return d(msg)
 
 def assert_equal(got, expected) :
-  assert_msg(got == expected, "Expected %s but got %s" % (expected, got))
+  assert_msg(got == expected, "Expected >>>%s<<< but got >>>%s<<<" % (expected, got))
 
 class assert_raises:
   """A cleaner way to assert that an exception is thrown from some code."""

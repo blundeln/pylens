@@ -192,3 +192,15 @@ Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
                      libparse-recdescent-perl (>= 1.90.0),
   liblog-log4perl-perl (>= 1.11)
 """)
+
+  # Now let's finish off by creating some output from scratch (i.e. using
+  # default values of all non-store lenses rather than any original input.
+  data = {
+    "Source": "Just a simple entry",
+    "Build-Depends-Indep": [
+      [{"name":"cheese", "version":"1.2"}, {"name":"nbdebug"}],
+      {"name":"someapp", "version":"<= 1.1"},
+    ]
+  }
+  output = lens.put(data)
+  assert_equal(output, """Source: Just a simple entry\nBuild-Depends-Indep: cheese (1.2) | nbdebug,\n  someapp (<= 1.1)\n""")

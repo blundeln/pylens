@@ -57,7 +57,12 @@ RESEARCH NOTES - for my questions and musings
       - None aligned input
       - ?
       - Could we improve this?
-    
+   
+Development
+===========
+
+To test package:
+  python2 setup.py install --user
 
 Links
 -----

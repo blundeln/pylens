@@ -1443,7 +1443,7 @@ class Literal(Lens) :
       self.get(concrete_input_reader)
     
     if item != self.literal_string :
-      raise LensException("%s can not PUT." % (self, item))
+      raise LensException("%s can not PUT %s." % (self, item))
     
     return item
 
