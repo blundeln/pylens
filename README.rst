@@ -7,7 +7,9 @@ This started off as an attempt to implement the extremely useful idea of lenses
 (bi-directional parsers) within the context of object serialisation, with the
 aim of simplifying lens definition and creating intuitive abstractions of data
 in flat file formats (e.g. UNIX configuration files) within a native scripting
-language such as python.
+language such as python.  The fundamental approach as altered several times
+but now is started to become more simpler and intuitive.  Hopefully I will
+make a stable release very soon.
 
 In a nutshell, we wish to serialise some object model to and from a flat file
 with some arbitrary structure, such that changes are made surgically to those

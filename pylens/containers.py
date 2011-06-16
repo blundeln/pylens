@@ -311,13 +311,18 @@ class LensObject(AbstractContainer) :
   """
   A container that stores labelled items as object attributes, providing
   sensible handling of label characters.
+
+  We can either constrain the attributes used with lenses or leave it open.
   
   TODO:
   - Make use of __new__, rather than __init__
   - copy minimal state
   - allow explicit constraining of attributes
+  - think about ordering for CREATED items.
+    - perhaps proper LABEL ordering is what we want for this case
   """
 
+  # Used to help with re-generating labels from object atribute names.
   _cached_labels = {}
 
   def __init__(self, **kargs) :
@@ -325,7 +330,7 @@ class LensObject(AbstractContainer) :
 
     # This automatically builds a list of attributes to exclude from our
     # container's state.
-    self.exclude_attributes()
+    self._exclude_attributes()
 
     # XXX: For key-value items, when changed we will usually loose meta that could
     # have been re-used, so need to think of a nice way to preserve this.
@@ -335,63 +340,7 @@ class LensObject(AbstractContainer) :
     # XXX: Praps something like below - need to think....
     #self.label = self._meta_data.label
 
-  def exclude_attributes(self) :
-    """
-    Just excludes attributes of our object that we do not expect to be used
-    as container state.
-    This should be called on object initialisation, before any model attributes
-    are asigned.
-    """
-    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"]
-
-  def convert_label_to_attribute_name(self, label) :
-    """
-    Tries to convert a typical label to a python identifier.  You may wish to
-    overload this if you require more specialised conversion.
-    """
-    attribute_name = label.lower()
-    attribute_name = re.sub(r"[ ]+", "_", attribute_name)
-    
-    # Check we end up with a valid python keyword.
-    if not re.match(r"[a-zA-Z][a-zA-Z0-9_]*$", attribute_name) :
-      raise Exception("Cannot express label '%s' as a python identifer to set as an object attribute - you will have to specialise this functionality for your purposes." % label) 
-   
-    # Cache this conversion on the class, since it may be useful to improve
-    # CREATED labels.
-    self.__class__._cached_labels[attribute_name] = label
-
-    return attribute_name
-
-
-  def convert_attribute_name_to_label(self, attribute_name) :
-    if attribute_name in self.__class__._cached_labels :
-      return self.__class__._cached_labels[attribute_name]
-
-    # We assume that an underscore represents a space.
-    return attribute_name.replace("_", " ")
-   
-
-  def _get_stateful_attributes(self) :
-    """Returns the names of container stateful attributes."""
-    attributes = []
-    for attr_name in self.__dict__.keys() :
-      if attr_name not in self.excluded_attributes and not attr_name.startswith("_"):
-        attributes.append(attr_name)
-    
-    return attributes
-
-  def _enable_attributes_meta(self) :
-    """Enables meta on attributes that may be used as container state."""
-    for attr_name in self._get_stateful_attributes() :
-      item = enable_meta_data(self.__dict__[attr_name])
-      self.__dict__[attr_name] = item
-      # Ensure the label of the item is updated to match the current attribute
-      # name.  If our label has changed, we need to regenerate a label.
-      current_label = item._meta_data.label
-      if not (has_value(current_label) and self.convert_label_to_attribute_name(current_label) == attr_name) :
-        item._meta_data.label = self.convert_attribute_name_to_label(attr_name)
-
-
+ 
   def get_put_candidates(self, lens, concrete_input_reader) :
     candidates = []
    
@@ -418,13 +367,73 @@ class LensObject(AbstractContainer) :
     if not has_value(item._meta_data.label) :
       raise LensException("%s expected item %s to have a label." % (self, item))
     # TODO: If constrained attributes, check within set.
-    setattr(self, self.convert_label_to_attribute_name(item._meta_data.label), item)
+    setattr(self, self._convert_label_to_attribute_name(item._meta_data.label), item)
 
   
   def unwrap(self):
     """We are both the container and the native object."""
     return self
 
+
+
+  def _exclude_attributes(self) :
+    """
+    Just excludes attributes of our object that we do not expect to be used
+    as container state.
+    This should be called on object initialisation, before any model attributes
+    are asigned.
+    """
+    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"]
+
+  def _convert_label_to_attribute_name(self, label) :
+    """
+    Tries to convert a typical label to a python identifier.  You may wish to
+    overload this if you require more specialised conversion.
+    """
+    attribute_name = label.lower()
+    attribute_name = re.sub(r"[ ]+", "_", attribute_name)
+    
+    # Check we end up with a valid python keyword.
+    if not re.match(r"[a-zA-Z][a-zA-Z0-9_]*$", attribute_name) :
+      raise Exception("Cannot express label '%s' as a python identifer to set as an object attribute - you will have to specialise this functionality for your purposes." % label) 
+   
+    # Cache this conversion on the class, since it may be useful to improve
+    # CREATED labels.
+    self.__class__._cached_labels[attribute_name] = label
+
+    return attribute_name
+
+
+  def _convert_attribute_name_to_label(self, attribute_name) :
+    if attribute_name in self.__class__._cached_labels :
+      return self.__class__._cached_labels[attribute_name]
+
+    # We assume that an underscore represents a space.
+    return attribute_name.replace("_", " ")
+   
+
+  def _get_stateful_attributes(self) :
+    """Returns the names of container stateful attributes."""
+    attributes = []
+    for attr_name in self.__dict__.keys() :
+      if attr_name not in self.excluded_attributes and not attr_name.startswith("_"):
+        attributes.append(attr_name)
+    
+    return attributes
+
+  def _enable_attributes_meta(self) :
+    """Enables meta on attributes that may be used as container state."""
+    for attr_name in self._get_stateful_attributes() :
+      item = enable_meta_data(self.__dict__[attr_name])
+      self.__dict__[attr_name] = item
+      # Ensure the label of the item is updated to match the current attribute
+      # name.  If our label has changed, we need to regenerate a label.
+      current_label = item._meta_data.label
+      if not (has_value(current_label) and self._convert_label_to_attribute_name(current_label) == attr_name) :
+        item._meta_data.label = self._convert_attribute_name_to_label(attr_name)
+
+
+ 
 class ContainerFactory:
   """Creates appropriate containers for native python types."""
 

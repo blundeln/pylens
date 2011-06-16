@@ -7,10 +7,7 @@ RESEARCH NOTES - for my questions and musings
     intuitive in most cases.
   - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - LABEL mode
-    - need to ensure in repeat put is done on sublens | Empty() so will at least consumed input if no put
-    - then can make source order mode more accurate by matching exact source position of gotten items.
-    - need to test with deletion from a dict.
-    - could we cache things on the class?
+    - Now Or fixed for A | empty() case, can make source order mode more accurate by matching exact source position of gotten items.
   
   ------------- Misc ideas
   - Support some global settings
@@ -30,6 +27,7 @@ RESEARCH NOTES - for my questions and musings
     Since last item in list may have no newline, appended items will not be
     seprated by a newline - perhaps we can force NewLine to ouput "\n" rather
     than "" in such cases. Also, think more generally about this.
+    - I should keep counter test cases.
   
   - Add profiling to test script: -m cProfile
   - Validating incoming items:
@@ -56,6 +54,7 @@ RESEARCH NOTES - for my questions and musings
     - Would be good if hook can add prefix to commit message to show test status.
   - Optimisations
     - Concering containers:
+      - Perhaps we have sidestepped this now.
       - How to know whether a given lens may modify a container or input
       - How to know efficiently if a lens has modifed a container
         - Dirty flag idea may fail with overwrites by nested lenses
