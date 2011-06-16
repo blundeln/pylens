@@ -44,8 +44,8 @@ except :
 from exceptions import *
 
 # More syntacticaly consistant assert function, for displaying explanations
-def assert_msg(condition, msg) :
-  assert condition, msg
+def assert_msg(condition, msg=None) :
+  assert condition, (msg or "")
 
 def test_description(msg) :
   """A debug message that will stand out."""

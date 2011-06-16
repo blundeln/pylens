@@ -68,6 +68,9 @@ class AbstractContainer(Rollbackable) :
     assert_msg(has_value(lens), "A new container must be passed the lens that creates it.")
     self.lens = lens
     self.label = None
+    
+    # Default to MODEL alignment mode.
+    self.alignment_mode = self.lens.options.alignment or MODEL
 
   def set_label(self, label) :
     assert_msg(isinstance(label, str), "The container label must be a string --- at least for the time being.")
@@ -111,6 +114,12 @@ class AbstractContainer(Rollbackable) :
 
     # Get candidates to PUT
     candidates = self.get_put_candidates(lens, concrete_input_reader)
+    
+    # Filter and sort them appropriately for our context (e.g. the lens, the
+    # alignment mode and the current input postion.
+    candidates = self.filter_and_sort_candidate_items(candidates, lens, concrete_input_reader)
+
+    # XXX: Perhaps we should do alignment sorting here
     for candidate in candidates :
       try :
         # XXX : Overkill to copy initial state every time within automatic_rollback.
@@ -123,6 +132,47 @@ class AbstractContainer(Rollbackable) :
 
     # Didn't PUT any token.
     raise NoTokenToConsumeException()
+
+
+  def filter_and_sort_candidate_items(self, candidate_items, lens, concrete_input_reader) :
+    """
+    In some cases we can whittle down the candidate list based on properties
+    of the lens, the container's alignment mode, and our position in the
+    concrete_input_reader.  We can then sort them, to give preference for which
+    will be tried firstmost in the consume_and_put_item() function.
+    """
+
+    # Handle a static label lens, in which the candidate choice is
+    # straightforward - here, for flexibility, we assume several items may share
+    # a static label.
+    if has_value(lens.options.label) :
+      valid_candidates = [item for item in candidate_items if item._meta_data.label == lens.options.label]
+      return valid_candidates
+
+    # Handle MODEL alignment (i.e. PUT will be in order of items in the abstract
+    # model).
+    if self.alignment_mode == MODEL :
+      # By definition, items are already in that order.
+      if len(candidate_items) > 0:
+        return [candidate_items[0]]
+      else:
+        return [] 
+    
+    # Handle SOURCE alignment.
+    if self.alignment_mode == SOURCE :
+      # Copy candidate_items.
+      def get_key(item) :
+        if has_value(item._meta_data.concrete_start_position) :
+          return item._meta_data.concrete_start_position
+        return LARGE_INTEGER # To ensure new items go on the end.
+      
+      # Sort the candiates by their source order - if they have meta on their
+      # source position.
+      sorted_candidate_items = sorted(candidate_items, key = get_key)
+      return sorted_candidate_items
+    # TODO: LABEL alignment mode
+    
+    raise Exception("Unknown alignment mode: %s" % self.alignment_mode)
 
 
   #
@@ -164,47 +214,21 @@ class ListContainer(AbstractContainer) :
       assert isinstance(items, list)
       self.items = items
   
+    assert_msg(isinstance(self.items, list))
+
     # Ensure our items can carry meta data (for algorithmic convenience) and be careful
-    # to protect the incoming lists meta data by modifying it in place.
+    # to preserve the incoming lists meta data by modifying it in place.
     for index, item in enumerate(self.items) :
       self.items[index] = enable_meta_data(item)
     
     # Store the label (if set) of the list in our container for stateful consumption. 
+    # XXX: This should probably happen in the base class, otherwise we might
+    # forget.
     self.label = self.items._meta_data.label
     
-    # Set the container_alignment_mode
-    # In abstract ordering mode (default), take next item.
-    # In source ordering mode, order by source in meta
-    self.alignment_mode = self.lens.options.alignment or MODEL
-  
-
+      
   def get_put_candidates(self, lens, concrete_input_reader) :
-
-    if not self.items :
-      return [] # No candidates
-
-    candidates = []
-    
-    # Handle a static label
-    if has_value(lens.options.label) :
-      candidates = [item for item in self.items if item._meta_data.label == lens.options.label]
-    
-    # Handle MODEL alignment
-    elif self.alignment_mode == MODEL :
-      if len(self.items) > 0 :
-        candidates.append(self.items[0])
-    
-    # Handle SOURCE alignment.
-    elif self.alignment_mode == SOURCE :
-      def get_key(item) :
-        if has_value(item._meta_data.concrete_start_position) :
-          return item._meta_data.concrete_start_position
-        return LARGE_INTEGER # To ensure new items go on the end.
-      candidates = sorted(self.items, key = get_key)
-    # TODO: LABEL mode
-    else :
-      raise Exception("Unknown alignment mode: %s" % self.alignment_mode)
-    return candidates
+    return self.items
   
   def remove_item(self, item) :
     self.items.remove(item)

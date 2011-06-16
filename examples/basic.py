@@ -183,7 +183,7 @@ def conditional_lenses_test() :
   my_list[0] = 'x'
   my_list[1] = 9
   my_list[4] += 4 # 3 -> 7
-  assert(lens.put(my_list) == "x9*2b*7**d*45*6e78")
+  assert_equal(lens.put(my_list), "x9*2b*7**d*45*6e78")
   # In practical terms, this translates to the preservation of important
   # artifacts of, say, configuration files, such as comments, whitespace,
   # indentation, etc. that whilst not important to us when modifying the
