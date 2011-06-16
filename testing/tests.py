@@ -186,6 +186,30 @@ def source_ordered_matching_list_test() :
   assert(output == "a+3c-2m*6")
 
 
+def lens_object_test():
+
+  class Person(LensObject) :
+    # TODO: must be able to create with no args - check pickel stuff I looked at
+    # before.
+    #def __init__(self, name, last_name, **kargs) :
+    def __init__(self, **kargs) :
+      super(Person, self).__init__(**kargs)
+
+  lens = Group(
+    List(
+      # Could make this a KeyValue lens.
+      Group(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str), type=list, auto_list=True),
+      ";",
+      type=None # XXX: Should get rid of default list type on List
+    ),
+  type=Person)
+
+  person = lens.get("name:nick;last name:blundell")
+  d(person.last_name)
+  #lens.put(person)
+
+  pass
+
 
 
 

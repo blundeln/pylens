@@ -302,6 +302,32 @@ class DictContainer(ListContainer) :
     return items_as_dict
 
 
+class LensObject(AbstractContainer) :
+  """
+  A container that stores labelled items as object attributes, providing
+  sensible handling of label characters.
+  """
+
+  def __init__(self, **kargs) :
+    super(LensObject, self).__init__(**kargs)
+
+    # XXX: Praps something like below - need to think....
+    #self.label = self._meta_data.label
+
+  def convert_label_to_attribute_name(self, label) :
+    # TODO: improve this.
+    attribute_name = label.replace(" ", "_")
+    return attribute_name
+
+  def store_item(self, item, lens, concrete_input_reader) :
+    if not has_value(item._meta_data.label) :
+      raise LensException("%s expected item %s to have a label." % (self, item))
+    setattr(self, self.convert_label_to_attribute_name(item._meta_data.label), item)
+
+  
+  def unwrap(self):
+    """We are both the container and the native object."""
+    return self
 
 class ContainerFactory:
   """Creates appropriate containers for native python types."""
