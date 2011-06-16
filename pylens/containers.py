@@ -116,7 +116,7 @@ class AbstractContainer(Rollbackable) :
 
     # Get candidates to PUT
     candidates = self.get_put_candidates(lens, concrete_input_reader)
-    
+   
     # Filter and sort them appropriately for our context (e.g. the lens, the
     # alignment mode and the current input postion.
     candidates = self.filter_and_sort_candidate_items(candidates, lens, concrete_input_reader)
@@ -220,6 +220,7 @@ class ListContainer(AbstractContainer) :
 
     # Ensure our items can carry meta data (for algorithmic convenience) and be careful
     # to preserve the incoming lists meta data by modifying it in place.
+    # Perhaps this can be done in AbstractContainer
     for index, item in enumerate(self.items) :
       self.items[index] = enable_meta_data(item)
     
@@ -340,14 +341,45 @@ class LensObject(AbstractContainer) :
     return attribute_name
 
   def convert_attribute_name_to_label(self, label) :
-    pass
+    # TODO
+    return label.replace("_", " ")
     
- 
+  def _get_stateful_attributes(self) :
+    """Returns the names of container stateful attributes."""
+    attributes = []
+    for attr_name in self.__dict__.keys() :
+      if attr_name not in self.excluded_attributes :
+        attributes.append(attr_name)
+    
+    return attributes
+
+  def _enable_attributes_meta(self) :
+    """Enables meta on attributes that may be used as container state."""
+    for attr_name in self._get_stateful_attributes() :
+      item = enable_meta_data(self.__dict__[attr_name])
+      self.__dict__[attr_name] = item
+      # Ensure the label of the item is updated to match the current attribute
+      # name.
+      # XXX: Enhance this.
+      item._meta_data.label = self.convert_attribute_name_to_label(attr_name)
+
+
   def get_put_candidates(self, lens, concrete_input_reader) :
     candidates = []
-    # XXX: Add meta at this stage?
-    for attr_name, value in self.__dict__.iteritems() :
+   
+    self._enable_attributes_meta()
+
+    # XXX: Add meta at this stage? - maybe we could allow AbstractContainer to
+    # ensure meta attached - prior to usage - no, see remove() issue below.
+    # Would be okay to wrap items in dict at this stage, I think.
+    for attr_name in self._get_stateful_attributes() :
+      value = self.__dict__[attr_name]
       if has_value(value) and attr_name not in self.excluded_attributes :
+        # XXX: But adding meta here will cause remove to fail since objects will
+        # differ.
+        # XXX: Maybe adding meta is a bad idea and we should work around it.
+        # XXX: But, we need to update the label of the item if assigned to new
+        # attr.
         candidates.append(value)
     return candidates
 

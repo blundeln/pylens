@@ -212,16 +212,13 @@ def lens_object_test():
   assert_equal(output, "name:nick;last name:blundell")
 
   test_description("CREATE")
-  #new_person = Person(lens=lens)
-  #lens.put()
-
-  pass
-
-
-
-
-
-
+  new_person = Person(lens=lens)
+  new_person.name = "james"
+  new_person.last_name = "bond"
+  got_person = lens.get(lens.put(new_person))
+  # If all went well, we should GET back what we PUT.
+  assert(got_person.name == "james" and got_person.last_name == "bond")
+  
 
 
 
