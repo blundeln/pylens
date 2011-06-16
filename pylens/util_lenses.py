@@ -265,3 +265,15 @@ class NullLens(Lens) :
     raise LensException("NullLens always fails, and is useful as a filler for the incremental writing of lenses.")
 
   # He, he. I won't test this one.
+
+class KeyValue(Group) :
+  """
+  Simply sets up the Group as an auto_list, which is useful when we just wish
+  to store a value by a key.
+  """
+  def __init__(self, *args, **kargs):
+    if "type" not in kargs:
+      kargs["type"] = list
+    if "auto_list" not in kargs:
+      kargs["auto_list"] = True
+    super(KeyValue, self).__init__(*args, **kargs)
