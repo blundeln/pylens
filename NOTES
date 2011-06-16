@@ -1,12 +1,16 @@
 RESEARCH NOTES - for my questions and musings
   - Think about how general class will be a container.
     - Implement LensObject, which can take attributes, bit like a dict
+    - Make use of __new__, rather than __init__
     - Implement aggregate container support within the base container.
+  - Get rid of default type on List lens - too confusing and not really
+    intuitive in most cases.
   - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - LABEL mode
     - need to ensure in repeat put is done on sublens | Empty() so will at least consumed input if no put
     - then can make source order mode more accurate by matching exact source position of gotten items.
     - need to test with deletion from a dict.
+    - could we cache things on the class?
   
   ------------- Misc ideas
   - Support some global settings

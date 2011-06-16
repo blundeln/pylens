@@ -34,6 +34,8 @@
 #
 import inspect
 import copy
+import re
+
 from debug import *
 from exceptions import *
 from util import *
@@ -309,6 +311,14 @@ class LensObject(AbstractContainer) :
   """
   A container that stores labelled items as object attributes, providing
   sensible handling of label characters.
+  
+  TODO:
+  - allow explicit constraining of attributes
+  - copy minimal state
+  - improve use of label translation.
+   - find allowed chars for variable name
+   - replace whitespace using regex
+     
   """
 
   def __init__(self, **kargs) :
@@ -333,11 +343,13 @@ class LensObject(AbstractContainer) :
     This should be called on object initialisation, before any model attributes
     are asigned.
     """
-    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes", "_meta_data"]
+    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"]
 
   def convert_label_to_attribute_name(self, label) :
     # TODO: improve this.
+    # 
     attribute_name = label.replace(" ", "_")
+    attribute_name = attribute_name.lower()
     return attribute_name
 
   def convert_attribute_name_to_label(self, label) :
@@ -348,7 +360,7 @@ class LensObject(AbstractContainer) :
     """Returns the names of container stateful attributes."""
     attributes = []
     for attr_name in self.__dict__.keys() :
-      if attr_name not in self.excluded_attributes :
+      if attr_name not in self.excluded_attributes and not attr_name.startswith("_"):
         attributes.append(attr_name)
     
     return attributes
@@ -361,25 +373,22 @@ class LensObject(AbstractContainer) :
       # Ensure the label of the item is updated to match the current attribute
       # name.
       # XXX: Enhance this.
-      item._meta_data.label = self.convert_attribute_name_to_label(attr_name)
+      
+      # If our label has changed, we need to regenerate a label.
+      current_label = item._meta_data.label
+      if not (has_value(current_label) and self.convert_label_to_attribute_name(current_label) == attr_name) :
+        item._meta_data.label = self.convert_attribute_name_to_label(attr_name)
 
 
   def get_put_candidates(self, lens, concrete_input_reader) :
     candidates = []
    
+    # Ensure all items that may be PUT may carry meta data.
     self._enable_attributes_meta()
 
-    # XXX: Add meta at this stage? - maybe we could allow AbstractContainer to
-    # ensure meta attached - prior to usage - no, see remove() issue below.
-    # Would be okay to wrap items in dict at this stage, I think.
     for attr_name in self._get_stateful_attributes() :
       value = self.__dict__[attr_name]
       if has_value(value) and attr_name not in self.excluded_attributes :
-        # XXX: But adding meta here will cause remove to fail since objects will
-        # differ.
-        # XXX: Maybe adding meta is a bad idea and we should work around it.
-        # XXX: But, we need to update the label of the item if assigned to new
-        # attr.
         candidates.append(value)
     return candidates
 

@@ -197,25 +197,27 @@ def lens_object_test():
 
   lens = Group(
     List(
-      # Could make this a KeyValue lens.
-      Group(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str), type=list, auto_list=True),
+      KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
       ";",
       type=None # XXX: Should get rid of default list type on List
     ),
   type=Person)
 
   test_description("GET")
-  person = lens.get("name:nick;last name:blundell")
+  person = lens.get("Name:nick;Last Name:blundell")
   assert(person.name == "nick" and person.last_name == "blundell")
   test_description("PUT")
   output = lens.put(person)
-  assert_equal(output, "name:nick;last name:blundell")
+  assert_equal(output, "Name:nick;Last Name:blundell")
 
   test_description("CREATE")
   new_person = Person(lens=lens)
   new_person.name = "james"
   new_person.last_name = "bond"
   got_person = lens.get(lens.put(new_person))
+  # XXX: Would be nice to control the order, but need to think of a nice way to
+  # do this - need to cache source info of a label, which we can use when we
+  # loose source info.
   # If all went well, we should GET back what we PUT.
   assert(got_person.name == "james" and got_person.last_name == "bond")
   
