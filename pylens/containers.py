@@ -66,6 +66,8 @@ class AbstractContainer(Rollbackable) :
 
   def __init__(self, lens=None) :
     assert_msg(has_value(lens), "A new container must be passed the lens that creates it.")
+    
+    # TODO: If we do not enclose our own lens, look for keyword of the lens.
     self.lens = lens
     self.label = None
     
@@ -311,17 +313,59 @@ class LensObject(AbstractContainer) :
   def __init__(self, **kargs) :
     super(LensObject, self).__init__(**kargs)
 
+    # This automatically builds a list of attributes to exclude from our
+    # container's state.
+    self.exclude_attributes()
+
+    # XXX: For key-value items, when changed we will usually loose meta that could
+    # have been re-used, so need to think of a nice way to preserve this.
+    # Default to SOURCE alignment, which will be more likely for a general object.
+    self.alignment_mode = self.lens.options.alignment or SOURCE
+
     # XXX: Praps something like below - need to think....
     #self.label = self._meta_data.label
+
+  def exclude_attributes(self) :
+    """
+    Just excludes attributes of our object that we do not expect to be used
+    as container state.
+    This should be called on object initialisation, before any model attributes
+    are asigned.
+    """
+    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes", "_meta_data"]
 
   def convert_label_to_attribute_name(self, label) :
     # TODO: improve this.
     attribute_name = label.replace(" ", "_")
     return attribute_name
 
+  def convert_attribute_name_to_label(self, label) :
+    pass
+    
+ 
+  def get_put_candidates(self, lens, concrete_input_reader) :
+    candidates = []
+    # XXX: Add meta at this stage?
+    for attr_name, value in self.__dict__.iteritems() :
+      if has_value(value) and attr_name not in self.excluded_attributes :
+        candidates.append(value)
+    return candidates
+
+  # TODO: state get and set, so don't fallback on deep copy!
+ 
+  def remove_item(self, item) :
+    for attr_name, value in self.__dict__.iteritems() :
+      if value is item :
+        del self.__dict__[attr_name]
+        return
+
+    raise Exception("Failed to remove item %s from %s."% (item, self))
+    
+
   def store_item(self, item, lens, concrete_input_reader) :
     if not has_value(item._meta_data.label) :
       raise LensException("%s expected item %s to have a label." % (self, item))
+    # TODO: If constrained attributes, check within set.
     setattr(self, self.convert_label_to_attribute_name(item._meta_data.label), item)
 
   

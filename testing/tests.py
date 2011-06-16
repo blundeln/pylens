@@ -204,9 +204,16 @@ def lens_object_test():
     ),
   type=Person)
 
+  test_description("GET")
   person = lens.get("name:nick;last name:blundell")
-  d(person.last_name)
-  #lens.put(person)
+  assert(person.name == "nick" and person.last_name == "blundell")
+  test_description("PUT")
+  output = lens.put(person)
+  assert_equal(output, "name:nick;last name:blundell")
+
+  test_description("CREATE")
+  #new_person = Person(lens=lens)
+  #lens.put()
 
   pass
 
