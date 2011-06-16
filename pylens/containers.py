@@ -45,6 +45,7 @@ SOURCE = "SOURCE"
 MODEL = "MODEL"
 LABEL = "LABEL"
 
+# Just used to simplify sorting.
 LARGE_INTEGER = 0xffffffff
 
 
@@ -54,6 +55,13 @@ class AbstractContainer(Rollbackable) :
   such may be retrieved for PUT.  Meta data from the lens may be used to aid
   storage and retrieval of items in the container (e.g. labels, keys, concrete
   residue).
+
+  We must be careful to allow the state of the container to be correctly
+  captured and re-instated to facilitate efficient rollback.  In the worst
+  case, we can deep-copy the state, but we should avoid this by considering
+  how a particular container modifies its state during GET and PUT.  For
+  example, with a list we may add or remove an item but not make finer changes
+  to an item; with a general class, however, this may not be the case.
   """
 
   def __init__(self, lens=None) :
@@ -137,6 +145,8 @@ class AbstractContainer(Rollbackable) :
 
   def is_fully_consumed(self) :
     # TODO: Need to think about best way to do this.
+    # This may be optional, since in some cases GET/PUT will cease when no
+    # state is changed, regardless of full container consumption.
     raise NotImplementedError()
     
 

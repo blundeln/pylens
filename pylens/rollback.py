@@ -82,8 +82,9 @@ class Rollbackable(object) :
 
   def __eq__(self, other):
     """So we can easily compare if two objects have state of equal value."""
-    # TODO: To use this is expensive and should be replaced by a more efficient
-    # TODO:   dirty-flag scheme.
+    # TODO: To use this is expensive and should be replaced by a more
+    # efficient method
+    # TODO:   perhaps a dirty-flag scheme???
     return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
 
   @staticmethod

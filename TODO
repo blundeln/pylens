@@ -25,6 +25,7 @@ target: future
   - DynamicLens - pass a function which creates a lens when it is called with
     context params (e.g. current collection) e.g. <X> .... </X>
   - Ambiguity checking.
-  - Apache lens?
+  - Apache lens example would be an important milestone?
   - How can we simplify the lens definition?
     - Context of lens definition -> auto whitespace
+    - I'm not so keen on this idea now, since clarity can be preferable to magic.

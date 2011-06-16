@@ -1,15 +1,23 @@
 RESEARCH NOTES - for my questions and musings
-  - Would be nice to generate some docs from source code examples.
-  - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - Think about how general class will be a container.
-  - Add bad tests that we know do not work and which are not run for commit.
-    - Perhaps like: with problem_test(): blah
-  - Tests: might actually be useful to break tests up within classes.
+    - Implement LensObject, which can take attributes, bit like a dict
+    - Implement aggregate container support within the base container.
+  - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - LABEL mode
     - need to ensure in repeat put is done on sublens | Empty() so will at least consumed input if no put
     - then can make source order mode more accurate by matching exact source position of gotten items.
     - need to test with deletion from a dict.
+  
   ------------- Misc ideas
+  - Support some global settings
+   - validate data in puts, which may be expensive
+   - allow or disallow overwriting labelled items already present in relevant containers.
+  - docs
+    - gen html docs from various source files
+    - Would be nice to generate some docs from source code examples.
+  - Tests: might actually be useful to break tests up within classes.
+  - Add bad tests that we know do not work and which are not run for commit.
+    - Perhaps like: with problem_test(): blah
   - Currently lens will succeed if not all items in repeat put, so need to
     check for consumption, where possible - perhaps a function of container
     that can optionally be implemented. 
