@@ -313,13 +313,12 @@ class LensObject(AbstractContainer) :
   sensible handling of label characters.
   
   TODO:
-  - allow explicit constraining of attributes
+  - Make use of __new__, rather than __init__
   - copy minimal state
-  - improve use of label translation.
-   - find allowed chars for variable name
-   - replace whitespace using regex
-     
+  - allow explicit constraining of attributes
   """
+
+  _cached_labels = {}
 
   def __init__(self, **kargs) :
     super(LensObject, self).__init__(**kargs)
@@ -346,16 +345,32 @@ class LensObject(AbstractContainer) :
     self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"]
 
   def convert_label_to_attribute_name(self, label) :
-    # TODO: improve this.
-    # 
-    attribute_name = label.replace(" ", "_")
-    attribute_name = attribute_name.lower()
+    """
+    Tries to convert a typical label to a python identifier.  You may wish to
+    overload this if you require more specialised conversion.
+    """
+    attribute_name = label.lower()
+    attribute_name = re.sub(r"[ ]+", "_", attribute_name)
+    
+    # Check we end up with a valid python keyword.
+    if not re.match(r"[a-zA-Z][a-zA-Z0-9_]*$", attribute_name) :
+      raise Exception("Cannot express label '%s' as a python identifer to set as an object attribute - you will have to specialise this functionality for your purposes." % label) 
+   
+    # Cache this conversion on the class, since it may be useful to improve
+    # CREATED labels.
+    self.__class__._cached_labels[attribute_name] = label
+
     return attribute_name
 
-  def convert_attribute_name_to_label(self, label) :
-    # TODO
-    return label.replace("_", " ")
-    
+
+  def convert_attribute_name_to_label(self, attribute_name) :
+    if attribute_name in self.__class__._cached_labels :
+      return self.__class__._cached_labels[attribute_name]
+
+    # We assume that an underscore represents a space.
+    return attribute_name.replace("_", " ")
+   
+
   def _get_stateful_attributes(self) :
     """Returns the names of container stateful attributes."""
     attributes = []
@@ -371,10 +386,7 @@ class LensObject(AbstractContainer) :
       item = enable_meta_data(self.__dict__[attr_name])
       self.__dict__[attr_name] = item
       # Ensure the label of the item is updated to match the current attribute
-      # name.
-      # XXX: Enhance this.
-      
-      # If our label has changed, we need to regenerate a label.
+      # name.  If our label has changed, we need to regenerate a label.
       current_label = item._meta_data.label
       if not (has_value(current_label) and self.convert_label_to_attribute_name(current_label) == attr_name) :
         item._meta_data.label = self.convert_attribute_name_to_label(attr_name)
@@ -392,7 +404,6 @@ class LensObject(AbstractContainer) :
         candidates.append(value)
     return candidates
 
-  # TODO: state get and set, so don't fallback on deep copy!
  
   def remove_item(self, item) :
     for attr_name, value in self.__dict__.iteritems() :
