@@ -189,68 +189,80 @@ def source_ordered_matching_list_test() :
 def lens_object_test():
 
   class Person(LensObject) :
-    # TODO: must be able to create with no args - check pickel stuff I looked at
-    # before.
-    #def __init__(self, name, last_name, **kargs) :
-    def __init__(self) :
-      super(Person, self).__init__()
-
-  # TODO: Actually the lens will go inside of the class
-  lens = Group(
-    List(
+    __lens__ = "Person::" + List(
       KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
       ";",
       type=None # XXX: Should get rid of default list type on List
-    ),
-  type=Person)
+    )
+    
+    def __init__(self, name, last_name) :
+      self.name, self.last_name = name, last_name
+
+
+  # This will soon become apparent when I fully integrate LensObjects into
+  # lens definitions.
+  lens = Group(Person.__lens__, type=Person)
 
   test_description("GET")
-  person = lens.get("Name:nick;Last   Name:blundell")
+  person = lens.get("Person::Name:nick;Last   Name:blundell")
   assert(person.name == "nick" and person.last_name == "blundell")
   test_description("PUT")
   output = lens.put(person)
-  assert_equal(output, "Name:nick;Last   Name:blundell")
+  assert_equal(output, "Person::Name:nick;Last   Name:blundell")
 
   test_description("CREATE")
-  new_person = Person()
-  new_person.name = "james"
-  new_person.last_name = "bond"
+  new_person = Person("james", "bond")
   output = lens.put(new_person)
   # XXX: Would be nice to control the order, but need to think of a nice way to
   # do this - need to cache source info of a label, which we can use when we
   # loose source info, also when a user declares attributes we can remember the
   # order and force this as model order.
-  assert_equal(output, "Last   Name:bond;Name:james")
+  assert_equal(output, "Person::Last   Name:bond;Name:james")
   got_person = lens.get(output)
   # If all went well, we should GET back what we PUT.
   assert(got_person.name == "james" and got_person.last_name == "bond")
   
 
 def init_test():
-
+  """
+  Just a few tests to figure out how we can use __new__ in object creation.
+  """
   # What we want:
-  # Allow a LensObject to define a constructor with required args.
-  # But instantiate without args.
- 
-  # Scenarios:
-  #
-  # We specify the class as a container for a lens:
-  #  - lens should create empty container, filling it as it goes
-  #    - should not need to call __init__
-  #  - we may put a GOT instance back
-  #    - it will know its lens, etc.
-  #  - The user instantiates a class with some initial state:
-  #    - Eg a list, a dict, some init args for a class
-  #    - it will have to find its lens later - how
+  #  Want to create an object with initial state regardless of constructor
+  #  args.
 
   class Person(object):
+    
+    def __new__(cls, *args, **kargs) :
+      # It seems to me the args are passed only to allow customisation based
+      # on them, since they are then passed to __init__ following this call in
+      # typical creation.
+      
+      # Create the instance, also passing args - since may also be used for
+      # customisation.
+      self = super(Person, cls).__new__(cls, *args, **kargs)
+      # Initialise some variables.
+      self.name = None
+      self.surname = None
+
+      # Return the instance.
+      return self
+    
     def __init__(self, name, surname):
+      d("Constructor called")
       self.name, self.surname = name, surname
+    
     def __str__(self) :
       return "[%s, %s]" % (self.name, self.surname)
 
 
-  person = Person.__new__(Person, lens=1)
+  person1 = Person("john", "smith")
+  d(person1)
+
+  person2 = Person.__new__(Person)
+  d(person2)
+
+  #person = Person.__new__(Person, lens=1)
   #d(person)
 
 

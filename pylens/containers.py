@@ -66,10 +66,13 @@ class AbstractContainer(Rollbackable) :
   to an item; with a general class, however, this may not be the case.
   """
 
-  def __init__(self) :
+  def __new__(cls, *args, **kargs) :
+    self = super(AbstractContainer, cls).__new__(cls, *args, **kargs)
+    # Initialise some vars regardless of __init__ being called.
     self.container_lens = None
     self.label = None
     self.alignment_mode = None
+    return self
 
   def set_container_lens(self, lens) :
     # Called when put() is preparing the container for PUTting to associate it with its container lens.
@@ -210,86 +213,78 @@ class AbstractContainer(Rollbackable) :
 class ListContainer(AbstractContainer) :
   """Most basic container, for storing items in a list."""
 
-  def __init__(self, items=None) :
-    super(ListContainer, self).__init__()
-
-    # Create new list if not passed one to wrap.
-    if not has_value(items) :
-      self.items = enable_meta_data([])
-    else : 
-      assert isinstance(items, list)
-      self.items = items
+  def __new__(cls, *args, **kargs) :
+    self = super(ListContainer, cls).__new__(cls, *args, **kargs)
+    self.container_item = []
+    return self
   
-    assert_msg(isinstance(self.items, list))
+  def __init__(self, container_item) :
+    assert isinstance(container_item, list)
+    self.container_item = container_item
+  
+    assert_msg(isinstance(self.container_item, list))
 
     # Ensure our items can carry meta data (for algorithmic convenience) and be careful
     # to preserve the incoming lists meta data by modifying it in place.
     # Perhaps this can be done in AbstractContainer
-    for index, item in enumerate(self.items) :
-      self.items[index] = enable_meta_data(item)
-    
-    # Store the label (if set) of the list in our container for stateful consumption. 
-    # XXX: This should probably happen in the base class, otherwise we might
-    # forget.
-    self.label = self.items._meta_data.label
+    for index, item in enumerate(self.container_item) :
+      self.container_item[index] = enable_meta_data(item)
     
       
   def get_put_candidates(self, lens, concrete_input_reader) :
-    return self.items
+    return self.container_item
   
   def remove_item(self, item) :
-    self.items.remove(item)
+    self.container_item.remove(item)
 
   def store_item(self, item, lens, concrete_input_reader) :
-    self.items.append(item)
+    self.container_item.append(item)
 
   
   def unwrap(self):
-    # Update the label of the list (e.g. if we stored and is_label item) then return it
-    self.items._meta_data.label = self.label
-    return self.items
+    return self.container_item
 
   def _get_state(self, copy_state=True) :
-    state = [copy_state and copy.copy(self.items) or self.items, self.label]
+    state = [copy_state and copy.copy(self.container_item) or self.container_item, self.label]
     return state
       
 
   def _set_state(self, state, copy_state=True) :
-    self.items = copy_state and copy.copy(state[0]) or state[0]
+    self.container_item = copy_state and copy.copy(state[0]) or state[0]
     self.label = state[1]
 
   def __str__(self) :
-    return str(self.items)
+    return str(self.container_item)
   __repr__ = __str__
 
 
 class DictContainer(ListContainer) :
   """Allows a list of items with labels to be accessed as a native python dict."""
-  def __init__(self, items=None) :
   
+  def __init__(self, container_item) :
+    """
+    We actually use all the functionality of the ListContainer, which we
+    can later unwrap to a dict, since items may carry labels in their
+    meta data.
+    """
+
     # Create new dict if not passed one to wrap.
-    if not has_value(items) :
-      self.items = enable_meta_data([])
-    else : 
-      assert isinstance(items, dict)
-      self.items = items
+    assert isinstance(container_item, dict)
+    self.container_item = container_item
 
     # Create a list to hold the items.
-    items_as_list = enable_meta_data([])
-    
+    items_as_list = []
 
     # Now add the items to the list, updating their labels from keys.
-    if has_value(items) :
-      assert isinstance(items, dict)
-      items_as_list._meta_data = items._meta_data
-      for key, item in items.iteritems() :
-        item = enable_meta_data(item)
-        item._meta_data.label = key
-        items_as_list.append(item)
+    assert isinstance(container_item, dict)
+    for key, item in container_item.iteritems() :
+      item = enable_meta_data(item)
+      item._meta_data.label = key
+      items_as_list.append(item)
 
     super(DictContainer, self).__init__(items_as_list)
 
-    # TODO: Choose default alignment mode.
+  # TODO: Choose default alignment mode in set_container_lens().
 
   def store_item(self, item, *args, **kargs) :
     if not has_value(item._meta_data.label) :
@@ -300,46 +295,47 @@ class DictContainer(ListContainer) :
     # First unwrap to a list.
     items_as_list = super(DictContainer, self).unwrap()
 
-    # The convert to a dictionary.
-    items_as_dict = enable_meta_data({})
-    items_as_dict._meta_data = items_as_list._meta_data
+    # Then convert to a dictionary, using item labels as keys.
+    items_as_dict = {}
     for item in items_as_list :
       items_as_dict[item._meta_data.label] = item
-
     return items_as_dict
 
 
 class LensObject(AbstractContainer) :
   """
   A container that stores labelled items as object attributes, providing
-  sensible handling of label characters.
+  simple converstion of lables to and from python identifiers to store as
+  attributes.  For example an item with the label "Last Name" would be stored
+  as an object attribute as "last_name".
 
   We can either constrain the attributes used with lenses or leave it open.
   
   TODO:
-  - Make use of __new__, rather than __init__
   - copy minimal state
   - allow explicit constraining of attributes
-  - think about ordering for CREATED items.
+  - think about ordering for CREATED items - praps relate to above point on
+    constraining attributes.
     - perhaps proper LABEL ordering is what we want for this case
   """
 
-  # Used to help with re-generating labels from object atribute names.
-  _cached_labels = {}
+  # Used to help with re-generating labels from object attribute names.  The
+  # class seems a good a place as any to store this globally-useful data.
+  __cached_labels = {}
 
-  def __init__(self) :
-    super(LensObject, self).__init__()
-
+  
+  def __new__(cls, *args, **kargs) :
+    """
+    It is important that container objects can be created without arguments
+    (a la serialisation), so here we initialise important variables before the
+    __init__ is called.
+    """
+    self = super(LensObject, cls).__new__(cls, *args, **kargs)
+    
     # This automatically builds a list of attributes to exclude from our
     # container's state.
     self._exclude_attributes()
-
-    # XXX: For key-value items, when changed we will usually loose meta that could
-    # have been re-used, so need to think of a nice way to preserve this.
-    # Default to SOURCE alignment, which will be more likely for a general object.
-
-    # XXX: Praps something like below - need to think....
-    #self.label = self._meta_data.label
+    return self
 
   def set_container_lens(self, lens) :
     super(LensObject, self).set_container_lens(lens)
@@ -352,7 +348,7 @@ class LensObject(AbstractContainer) :
     # Ensure all items that may be PUT may carry meta data.
     self._enable_attributes_meta()
 
-    for attr_name in self._get_stateful_attributes() :
+    for attr_name in self._get_data_attributes() :
       value = self.__dict__[attr_name]
       if has_value(value) and attr_name not in self.excluded_attributes :
         candidates.append(value)
@@ -396,6 +392,7 @@ class LensObject(AbstractContainer) :
     overload this if you require more specialised conversion.
     """
     attribute_name = label.lower()
+    # XXX: We could pre-compile this regex.
     attribute_name = re.sub(r"[ ]+", "_", attribute_name)
     
     # Check we end up with a valid python keyword.
@@ -404,21 +401,21 @@ class LensObject(AbstractContainer) :
    
     # Cache this conversion on the class, since it may be useful to improve
     # CREATED labels.
-    self.__class__._cached_labels[attribute_name] = label
+    self.__class__.__cached_labels[attribute_name] = label
 
     return attribute_name
 
 
   def _convert_attribute_name_to_label(self, attribute_name) :
-    if attribute_name in self.__class__._cached_labels :
-      return self.__class__._cached_labels[attribute_name]
+    if attribute_name in self.__class__.__cached_labels :
+      return self.__class__.__cached_labels[attribute_name]
 
     # We assume that an underscore represents a space.
     return attribute_name.replace("_", " ")
    
 
-  def _get_stateful_attributes(self) :
-    """Returns the names of container stateful attributes."""
+  def _get_data_attributes(self) :
+    """Returns the names of container items that are being used to hold data items."""
     attributes = []
     for attr_name in self.__dict__.keys() :
       if attr_name not in self.excluded_attributes and not attr_name.startswith("_"):
@@ -428,7 +425,7 @@ class LensObject(AbstractContainer) :
 
   def _enable_attributes_meta(self) :
     """Enables meta on attributes that may be used as container state."""
-    for attr_name in self._get_stateful_attributes() :
+    for attr_name in self._get_data_attributes() :
       item = enable_meta_data(self.__dict__[attr_name])
       self.__dict__[attr_name] = item
       # Ensure the label of the item is updated to match the current attribute
@@ -440,17 +437,24 @@ class LensObject(AbstractContainer) :
 
  
 class ContainerFactory:
-  """Creates appropriate containers for native python types."""
+  """
+  Used to create appropriate containers for particular types of lens.  For
+  example, lens.type == dict -> container_class == DictContainer.
+  """
 
   @staticmethod
   def get_container_class(incoming_type) :
+    """
+    Returns the container class associated with this type, if there is one.
+    """
     if incoming_type == None:
       return None
 
+    # If type is already an AbstractContainer, return it.
     if issubclass(incoming_type, AbstractContainer) :
       return incoming_type
 
-    # Also handles auto_list
+    # Handle associations with native python containers.
     if issubclass(incoming_type, list) :
       return ListContainer
     elif issubclass(incoming_type, dict) :
@@ -461,12 +465,19 @@ class ContainerFactory:
 
   @staticmethod
   def create_container(container_lens) :
-    
+    """
+    Tries to create an container appropriate for this lens and returns None
+    if there is no associated container class.
+    """
+
+    # See if the lens type has a container class.
     container_class = ContainerFactory.get_container_class(container_lens.type)
     
     if container_class == None:
       return None
-    return container_class()
+    
+    # We do not call the constructor, which may require args.
+    return container_class.__new__(container_class)
 
   @staticmethod
   def wrap_container(incoming_object, container_lens=None) :
@@ -478,8 +489,13 @@ class ContainerFactory:
     container_class = ContainerFactory.get_container_class(type(incoming_object))
     if container_class == None :
       return None
-
-    return container_class(incoming_object)
+   
+    # Pass the raw data item to wrap.
+    container = container_class(incoming_object)
+    # Set the (consumable) label of the container based on the item's current
+    # label
+    container.label = incoming_object._meta_data.label
+    return container
    
   # TODO: Add tests
 

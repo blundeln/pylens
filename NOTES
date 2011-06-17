@@ -4,6 +4,8 @@ RESEARCH NOTES - for my questions and musings
   - Think about how general class will be a container.
     - Implement LensObject, which can take attributes, bit like a dict
       - See todo notes on the LensObject class
+  - dist
+    - Copy README.rst to README for benefit of PyPi
   - Extend LensObject idea to Implement aggregate container support within the base container.
   - Get rid of default type on List lens - too confusing and not really
     intuitive in most cases.

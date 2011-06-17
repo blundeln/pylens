@@ -135,20 +135,23 @@ class Lens(object) :
     # Create an empty appropriate container class for our lens, if there is one;
     # this will be None if we are not a container-type lens (e.g. a dict or
     # list).
-    new_container = self._create_container()
-    if new_container :
+    lens_container = self._create_lens_container()
+    if lens_container :
       d("Created container")
 
     # If we are a container-type lens, replace the current container of
-    # sub-lenses with our own container (new_container).
-    if new_container :
+    # sub-lenses with our own container (lens_container).
+    if lens_container :
       # Call GET proper with our container, checking that no item is returned,
       # since all items should be stored WITHIN the container
-      assert_msg(self._get(concrete_input_reader, new_container) == None, "Container lens %s has GOT an item, but all items must be stored in the current container, not returned." % self)
+      assert_msg(self._get(concrete_input_reader, lens_container) == None, "Container lens %s has GOT an item, but all items must be stored in the current container, not returned." % self)
       
       # Since we created the container, we will return it as our item, for a
       # higher order lens to store.
-      item = new_container.unwrap()
+      item = lens_container.unwrap()
+     
+
+
     # Otherwise, call GET proper using the outer container, if there is one.
     else :
       item = self._get(concrete_input_reader, current_container)
@@ -177,6 +180,12 @@ class Lens(object) :
       # A reference to the concrete reader and position parsed from.
       item._meta_data.concrete_start_position = concrete_start_position
       item._meta_data.concrete_input_reader = concrete_input_reader
+
+      # If the item was unwrapped from a container, update meta with label
+      # from the container, which may have been set if there was an is_label
+      # lens.
+      if lens_container :
+        item._meta_data.label = lens_container.label
 
     # Note that, even if we are not a typed lens, we may return an item
     # extracted from some sub-lens, the Or lens being a good example.
@@ -481,7 +490,7 @@ class Lens(object) :
     assert_msg(isinstance(concrete_input, ConcreteInputReader), "Expected to have a ConcreteInputReader not a %s" % type(concrete_input))
     return concrete_input
 
-  def _create_container(self):
+  def _create_lens_container(self):
     """Creates a container for this lens, if the lens is of a container type."""
     return ContainerFactory.create_container(self)
 

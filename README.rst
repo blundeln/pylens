@@ -7,8 +7,8 @@ This started off as an attempt to implement the extremely useful idea of lenses
 (bi-directional parsers) within the context of object serialisation, with the
 aim of simplifying lens definition and creating intuitive abstractions of data
 in flat file formats (e.g. UNIX configuration files) within a native scripting
-language such as python.  The fundamental approach as altered several times
-but now is started to become more simpler and intuitive.  Hopefully I will
+language such as python.  The fundamental approach has altered several times
+but now is starting to become more simple and more intuitive.  Hopefully I will
 make a stable release very soon.
 
 In a nutshell, we wish to serialise some object model to and from a flat file
@@ -50,15 +50,13 @@ For more examples, see the extensive unit tests and longer tests in the followin
   testing/tests.py
   pylens/*_lenses.py
 
-Status
+Limitations
 -----------------------------------------------------
-
-Work in progress: alpha stage
 
 Note that, the initial aim of this project is to see if we can create some
 richer abstractions of data (i.e. using native language objects) for use with
 lenses, but that, since we do not use an FSA like Augeas and Boomerang,
-ambiguity checking is not yet supported, though I'm interested in exploring
+ambiguity checking is not supported, though I'm interested in exploring
 how we can implement some kind of certainty of non-ambiguity into the
 framework, if not full ambiguity checking.  pylens does not claim to be a full
 typed checked system, and leaves sanity checking down to the lens designer.
@@ -66,8 +64,15 @@ typed checked system, and leaves sanity checking down to the lens designer.
 The main idea here is to increase flexibility of the framework at the price of
 weaker type-checking, leaving part of that responsibility to the lens authors.
 
+Status
+-----------------------------------------------------
+
 For an informal TODO list see the TODO file:
 https://github.com/blundeln/pylens/blob/master/TODO
+
+The Theory
+-----------------------------------------------------
+
 
 For more details on the theory see the work
 relating to lenses/bi-directional-programming of Nate Foster et al. (links

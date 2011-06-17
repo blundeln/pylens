@@ -10,6 +10,7 @@ target: 1.0.0b1
 
 target: 1.0.0b2
   - Allow label alignment proper (e.g. if label changes move item)
+  - Need a good example in main README to show what the framework allows
 
 target: 1.0.0rc1
   - Polish code (mainly comments, etc.)
