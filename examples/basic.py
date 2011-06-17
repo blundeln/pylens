@@ -296,7 +296,7 @@ def more_complex_structure_test() :
   got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
   d(output)
-  assert(output == """
+  assert_equal(output, """
   people: [bill, ben]
 
   animals: [snake,tiger,monkey]

@@ -103,7 +103,7 @@ def dict_test() :
   got = lens.get("a+3c-2z*7")
   got["c"] = 4
   output = lens.put(got)
-  assert(output == "a+3z*7c*4")
+  assert_equal(output, "a+3z*7c*4")
 
 
 
@@ -169,7 +169,7 @@ def source_ordered_matching_list_test() :
 
   output = lens.put(got)
   d(output)
-  assert(output == "a+3c-2z*7")
+  assert_equal(output, "a+3c-2z*7")
 
   d("With deletion and creation")
   d("GET")
@@ -192,9 +192,10 @@ def lens_object_test():
     # TODO: must be able to create with no args - check pickel stuff I looked at
     # before.
     #def __init__(self, name, last_name, **kargs) :
-    def __init__(self, **kargs) :
-      super(Person, self).__init__(**kargs)
+    def __init__(self) :
+      super(Person, self).__init__()
 
+  # TODO: Actually the lens will go inside of the class
   lens = Group(
     List(
       KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
@@ -211,7 +212,7 @@ def lens_object_test():
   assert_equal(output, "Name:nick;Last   Name:blundell")
 
   test_description("CREATE")
-  new_person = Person(lens=lens)
+  new_person = Person()
   new_person.name = "james"
   new_person.last_name = "bond"
   output = lens.put(new_person)
@@ -225,7 +226,32 @@ def lens_object_test():
   assert(got_person.name == "james" and got_person.last_name == "bond")
   
 
+def init_test():
 
+  # What we want:
+  # Allow a LensObject to define a constructor with required args.
+  # But instantiate without args.
+ 
+  # Scenarios:
+  #
+  # We specify the class as a container for a lens:
+  #  - lens should create empty container, filling it as it goes
+  #    - should not need to call __init__
+  #  - we may put a GOT instance back
+  #    - it will know its lens, etc.
+  #  - The user instantiates a class with some initial state:
+  #    - Eg a list, a dict, some init args for a class
+  #    - it will have to find its lens later - how
+
+  class Person(object):
+    def __init__(self, name, surname):
+      self.name, self.surname = name, surname
+    def __str__(self) :
+      return "[%s, %s]" % (self.name, self.surname)
+
+
+  person = Person.__new__(Person, lens=1)
+  #d(person)
 
 
 #####################################################

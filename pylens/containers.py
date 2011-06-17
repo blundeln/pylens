@@ -66,15 +66,16 @@ class AbstractContainer(Rollbackable) :
   to an item; with a general class, however, this may not be the case.
   """
 
-  def __init__(self, lens=None) :
-    assert_msg(has_value(lens), "A new container must be passed the lens that creates it.")
-    
-    # TODO: If we do not enclose our own lens, look for keyword of the lens.
-    self.lens = lens
+  def __init__(self) :
+    self.container_lens = None
     self.label = None
-    
-    # Default to MODEL alignment mode.
-    self.alignment_mode = self.lens.options.alignment or MODEL
+    self.alignment_mode = None
+
+  def set_container_lens(self, lens) :
+    # Called when put() is preparing the container for PUTting to associate it with its container lens.
+    self.container_lens = lens
+    # Default to MODEL alignment
+    self.alignment_mode = self.container_lens.options.alignment or MODEL
 
   def set_label(self, label) :
     assert_msg(isinstance(label, str), "The container label must be a string --- at least for the time being.")
@@ -107,6 +108,7 @@ class AbstractContainer(Rollbackable) :
   def consume_and_put_item(self, lens, concrete_input_reader) :
     """Called by lenses that put items from the container into sub-lenses (e.g. And)."""
     assert(lens.has_type())
+    assert_msg(has_value(self.container_lens), "Our container has not been associated with a container type lens.")
    
     # Handle is_label lens
     if lens.options.is_label:
@@ -208,8 +210,8 @@ class AbstractContainer(Rollbackable) :
 class ListContainer(AbstractContainer) :
   """Most basic container, for storing items in a list."""
 
-  def __init__(self, items=None, **kargs) :
-    super(ListContainer, self).__init__(**kargs)
+  def __init__(self, items=None) :
+    super(ListContainer, self).__init__()
 
     # Create new list if not passed one to wrap.
     if not has_value(items) :
@@ -263,7 +265,7 @@ class ListContainer(AbstractContainer) :
 
 class DictContainer(ListContainer) :
   """Allows a list of items with labels to be accessed as a native python dict."""
-  def __init__(self, items=None, **kargs) :
+  def __init__(self, items=None) :
   
     # Create new dict if not passed one to wrap.
     if not has_value(items) :
@@ -285,7 +287,7 @@ class DictContainer(ListContainer) :
         item._meta_data.label = key
         items_as_list.append(item)
 
-    super(DictContainer, self).__init__(items_as_list, **kargs)
+    super(DictContainer, self).__init__(items_as_list)
 
     # TODO: Choose default alignment mode.
 
@@ -325,8 +327,8 @@ class LensObject(AbstractContainer) :
   # Used to help with re-generating labels from object atribute names.
   _cached_labels = {}
 
-  def __init__(self, **kargs) :
-    super(LensObject, self).__init__(**kargs)
+  def __init__(self) :
+    super(LensObject, self).__init__()
 
     # This automatically builds a list of attributes to exclude from our
     # container's state.
@@ -335,11 +337,14 @@ class LensObject(AbstractContainer) :
     # XXX: For key-value items, when changed we will usually loose meta that could
     # have been re-used, so need to think of a nice way to preserve this.
     # Default to SOURCE alignment, which will be more likely for a general object.
-    self.alignment_mode = self.lens.options.alignment or SOURCE
 
     # XXX: Praps something like below - need to think....
     #self.label = self._meta_data.label
 
+  def set_container_lens(self, lens) :
+    super(LensObject, self).set_container_lens(lens)
+    # For a general class container, SOURCE alignment will be a more common default.
+    self.alignment_mode = self.container_lens.options.alignment or SOURCE
  
   def get_put_candidates(self, lens, concrete_input_reader) :
     candidates = []
@@ -461,7 +466,7 @@ class ContainerFactory:
     
     if container_class == None:
       return None
-    return container_class(lens = container_lens)
+    return container_class()
 
   @staticmethod
   def wrap_container(incoming_object, container_lens=None) :
@@ -474,7 +479,7 @@ class ContainerFactory:
     if container_class == None :
       return None
 
-    return container_class(incoming_object, lens = container_lens)
+    return container_class(incoming_object)
    
   # TODO: Add tests
 

@@ -1,4 +1,6 @@
 RESEARCH NOTES - for my questions and musings
+  - Refactor container initialisation
+    - don't need lens on GET, which simplifies things somewhat.
   - Think about how general class will be a container.
     - Implement LensObject, which can take attributes, bit like a dict
       - See todo notes on the LensObject class

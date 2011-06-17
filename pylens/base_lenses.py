@@ -339,7 +339,7 @@ class Lens(object) :
         raise LensException("This lens %s of type %s cannot PUT an item of that type %s" % (self, self.type, type(item)))
       
       # If this item was previously GOTten, we can get its original input.
-      if item._meta_data.concrete_input_reader :
+      if has_value(item._meta_data.concrete_input_reader) :
         
         # Create a personal concrete reader for this item, based on its meta
         # data.
@@ -377,6 +377,8 @@ class Lens(object) :
         # The item is now represented as a consumable container.
         item = None
         current_container = item_as_container
+        # Set the us as the lens of this container, which it will use to determine alignment mode, etc.
+        current_container.set_container_lens(self)
       else :
         # When PUTing a non-container item, for consistancy, should cast to string (e.g. if int
         # passed) and discard current container from this branch.
