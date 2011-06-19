@@ -187,38 +187,44 @@ def source_ordered_matching_list_test() :
 
 
 def lens_object_test():
+  """
+  Here we demonstrate the use of classes to define our data model which are
+  related to a lens.
+  """
 
+  # Define our Person class, which internally defines its lens.
   class Person(LensObject) :
     __lens__ = "Person::" + List(
       KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
       ";",
-      type=None # XXX: Should get rid of default list type on List
+      type=None # XXX: I should get rid of default list type on List
     )
     
     def __init__(self, name, last_name) :
       self.name, self.last_name = name, last_name
 
-
-  # This will soon become apparent when I fully integrate LensObjects into
-  # lens definitions.
-  lens = Group(Person.__lens__, type=Person)
-
   test_description("GET")
-  person = lens.get("Person::Name:nick;Last   Name:blundell")
+  # Here we use the high-level API get() function, which is for convenience and
+  # which equates to:
+  #  lens = Group(Person.__lens__, type=Person)
+  #  person = lens.get("Person::Name:nick;Last   Name:blundell")
+  person = get(Person, "Person::Name:nick;Last   Name:blundell")
   assert(person.name == "nick" and person.last_name == "blundell")
   test_description("PUT")
-  output = lens.put(person)
+  
+  # Now we PUT it back with no modification and should get what we started with.
+  output = put(person)
   assert_equal(output, "Person::Name:nick;Last   Name:blundell")
 
   test_description("CREATE")
   new_person = Person("james", "bond")
-  output = lens.put(new_person)
+  output = put(new_person)
   # XXX: Would be nice to control the order, but need to think of a nice way to
   # do this - need to cache source info of a label, which we can use when we
   # loose source info, also when a user declares attributes we can remember the
   # order and force this as model order.
   assert_equal(output, "Person::Last   Name:bond;Name:james")
-  got_person = lens.get(output)
+  got_person = get(Person, output)
   # If all went well, we should GET back what we PUT.
   assert(got_person.name == "james" and got_person.last_name == "bond")
   

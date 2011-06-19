@@ -44,17 +44,17 @@ G   = Group
 
 
 ##################################
-# Main API functions
+# High-level API functions
 ##################################
 
 def get(lens, *args, **kargs) :
   """
-  Extracts an python structure from some string structure using the given
+  Extracts a python structure from some string structure using the given
   lens.
 
   Example: get(some_lens, "a=1,c=4") -> {"a":1, "c":4}
   """
-  lens = BaseLens.coerce_to_lens(lens)
+  lens = Lens._coerce_to_lens(lens)
   return lens.get(*args, **kargs)
 
 def put(lens_or_instance, *args, **kargs) :
@@ -64,19 +64,16 @@ def put(lens_or_instance, *args, **kargs) :
   Example: put(some_lens, {"a":1, "c":4}) -> "a=1,c=4"
   """
   # If we have an instance of a class which defines its own lens...
-  if hasattr(lens_or_instance, "__lens__") :
-    # Might as well still coerce the lens, just in case.
-    lens = BaseLens.coerce_to_lens(lens_or_instance.__lens__)
+  if isinstance(lens_or_instance, LensObject) : #and hasattr(lens_or_instance, "__lens__") :
+    assert_msg(hasattr(lens_or_instance, "__lens__"), "LensObject %s defines no __lens__" % lens_or_instance)
+    lens = Lens._coerce_to_lens(lens_or_instance.__class__)
     instance = lens_or_instance # For clarity.
     return lens.put(instance, *args, **kargs)
   
   # Otherwise...
-  lens = BaseLens.coerce_to_lens(lens_or_instance)
+  lens = Lens._coerce_to_lens(lens_or_instance)
   return lens.put(*args, **kargs)
 
-def main_api_test() :
-  #TODO: I'll test this with class item, since then it makes more sense.
-  pass
 
 ###########################
 # Main.
