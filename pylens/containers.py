@@ -317,6 +317,8 @@ class LensObject(AbstractContainer) :
   - think about ordering for CREATED items - praps relate to above point on
     constraining attributes.
     - perhaps proper LABEL ordering is what we want for this case
+  - Perhaps also ensure lens coercion happens if this is aggregated with a lens.
+    (e.g. "[" + Person + "]" would current not coerce.)
   """
 
   # Used to help with re-generating labels from object attribute names.  The

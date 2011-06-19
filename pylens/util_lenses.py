@@ -81,7 +81,7 @@ class List(And) :
   def __init__(self, lens, delimiter_lens, **kargs):
     if "type" not in kargs :
       kargs["type"] = list
-    super(List, self).__init__(lens, ZeroOrMore(delimiter_lens + lens), **kargs)
+    super(List, self).__init__(lens, ZeroOrMore(And(delimiter_lens, lens)), **kargs)
 
   @staticmethod
   def TESTS() :

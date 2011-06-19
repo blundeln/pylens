@@ -304,7 +304,50 @@ def more_complex_structure_test() :
   newthing:[thinga, thingb]\n""")
 
 
+def mapping_lenses_to_classes_test():
+  """
+  We have seen how we can use list and dict containers, but we can also easily define
+  classes that map to lenses, and we can use these as elements of larger lenses,
+  allowing us to (surgically) manipulate potentially complex structured files in a
+  consistent python model (e.g. for configuring a UNIX system).
+
+  This can be thought of as a special form of serialisation whereby a class
+  defines the lens that it uses for serialisation.
+  """
+
+  # Define our Person class, which internally defines its lens.
+  class Person(LensObject) :
+    # We define the lens that maps an element of some grammer to and from this class.
+    __lens__ = "Person::" + List(
+      KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
+      ",",
+      type=None
+    )
+    
+    def __init__(self, name, last_name) :
+      self.name, self.last_name = name, last_name
+
+  # Extract a person instance from the string.  Note how the field with label
+  # "Last Name" gets mapped automatically to the attribute last_name. 
+  person = get(Person, "Person::Name:nick,Last Name:blundell")
+  assert(person.name == "nick", person.last_name == "blundell")
+
+  # We can use the class as part of a larger lens now.
+  lens = List(Person, ";", type=list)
+  people = lens.get("Person::Name:nick,Last Name:blundell;Person::Name:albert,Last Name:camus")
+  # Here extract a python list of Person instances.
+  assert(people[0].name == "nick" and people[1].last_name == "camus")
+
+  # Let's alter out abstract model, then put it back as a string.
+  people.insert(1,Person("Fred", "Flintstone"))
+  output = lens.put(people)
+  assert_equal(output, "Person::Name:nick,Last Name:blundell;Person::Last Name:Flintstone,Name:Fred;Person::Name:albert,Last Name:camus")
+  # Great.
+  # Note that there is a fundamental limitation in the framework that means Fred's last name is
+  # listed first in this example, though I have an idea to fix this which I will work on soon.
+
+
 # TODO: Alignment mode examples.
 # TODO: Until, auto_list
+# TODO: Aggregate containers.
 # TODO Recursion examples
-# TODO Class examples.
