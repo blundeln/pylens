@@ -1,5 +1,6 @@
 #
 # These are just examples, thinking out loud, of where I'd like to be with the lens serialisation idea.
+# Update: we are getting there!
 #
 
 CONFIG_EXAMPLE = """

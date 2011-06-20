@@ -247,7 +247,6 @@ class ListContainer(AbstractContainer) :
   def _get_state(self, copy_state=True) :
     state = [copy_state and copy.copy(self.container_item) or self.container_item, self.label]
     return state
-      
 
   def _set_state(self, state, copy_state=True) :
     self.container_item = copy_state and copy.copy(state[0]) or state[0]
@@ -312,13 +311,10 @@ class LensObject(AbstractContainer) :
   We can either constrain the attributes used with lenses or leave it open.
   
   TODO:
-  - copy minimal state
   - allow explicit constraining of attributes
   - think about ordering for CREATED items - praps relate to above point on
     constraining attributes.
-    - perhaps proper LABEL ordering is what we want for this case
-  - Perhaps also ensure lens coercion happens if this is aggregated with a lens.
-    (e.g. "[" + Person + "]" would current not coerce.)
+    - perhaps proper LABEL ordering is what we want for this case - otherwise we may over complicate things
   """
 
   # Used to help with re-generating labels from object attribute names.  The
@@ -334,10 +330,20 @@ class LensObject(AbstractContainer) :
     """
     self = super(LensObject, cls).__new__(cls, *args, **kargs)
     
+    # Check for constrained attributes, define on the class.
+    constrained_attributes = self._get_constrained_attributes()
+    d(constrained_attributes)
+
     # This automatically builds a list of attributes to exclude from our
     # container's state.
     self._exclude_attributes()
     return self
+
+  def _get_constrained_attributes(self) :
+    attributes = []
+    for key, value in self.__class__.__dict__.iteritems() :
+      d(key)
+    return attributes
 
   def set_container_lens(self, lens) :
     super(LensObject, self).set_container_lens(lens)
@@ -436,6 +442,12 @@ class LensObject(AbstractContainer) :
       if not (has_value(current_label) and self._convert_label_to_attribute_name(current_label) == attr_name) :
         item._meta_data.label = self._convert_attribute_name_to_label(attr_name)
 
+  def _get_state(self, copy_state=True) :
+    state = copy_state and copy.copy(self.__dict__) or self.__dict__
+    return state
+
+  def _set_state(self, state, copy_state=True) :
+    self.__dict__ = copy_state and copy.copy(state) or state
 
  
 class ContainerFactory:

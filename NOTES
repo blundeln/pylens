@@ -1,9 +1,15 @@
 RESEARCH NOTES - for my questions and musings
-  - Refactor container initialisation
-    - don't need lens on GET, which simplifies things somewhat.
-  - Think about how general class will be a container.
-    - Implement LensObject, which can take attributes, bit like a dict
-      - See todo notes on the LensObject class
+  - Check consumption of input and/or containers.
+    - Also need to rollback on success, so we could put the thing again.
+  - Allow richer class models:
+    - Use static class variables to:
+      - Network interfaces lens might be a good example to show this with.
+      - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
+      - Describe sub-containers (e.g. interfaces = Container(type=list, stores_lenses=[list of lenses])
+        - This will allow for more flexible models (i.e. we don't have to nest lens containers so rigidly)
+        - Be cautions with checking which lens the item actually came from, not necessarily which returned it (i.e. Or)
+
+  - See todo notes on the LensObject class
   - dist
     - Copy README.rst to README for benefit of PyPi
   - Extend LensObject idea to Implement aggregate container support within the base container.
@@ -12,8 +18,12 @@ RESEARCH NOTES - for my questions and musings
   - Re-organise these notes! and put feature ideas in TODO, rather than here.
   - LABEL mode
     - Now Or fixed for A | empty() case, can make source order mode more accurate by matching exact source position of gotten items.
+      - Or perhaps it is fine as it is: ordering put candidates by source.
   
   ------------- Misc ideas
+  - Perhaps also ensure lens coercion happens if this is LensObject aggregated with a lens.
+    (e.g. "[" + Person + "]" would current not coerce.)
+    - Hmmm, might be messy, playing with operators of a type.
   - Support some global settings
    - validate data in puts, which may be expensive
    - allow or disallow overwriting labelled items already present in relevant containers.
