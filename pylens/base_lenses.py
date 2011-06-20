@@ -397,15 +397,21 @@ class Lens(object) :
         item = str(item)
         current_container = None
 
+      # Store the initial container state, so we can recover it on success,
+      # since put can be destructive to some containers, depending on how they
+      # are implemented.
+      pre_consumed_state = get_rollbackables_state(current_container)
+
       # Now that arguments are set up, call PUT proper on our lens.
       output = self._put(item, concrete_input_reader, current_container)
 
       # Check the container items have been fully consumed by this lens.
       if has_value(item_as_container) and GlobalSettings.check_consumption and not current_container.is_fully_consumed() :
         raise NotFullyConsumedException("The container %s has not been fully consumed." % current_container)
+      
+      # Now recover pre-consumption state of the container.
+      set_rollbackables_state(pre_consumed_state, current_container)
 
-      # XXX: Somewhere around here, restore state of container item - perhaps
-      # when unwrapped, and using piggybacked initial state.
         
    
     # If instead of an item we have a container, instruct the container to put
@@ -1168,8 +1174,6 @@ class Repeat(Lens) :
     # fewer than we had originally).  This is basically the same implentation of
     # get, though we discard any items and continue to track no_got for the puts above.
     #
-
-    # XXX: Issue.  This seems not to discard GOTen items.
 
     if concrete_input_reader and no_got < self.max_count:
       

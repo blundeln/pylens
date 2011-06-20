@@ -202,6 +202,22 @@ def source_ordered_matching_list_test() :
   d(output)
   assert(output == "a+3c-2m*6")
 
+def state_recovery_test():
+
+  test_description("Test that the user's item's state is recovered after consumption.")
+  INPUT = "x=y;p=q"
+  lens = List(KeyValue(Word(alphas, is_label=True)+"="+Word(alphas, type=str)), ";", type=dict)
+  got = lens.get(INPUT)
+  my_dict = {}
+  my_dict["beans"] = "yummy"
+  my_dict["marmite"] = "eurgh"
+  lens.put(my_dict)
+  assert_equal(my_dict, {"beans":"yummy", "marmite":"eurgh"})
+  # XXX: Actually, due to DictContainer implementation, this state would not be
+  # lost anyway, though a similar test with LensObject below flexes this test
+  # case.  I will leave this test, should the implemenation change in someway to
+  # warrent this test case.
+
 
 def lens_object_test():
   """
@@ -236,6 +252,10 @@ def lens_object_test():
   test_description("CREATE")
   new_person = Person("james", "bond")
   output = put(new_person)
+  
+  # Test that consumed state is restored on a successful PUT.
+  assert(new_person.name == "james" and new_person.last_name == "bond")
+  
   # XXX: Would be nice to control the order, but need to think of a nice way to
   # do this - need to cache source info of a label, which we can use when we
   # loose source info, also when a user declares attributes we can remember the
