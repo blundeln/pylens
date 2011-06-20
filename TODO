@@ -6,11 +6,11 @@ target: 1.0.0b1
     - This is what I have been heading towards.
     - Alter obj attr names to be valid python variables.
   - More example lenses.
+    - Need a good example in main README to show what the framework allows
   - Regex lens? Might as well since we have a cheeky Until lens
 
 target: 1.0.0b2
   - Allow label alignment proper (e.g. if label changes move item)
-  - Need a good example in main README to show what the framework allows
 
 target: 1.0.0rc1
   - Polish code (mainly comments, etc.)
@@ -19,14 +19,9 @@ target: 1.0.0rc1
 
 target: future
   - Use of auto containers for convenience of when none is specified.
-  - Make compatible with python 3
+  - Port for python 3
   - How to handle default indentation in recursive grammars.
-  - Shorter syntax for differentiating between store and non-store lenses so parsers less cluttered
-    - e.g. Word(...) vs S(Word(...)), or something
   - DynamicLens - pass a function which creates a lens when it is called with
     context params (e.g. current collection) e.g. <X> .... </X>
   - Ambiguity checking.
   - Apache lens example would be an important milestone?
-  - How can we simplify the lens definition?
-    - Context of lens definition -> auto whitespace
-    - I'm not so keen on this idea now, since clarity can be preferable to magic.

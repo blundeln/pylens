@@ -1,6 +1,4 @@
 RESEARCH NOTES - for my questions and musings
-  - Need to rollback on success, so we could put the thing again.
-    - make a test for this.
   - Allow richer class models:
     - Use static class variables to:
       - Network interfaces lens might be a good example to show this with.
@@ -9,16 +7,21 @@ RESEARCH NOTES - for my questions and musings
         - This will allow for more flexible models (i.e. we don't have to nest lens containers so rigidly)
         - Be cautions with checking which lens the item actually came from, not necessarily which returned it (i.e. Or)
 
-  - See todo notes on the LensObject class
+  - Label ordering:
+    - think about ordering for CREATED items - praps relate to above point on
+      constraining attributes.
+      - perhaps proper LABEL ordering is what we want for this case - otherwise we may over complicate things
+    - LABEL mode
+      - Now Or fixed for A | empty() case, can make source order mode more accurate by matching exact source position of gotten items.
+        - Or perhaps it is fine as it is: ordering put candidates by source.
   - dist
     - Copy README.rst to README for benefit of PyPi
-  - Extend LensObject idea to Implement aggregate container support within the base container.
+    - Gen some html docs, perhaps with sphinx and some custom parsing of example
+      code.
   - Get rid of default type on List lens - too confusing and not really
     intuitive in most cases.
-  - Re-organise these notes! and put feature ideas in TODO, rather than here.
-  - LABEL mode
-    - Now Or fixed for A | empty() case, can make source order mode more accurate by matching exact source position of gotten items.
-      - Or perhaps it is fine as it is: ordering put candidates by source.
+  
+  - Re-organise these notes! and put broad feature ideas in TODO, rather than here.
   
   ------------- Misc ideas
   - Perhaps also ensure lens coercion happens if this is LensObject aggregated with a lens.

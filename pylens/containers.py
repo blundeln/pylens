@@ -316,12 +316,6 @@ class LensObject(AbstractContainer) :
   as an object attribute as "last_name".
 
   We can either constrain the attributes used with lenses or leave it open.
-  
-  TODO:
-  - allow explicit constraining of attributes
-  - think about ordering for CREATED items - praps relate to above point on
-    constraining attributes.
-    - perhaps proper LABEL ordering is what we want for this case - otherwise we may over complicate things
   """
 
   # Used to help with re-generating labels from object attribute names.  The
