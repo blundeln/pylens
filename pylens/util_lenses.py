@@ -67,6 +67,7 @@ class Optional(Or) :
 
   @staticmethod
   def TESTS():
+    GlobalSettings.check_consumption = False
     lens = Optional(AnyOf(alphas, type=str))
     assert(lens.get("abc") == "a")
     assert(lens.get("123") == None)
@@ -155,6 +156,8 @@ class Word(And) :
   @staticmethod
   def TESTS() :
 
+    GlobalSettings.check_consumption = False
+    
     lens = Word(alphanums, init_chars=alphas, type=str, max_count=5)
     d("GET")
     assert(lens.get("w23dffdf3") == "w23df")
@@ -229,7 +232,9 @@ class Whitespace(Or) :
 
   @staticmethod
   def TESTS() :
-    
+   
+    GlobalSettings.check_consumption = False
+
     # Simple whitespace.
     lens = Whitespace(" ")
     concrete_input_reader = ConcreteInputReader("  \t  xyz")

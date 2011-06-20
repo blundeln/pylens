@@ -34,6 +34,7 @@
 import inspect
 
 from debug import *
+from settings import *
 from exceptions import *
 from containers import *
 from readers import *
@@ -179,6 +180,7 @@ class Lens(object) :
 
       # A reference to the concrete reader and position parsed from.
       item._meta_data.concrete_start_position = concrete_start_position
+      item._meta_data.concrete_end_position = concrete_input_reader.get_pos()
       item._meta_data.concrete_input_reader = concrete_input_reader
 
       # If the item was unwrapped from a container, update meta with label
@@ -195,7 +197,11 @@ class Lens(object) :
         d("GOT: %s %s" % (item, item._meta_data.label and "[label: '%s']" % (item._meta_data.label) or ""))
       else :
         d("GOT: NOTHING (to store)")
-    
+  
+    # If appropriate, check the input was fully consumed by this lens
+    if isinstance(concrete_input, str) and GlobalSettings.check_consumption and not concrete_input_reader.is_fully_consumed() :
+      raise NotFullyConsumedException("The following input remains to be consumed by this lens: '%s'" % concrete_input_reader.get_remaining())
+
     # Pre-process outgoing item.
     item = self._process_outgoing_item(item)
 
@@ -720,7 +726,7 @@ class And(Lens) :
   def TESTS() :
     d("GET")
     lens = And(AnyOf(alphas, type=str), AnyOf(nums, type=int), type=list)
-    got = lens.get("m0nkey")
+    got = lens.get("m0")
     assert(got == ["m", 0])
     
     d("PUT")
@@ -978,12 +984,12 @@ class AnyOf(Lens) :
 
   @staticmethod
   def TESTS() :
-    
+   
     lens = AnyOf(alphas, type=str, some_property="some_val")
     assert(lens.options.some_property == "some_val") # Might as well test lens options working.
     
     d("GET")
-    got = lens.get("monkey")
+    got = lens.get("m")
     assert(got == "m")
 
     # Test putting back what we got (i.e. with meta)
@@ -1202,7 +1208,7 @@ class Repeat(Lens) :
     with assert_raises(TooFewIterationsException) :
       lens.get("12")
     # Test max_count
-    assert(lens.get("12345678") == [1,2,3,4,5])
+    assert(lens.get(ConcreteInputReader("12345678")) == [1,2,3,4,5])
 
     test_description("Put as many as were there originally.")
     input_reader = ConcreteInputReader("98765")
@@ -1251,6 +1257,7 @@ class Repeat(Lens) :
     assert(lens.put(lens.get("1234")) == "1234")
 
     d("Test for completeness")
+    GlobalSettings.check_consumption = False
     lens = Repeat(AnyOf(nums, type=int), type=list, min_count=0, max_count=1)
     assert(lens.get("abc") == []) # No exception thrown since min_count == 0
     assert(lens.get("123abc") == [1])  # Since max_count == 1
@@ -1261,6 +1268,7 @@ class Repeat(Lens) :
     assert(lens.get("abc123") == "abc")
     assert(lens.put("xyz") == "xyz")
 
+    GlobalSettings.check_consumption = True
 
     d("Test infinity problem")
     lens = Repeat(Empty(), min_count=3, max_count=None)
@@ -1332,6 +1340,8 @@ class Empty(Lens) :
   @staticmethod
   def TESTS() :
     
+    GlobalSettings.check_consumption = False
+    
     d("Test with type")
     lens = Empty(type=str)
     assert(lens.get("anything") == "")
@@ -1388,7 +1398,8 @@ class Group(Lens) :
 
   @staticmethod
   def TESTS() :
-   
+    GlobalSettings.check_consumption = False
+
     d("GET")
     lens = Group(AnyOf(alphas,type=str) + AnyOf(nums, type=int), type=list)
     got = lens.get("a2b3")

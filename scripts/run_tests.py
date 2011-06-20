@@ -62,7 +62,14 @@ def get_tests() :
       tests[item.__name__] = getattr(item, CLASS_TEST_FUNCTION)
 
   return tests
- 
+
+
+def test_set_up():
+  """
+  Ensure that all tests run with same global state, which some tests may alter.
+  """
+  GlobalSettings.check_consumption = True
+
 
 def run_tests(test_mode, args) :
   
@@ -73,7 +80,7 @@ def run_tests(test_mode, args) :
     if not args :
       raise Exception("You must specify a series of tests")
     for test_name in args :
-      # TODO: Allow omision of _test in specifying funciton tests.
+      # TODO: Allow omission of _test in specifying function tests.
       if test_name not in all_tests :
         raise Exception("There is no test called: %s" % test_name)
       filtered_tests[test_name] = all_tests[test_name]
@@ -82,13 +89,13 @@ def run_tests(test_mode, args) :
   
   test_suite = unittest.TestSuite()
   for name, test_function in filtered_tests.iteritems() :
-    testcase = unittest.FunctionTestCase(test_function, description=name)
+    testcase = unittest.FunctionTestCase(test_function, description=name, setUp=test_set_up)
     test_suite.addTest(testcase)
-  
+ 
   runner = unittest.TextTestRunner()
   test_result = runner.run(test_suite)
   
-  # Useful to return an errorcode fo repository commit hook.
+  # Useful to return an error code for repository commit hook.
   if not test_result.wasSuccessful() :
     sys.exit(1)
 
