@@ -290,6 +290,7 @@ class Lens(object) :
     # Ensure we have a ConcreteInputReader; otherwise None.
     concrete_input_reader = self._normalise_concrete_input(concrete_input)
 
+    # Display some useful info for debig tracing.
     if IN_DEBUG_MODE :
       
       # It's very useful to see if an item holds a label in its meta.
@@ -305,37 +306,27 @@ class Lens(object) :
         item_label_string = item_label_string,
       ))
 
-    def _report_output(output) :
-      """Reports output prior to return - just for debugging."""
-      if has_value(output) :
-        d("PUT: '%s'" % output)
-      else :
-        d("PUT: NOTHING")
 
-    # Handle cases where our lens does not directly store an item.
+
+    # First handle cases where our lens does not directly store an item: it will
+    # either return the default output string, if it has one; or it will
+    # generate some output internally, perhaps from the input or from the
+    # default output of a sub-lens.
     if not self.has_type() :
-      
       # Use default (for CREATE)
       if concrete_input_reader == None and has_value(self.default) :
-        # XXX: Note sure about this - need to think about the more general
-        # problem.
-        #if has_value(item):
-        #  raise LensException("%s should definitely not have been passed an item '%s' since a non-store lens with a default." % (self, item))
-        default = str(self.default)
-        if IN_DEBUG_MODE : _report_output(default)
-        return default
+        output = str(self.default)
       
       # Otherwise do a PUT proper, passing through our arguments, for example
       # our child lens may put an item directly or from the container of use
       # its own default value.
-      output = self._put(item, concrete_input_reader, current_container)
-      if IN_DEBUG_MODE : _report_output(output)
-      return output
+      else :
+        output = self._put(item, concrete_input_reader, current_container)
 
 
     # Now we can assume that our lens has a type (i.e. will directly PUT an
     # item)
-    if has_value(item) :
+    elif has_value(item) :
     
       # For the sake of algorithmic consistancy, ensure the incoming item can
       # hold meta data.
@@ -346,7 +337,8 @@ class Lens(object) :
       if has_value(label) :
         item._meta_data.label = label
 
-      # Pre-process the incoming item (e.g to handle auto_list)
+      # Pre-process the incoming item (e.g to handle auto_list or other future
+      # extensions)
       item = self._process_incoming_item(item)
      
       # Check our item's type is compatible with the lens.
@@ -402,8 +394,6 @@ class Lens(object) :
 
       # Now that arguments are set up, call PUT proper on our lens.
       output = self._put(item, concrete_input_reader, current_container)
-      if IN_DEBUG_MODE : _report_output(output)
-      return output
    
     # If instead of an item we have a container, instruct the container to put
     # an item into the lens.  This gives the container much flexibilty about
@@ -411,11 +401,20 @@ class Lens(object) :
     elif has_value(current_container) :
       assert(isinstance(current_container, AbstractContainer))
       output = current_container.consume_and_put_item(self, concrete_input_reader)
-      if IN_DEBUG_MODE : _report_output(output)
-      return output
+    
+    else :
+      # We should have returned by now.
+      raise LensException("This typed lens expected to PUT an item either directly or from a container.")
 
-    # We should have returned by now.
-    raise LensException("This typed lens expected to PUT an item either directly or from a container.")
+    # Report what we PUT.
+    if IN_DEBUG_MODE :
+      if has_value(output) :
+        d("PUT: '%s'" % output)
+      else :
+        d("PUT: NOTHING")
+
+    return output
+
 
 
   def get_and_discard(self, concrete_input, current_container) :
