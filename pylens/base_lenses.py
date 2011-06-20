@@ -289,6 +289,10 @@ class Lens(object) :
 
     # Ensure we have a ConcreteInputReader; otherwise None.
     concrete_input_reader = self._normalise_concrete_input(concrete_input)
+    
+    # We need this for checking consumption, since concrete_input_reader can be
+    # changed by out algorithm.
+    original_concrete_input_reader = concrete_input_reader
 
     # Display some useful info for debig tracing.
     if IN_DEBUG_MODE :
@@ -359,6 +363,7 @@ class Lens(object) :
           if has_value(concrete_input_reader) :
             d("Inputs not aligned, so consuming and discarding from outer input reader.")
             self.get_and_discard(concrete_input_reader, current_container)
+
           # Now use substitute the outer reader (if there was one) with our
           # item's reader
           concrete_input_reader = item_input_reader
@@ -402,8 +407,8 @@ class Lens(object) :
       assert(isinstance(current_container, AbstractContainer))
       output = current_container.consume_and_put_item(self, concrete_input_reader)
     
+    # Catch-all case.  We should have been passed an item to PUT.
     else :
-      # We should have returned by now.
       raise LensException("This typed lens expected to PUT an item either directly or from a container.")
 
     # Report what we PUT.
@@ -412,6 +417,10 @@ class Lens(object) :
         d("PUT: '%s'" % output)
       else :
         d("PUT: NOTHING")
+
+    # If appropriate, check the input was fully consumed by this lens
+    if isinstance(concrete_input, str) and GlobalSettings.check_consumption and not original_concrete_input_reader.is_fully_consumed() :
+      raise NotFullyConsumedException("The following input remains to be consumed by this lens: '%s'" % original_concrete_input_reader.get_remaining())
 
     return output
 

@@ -107,6 +107,20 @@ def dict_test() :
 
 
 
+def consumption_test():
+ 
+  test_description("Test input consumption")
+  lens = Repeat(AnyOf(nums, type=int), type=list)
+  with assert_raises(NotFullyConsumedException):
+    lens.get("123abc") # This will leave 'abc'
+
+  with assert_raises(NotFullyConsumedException):
+    lens.put([1,2], "123abc")  # This will leave 'abc'
+
+  test_description("Test container consumption")
+  # TODO
+
+
 def list_test() :
 
   lens = Repeat(AnyOf(nums, type=int), type=list)
