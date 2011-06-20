@@ -133,8 +133,10 @@ def get_rollbackables_state(*rollbackables, **kargs) :
   for rollbackable in rollbackables :
     if isinstance(rollbackable, Rollbackable) :
       rollbackables_state.append(rollbackable._get_state(copy_state=copy_state))
-
-  #d(str(rollbackables_state))
+  
+  #if IN_DEBUG_MODE :
+  #  d("Getting state : %s" % rollbackables_state)
+  
   return rollbackables_state
 
 def set_rollbackables_state(new_rollbackables_state, *rollbackables, **kargs) :
@@ -144,7 +146,10 @@ def set_rollbackables_state(new_rollbackables_state, *rollbackables, **kargs) :
     copy_state = False
   else :
     copy_state = True
- 
+
+  #if IN_DEBUG_MODE :
+  #  d("Setting state to: %s" % new_rollbackables_state)
+
   state_index = 0
   for rollbackable in rollbackables:
     if isinstance(rollbackable, Rollbackable) :

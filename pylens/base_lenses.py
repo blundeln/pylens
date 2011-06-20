@@ -291,10 +291,10 @@ class Lens(object) :
     concrete_input_reader = self._normalise_concrete_input(concrete_input)
     
     # We need this for checking consumption, since concrete_input_reader can be
-    # changed by out algorithm.
+    # changed by our algorithm.
     original_concrete_input_reader = concrete_input_reader
 
-    # Display some useful info for debig tracing.
+    # Display some useful info for debug tracing.
     if IN_DEBUG_MODE :
       
       # It's very useful to see if an item holds a label in its meta.
@@ -385,7 +385,7 @@ class Lens(object) :
       # TODO: We need to check that the container, if from an item, has been fully consumed
       # here and raise an LensException if it has not.
       item_as_container = ContainerFactory.wrap_container(item, container_lens=self)
-      if item_as_container :
+      if has_value(item_as_container) :
         # The item is now represented as a consumable container.
         item = None
         current_container = item_as_container
@@ -399,6 +399,14 @@ class Lens(object) :
 
       # Now that arguments are set up, call PUT proper on our lens.
       output = self._put(item, concrete_input_reader, current_container)
+
+      # Check the container items have been fully consumed by this lens.
+      if has_value(item_as_container) and GlobalSettings.check_consumption and not current_container.is_fully_consumed() :
+        raise NotFullyConsumedException("The container %s has not been fully consumed." % current_container)
+
+      # XXX: Somewhere around here, restore state of container item - perhaps
+      # when unwrapped, and using piggybacked initial state.
+        
    
     # If instead of an item we have a container, instruct the container to put
     # an item into the lens.  This gives the container much flexibilty about
@@ -1161,10 +1169,11 @@ class Repeat(Lens) :
     # get, though we discard any items and continue to track no_got for the puts above.
     #
 
+    # XXX: Issue.  This seems not to discard GOTen items.
+
     if concrete_input_reader and no_got < self.max_count:
       
-      # Store the initial container state, so we can discard changes later.
-      container_state = get_rollbackables_state(current_container)
+      d("Now consuming and discarding excess input.")
       
       # Iterate over the input with our lens, consuming as much of it as
       # possible.
@@ -1173,7 +1182,8 @@ class Repeat(Lens) :
         rollback_context = automatic_rollback(concrete_input_reader, current_container, check_for_state_change=True)
         try :
           with rollback_context :
-            self.container_get(lens, concrete_input_reader, current_container)
+            # XXX: Inefficient to discard container items each time.
+            lens.get_and_discard(concrete_input_reader, current_container)
           
           # If the lens changed no state, then we must break, otherwise continue
           # for ever.
@@ -1189,8 +1199,6 @@ class Repeat(Lens) :
         except LensException :
           break
       
-      # Now discard any items added by the lens.
-      set_rollbackables_state(container_state, current_container)
 
 
     if no_put < self.min_count :
@@ -1224,15 +1232,17 @@ class Repeat(Lens) :
     
     test_description("Put a maximum (5) of the items (6)")
     input_reader = ConcreteInputReader("987654321")
+    GlobalSettings.check_consumption = False
     assert(lens.put([1,2,3,4,5,6], input_reader) == "12345" and input_reader.get_remaining() == "4321")
+    GlobalSettings.check_consumption = True
     
     test_description("Put more than there were originally.")
     input_reader = ConcreteInputReader("981abc")
     got = lens.get(input_reader)
     got.insert(2, 3)
     input_reader.reset()
-    assert(lens.put(got, input_reader) == "9831" and input_reader.get_remaining() == "abc")
-
+    assert_equal(lens.put(got, input_reader), "9831")
+    assert_equal(input_reader.get_remaining(), "abc")
 
     test_description("PUT fewer than got originally, but consume up to max from the input.")
     input_reader = ConcreteInputReader("87654321")

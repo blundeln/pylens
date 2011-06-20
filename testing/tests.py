@@ -118,7 +118,10 @@ def consumption_test():
     lens.put([1,2], "123abc")  # This will leave 'abc'
 
   test_description("Test container consumption")
-  # TODO
+  
+  # This will consume input but leave "a" in list.
+  with assert_raises(NotFullyConsumedException):
+    lens.put([1,2,"a"], "67")
 
 
 def list_test() :

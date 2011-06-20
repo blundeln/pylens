@@ -69,6 +69,7 @@ class AbstractContainer(Rollbackable) :
   def __new__(cls, *args, **kargs) :
     self = super(AbstractContainer, cls).__new__(cls, *args, **kargs)
     # Initialise some vars regardless of __init__ being called.
+    # XXX: Perhaps mark these variables as private (i.e. prefix underscore)
     self.container_lens = None
     self.label = None
     self.alignment_mode = None
@@ -128,7 +129,6 @@ class AbstractContainer(Rollbackable) :
     # alignment mode and the current input postion.
     candidates = self.filter_and_sort_candidate_items(candidates, lens, concrete_input_reader)
 
-    # XXX: Perhaps we should do alignment sorting here
     for candidate in candidates :
       try :
         # XXX : Overkill to copy initial state every time within automatic_rollback.
@@ -203,9 +203,13 @@ class AbstractContainer(Rollbackable) :
     raise NotImplementedError()
 
   def is_fully_consumed(self) :
-    # TODO: Need to think about best way to do this.
-    # This may be optional, since in some cases GET/PUT will cease when no
-    # state is changed, regardless of full container consumption.
+    """
+    A container-specific sanity check to see if this container has been fully
+    consumed (i.e. all items have been PUT).
+
+    Note, since the label item may not always be consumed (only if an is_label
+    lens is used), this should be discounted.
+    """
     raise NotImplementedError()
     
 
@@ -255,6 +259,9 @@ class ListContainer(AbstractContainer) :
   def __str__(self) :
     return str(self.container_item)
   __repr__ = __str__
+  
+  def is_fully_consumed(self) :
+    return len(self.container_item) == 0
 
 
 class DictContainer(ListContainer) :
@@ -449,7 +456,10 @@ class LensObject(AbstractContainer) :
   def _set_state(self, state, copy_state=True) :
     self.__dict__ = copy_state and copy.copy(state) or state
 
- 
+  def is_fully_consumed(self) :
+    return len(self._get_data_attributes()) == 0
+
+
 class ContainerFactory:
   """
   Used to create appropriate containers for particular types of lens.  For

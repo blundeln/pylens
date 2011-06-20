@@ -1,6 +1,6 @@
 RESEARCH NOTES - for my questions and musings
-  - Check consumption of input and/or containers.
-    - Also need to rollback on success, so we could put the thing again.
+  - Need to rollback on success, so we could put the thing again.
+    - make a test for this.
   - Allow richer class models:
     - Use static class variables to:
       - Network interfaces lens might be a good example to show this with.
