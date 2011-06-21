@@ -248,6 +248,10 @@ def lens_object_test():
   # Now we PUT it back with no modification and should get what we started with.
   output = put(person)
   assert_equal(output, "Person::Name:nick;Last   Name:blundell")
+  # And we do this again to check the consumed state of person was restored
+  # after the successful PUT.
+  output = put(person)
+  assert_equal(output, "Person::Name:nick;Last   Name:blundell")
 
   test_description("CREATE")
   new_person = Person("james", "bond")
@@ -271,44 +275,6 @@ def constrained_lens_object_test():
   Here we show how the user can constrain valid attributes of a LensObject.
   """
   return # TODO
-  # Define our Person class, which internally defines its lens.
-  class Person(LensObject) :
-    name = None
-    last_name = None
-    
-    __lens__ = "Person::" + List(
-      KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
-      ";",
-      type=None # XXX: I should get rid of default list type on List
-    )
-    
-    def __init__(self, name, last_name) :
-      self.name, self.last_name = name, last_name
-
-  test_description("GET")
-  # Here we use the high-level API get() function, which is for convenience and
-  # which equates to:
-  #  lens = Group(Person.__lens__, type=Person)
-  #  person = lens.get("Person::Name:nick;Last   Name:blundell")
-  person = get(Person, "Person::Name:nick;Last   Name:blundell")
-  assert(person.name == "nick" and person.last_name == "blundell")
-  test_description("PUT")
-  
-  # Now we PUT it back with no modification and should get what we started with.
-  output = put(person)
-  assert_equal(output, "Person::Name:nick;Last   Name:blundell")
-
-  test_description("CREATE")
-  new_person = Person("james", "bond")
-  output = put(new_person)
-  # XXX: Would be nice to control the order, but need to think of a nice way to
-  # do this - need to cache source info of a label, which we can use when we
-  # loose source info, also when a user declares attributes we can remember the
-  # order and force this as model order.
-  assert_equal(output, "Person::Last   Name:bond;Name:james")
-  got_person = get(Person, output)
-  # If all went well, we should GET back what we PUT.
-  assert(got_person.name == "james" and got_person.last_name == "bond")
   
 
 def advanced_lens_object_test() :

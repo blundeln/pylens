@@ -311,7 +311,6 @@ class Lens(object) :
       ))
 
 
-
     # First handle cases where our lens does not directly store an item: it will
     # either return the default output string, if it has one; or it will
     # generate some output internally, perhaps from the input or from the
@@ -335,8 +334,16 @@ class Lens(object) :
       # For the sake of algorithmic consistancy, ensure the incoming item can
       # hold meta data.
       item = enable_meta_data(item)
-      
-      # Associate a label with the item, usually a label passed from the user
+     
+      # Store original state of item, including meta data, so we can recover it on success,
+      # since PUT can be destructive to some containers, depending on how they
+      # are implemented and their meta data.
+      original_meta_data = item._meta_data.copy()
+      original_item = item
+      if isinstance(item, Rollbackable) :
+        original_state = item._get_state()
+
+      # Associate a label with the item, usually a label passed from the user,
       # which is required internally by a structure.
       if has_value(label) :
         item._meta_data.label = label
@@ -397,21 +404,21 @@ class Lens(object) :
         item = str(item)
         current_container = None
 
-      # Store the initial container state, so we can recover it on success,
-      # since put can be destructive to some containers, depending on how they
-      # are implemented.
-      pre_consumed_state = get_rollbackables_state(current_container)
 
       # Now that arguments are set up, call PUT proper on our lens.
-      output = self._put(item, concrete_input_reader, current_container)
+      try :
+        output = self._put(item, concrete_input_reader, current_container)
 
-      # Check the container items have been fully consumed by this lens.
-      if has_value(item_as_container) and GlobalSettings.check_consumption and not current_container.is_fully_consumed() :
-        raise NotFullyConsumedException("The container %s has not been fully consumed." % current_container)
-      
-      # Now recover pre-consumption state of the container.
-      set_rollbackables_state(pre_consumed_state, current_container)
-
+        # Check the container items have been fully consumed by this lens.
+        if has_value(item_as_container) and GlobalSettings.check_consumption and not current_container.is_fully_consumed() :
+          raise NotFullyConsumedException("The container %s has not been fully consumed." % current_container)
+      finally:
+        # Now recover the original state of the item, including its meta data,
+        # whether put succeeded or not.
+        original_item._meta_data = original_meta_data
+        if isinstance(original_item, Rollbackable) :
+          original_item._set_state(original_state)
+        
         
    
     # If instead of an item we have a container, instruct the container to put

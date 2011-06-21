@@ -1,9 +1,4 @@
 RESEARCH NOTES - for my questions and musings
-  - Have to think carefully about container state and consumption
-    - a lens may change the meta of an item before trying to put it
-      - does this get restored - i don't think so?
-    - If we put an item twice we can get different results, so need to have a
-      good think about this.
   - Allow richer class models:
     - Use static class variables to:
       - Network interfaces lens might be a good example to show this with.
@@ -29,6 +24,8 @@ RESEARCH NOTES - for my questions and musings
   - Re-organise these notes! and put broad feature ideas in TODO, rather than here.
   
   ------------- Misc ideas
+  - Do we need to unify the way that we deal with modifed containers and
+    modified items???
   - Perhaps also ensure lens coercion happens if this is LensObject aggregated with a lens.
     (e.g. "[" + Person + "]" would current not coerce.)
     - Hmmm, might be messy, playing with operators of a type.
