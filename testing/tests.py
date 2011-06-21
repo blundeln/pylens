@@ -328,6 +328,17 @@ iface wlan0 inet static
     dns-nameservers 67.207.128.4 67.207.128.5
 """
 
+  class NetworkInterface(LensObject) :
+    __lens__ = "iface" + WS(" ") + Keyword(is_label=True)
+    
+    def __init__(self, **kargs) :
+      pass
+
+  GlobalSettings.check_consumption = False
+  got = get(BlankLine() + NetworkInterface, INPUT)
+  
+  
+  GlobalSettings.check_consumption = True
 
 def init_test():
   """

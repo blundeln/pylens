@@ -539,7 +539,7 @@ class Lens(object) :
     # Coerce LensObject class to its internally defined lens, such that the lens will GET
     # and PUT instances of that class.
     elif inspect.isclass(lens_operand) and issubclass(lens_operand, LensObject) :
-      assert_msg(hasattr(lens_operand, "__lens__"), "LensObject %s defines has no __lens__ variable" % lens_operand)
+      assert_msg(hasattr(lens_operand, "__lens__"), "LensObject %s defines no __lens__ variable" % lens_operand)
       # Note, we also coerce __lens__ to a lens, just for completeness (e.g. if
       # lens was simply a string, it would be coerced to a Literal lens.
       lens_operand = Group(Lens._coerce_to_lens(lens_operand.__lens__), type=lens_operand)

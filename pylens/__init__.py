@@ -55,6 +55,10 @@ def get(lens, *args, **kargs) :
   Example: get(some_lens, "a=1,c=4") -> {"a":1, "c":4}
   """
   lens = Lens._coerce_to_lens(lens)
+  # Wrap in AutoGroup, so outer container may be ommitted for convenience
+  # (usually of testing lens fragments)
+  if not lens.has_type() :
+    lens = AutoGroup(lens)
   return lens.get(*args, **kargs)
 
 def put(lens_or_instance, *args, **kargs) :
@@ -72,6 +76,11 @@ def put(lens_or_instance, *args, **kargs) :
   
   # Otherwise...
   lens = Lens._coerce_to_lens(lens_or_instance)
+  # Wrap in AutoGroup, so outer container may be ommitted for convenience
+  # (usually of testing lens fragments). We assume above that instance will be
+  # wrapped in am appropriately typed group, so only do this here.
+  if not lens.has_type() :
+    lens = AutoGroup(lens)
   return lens.put(*args, **kargs)
 
 
