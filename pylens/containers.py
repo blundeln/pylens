@@ -81,10 +81,11 @@ class AbstractContainer(Rollbackable) :
     # Default to MODEL alignment
     self._alignment_mode = self._container_lens.options.alignment or MODEL
 
-  def set_label(self, label) :
-    assert_msg(isinstance(label, str), "The container label must be a string --- at least for the time being.")
-    if label and self._label :
-      raise Exception("Container already has a label defined: %s" % self._label)
+  def set_label(self, label, overwrite=False) :
+    if not overwrite :
+      assert_msg(isinstance(label, str), "The container label must be a string --- at least for the time being.")
+      if label and self._label:
+        raise Exception("Container already has a label defined: %s" % self._label)
     self._label = label
 
   def get_label(self) :
@@ -513,20 +514,21 @@ class ContainerFactory:
   @staticmethod
   def wrap_container(incoming_object) :
     """Wraps a container if possible."""
-    if incoming_object == None or issubclass(type(incoming_object), AbstractContainer) :
-      return incoming_object
-    
-    #d("Wrapping %s" % incoming_object)
-    container_class = ContainerFactory.get_container_class(type(incoming_object))
-    if container_class == None :
+    if not has_value(incoming_object) :
       return None
+    
+    if issubclass(type(incoming_object), AbstractContainer) :
+      container = incoming_object
+    else :
+      #d("Wrapping %s" % incoming_object)
+      container_class = ContainerFactory.get_container_class(type(incoming_object))
+      if not has_value(container_class) :
+        return None
+     
+      # Pass the raw data item to wrap.
+      container = container_class(incoming_object)
    
-    # Pass the raw data item to wrap.
-    container = container_class(incoming_object)
     # Set the (consumable) label of the container based on the item's current
     # label
-    container._label = incoming_object._meta_data.label
+    container.set_label(incoming_object._meta_data.label, overwrite=True)
     return container
-   
-  # TODO: Add tests
-

@@ -283,23 +283,13 @@ def advanced_lens_object_test() :
 iface eth0-home inet static
    address 192.168.1.1
    netmask 255.255.255.0
-   gateway 67.207.128.1
+   gateway  67.207.128.1
    dns-nameservers 67.207.128.4 67.207.128.5
    up flush-mail
 
 auto lo eth0
-allow-hotplug eth1
-
-iface lo inet loopback
-
-mapping eth0
-   script /usr/local/sbin/map-scheme
-   map HOME eth0-home
-   map WORK eth0-work
-
-
-iface eth0-work inet dhcp
-iface eth1 inet dhcp
+# A comment
+auto eth1 
 """
 
   class NetworkInterface(LensObject) :
@@ -311,7 +301,8 @@ iface eth1 inet dhcp
                 )
     
     def __init__(self, **kargs) :
-      pass
+      for key, value in kargs.iteritems() :
+        setattr(self, key, value)
 
     def _map_label_to_identifier(self, label) :
       return label.replace("-","_")
@@ -320,29 +311,28 @@ iface eth1 inet dhcp
       return attribute_name.replace("_", "-")
 
 
-
-    
-
-  test_description("Getting NetworkInterface")
+  test_description("Testing NetworkInterface")
   GlobalSettings.check_consumption = False
-  
   interface = get(BlankLine() + NetworkInterface, INPUT)
   interface.cheese_type = "cheshire"
   interface.address = "bananas"
-  before_dict = str(interface.__dict__)
   output = put(interface) 
-  # XXX: Working here.  Investigating inconsistency of double put.
-  return
-  after_dict = str(interface.__dict__)
-  d("Before: %s" % before_dict)
-  d("After: %s" % after_dict)
-  return
 
-  lens = AutoGroup(BlankLine() + NetworkInterface)
-  got = lens.get(INPUT)
-  d(got.__dict__)
-  output = lens.put(got)
+  # Try creating from scratch.
+  interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
+  output = put(interface, label="wlan3")
  
+  #
+  # Now lets create a class to represent the whole configuration.
+  #
+
+  class InterfaceConfiguration(LensObject) :
+    __lens__ = ZeroOrMore(NetworkInterface | BlankLine() | HashComment())
+
+    # TODO: Working here - need to add aggregate container support.
+
+  #config = get(InterfaceConfiguration, INPUT)  
+
   GlobalSettings.check_consumption = True
 
 def init_test():

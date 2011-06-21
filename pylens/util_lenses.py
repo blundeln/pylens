@@ -316,3 +316,9 @@ class AutoGroup(Group):
       kargs["auto_list"] = True
     super(Group, self).__init__(**kargs)
     self.extend_sublenses([lens])
+
+
+class HashComment(And) :
+  """A common hash comment."""
+  def __init__(self, **kargs):
+    super(HashComment, self).__init__("#", Until(NewLine()), NewLine(), **kargs)

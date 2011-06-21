@@ -26,6 +26,9 @@ RESEARCH NOTES - for my questions and musings
   ------------- Misc ideas
   - Do we need to unify the way that we deal with modifed containers and
     modified items???
+    - TO solve the doulbe PUT issue, we now always store original state in PUT
+      - Actually we only store state when we have a Rollbackable item, such as a
+        LensObject
   - Perhaps also ensure lens coercion happens if this is LensObject aggregated with a lens.
     (e.g. "[" + Person + "]" would current not coerce.)
     - Hmmm, might be messy, playing with operators of a type.
