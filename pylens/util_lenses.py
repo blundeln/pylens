@@ -282,3 +282,10 @@ class KeyValue(Group) :
     if "auto_list" not in kargs:
       kargs["auto_list"] = True
     super(KeyValue, self).__init__(*args, **kargs)
+
+class BlankLine(And) :
+  """
+  Matches a blank line (i.e. optional whitespace followed by NewLine().
+  """
+  def __init__(self, **kargs):
+    super(BlankLine, self).__init__(WS(""), NewLine(), **kargs)

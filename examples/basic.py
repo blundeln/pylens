@@ -276,16 +276,13 @@ def more_complex_structure_test() :
   # Test the parts 
   assert(entry.get("  something: [a , b,c,d]\n") == ["a","b","c","d"])
  
-  # Let's also allow for blank lines.
-  blank_line = WS("") + NewLine()
-
   # Now put the lens together, and set the type to dict, so we can make use of
   # the labels.  Note that, especially with dictionaries, there are a few
   # possibilities of realigning them with the source: based on label strings,
   # original location within the source, and abstract ordering (i.e. arbitrary
   # for python dicts).
   # TODO: I will write more on alignment soon.
-  lens = OneOrMore(entry | blank_line, type=dict, alignment=SOURCE)
+  lens = OneOrMore(entry | BlankLine(), type=dict, alignment=SOURCE)
   
   # For debugging: will name lenses by their local variable names.
   auto_name_lenses(locals())
@@ -330,7 +327,7 @@ def mapping_lenses_to_classes_test():
   # Extract a person instance from the string.  Note how the field with label
   # "Last Name" gets mapped automatically to the attribute last_name. 
   person = get(Person, "Person::Name:nick,Last Name:blundell")
-  assert(person.name == "nick", person.last_name == "blundell")
+  assert(person.name == "nick" and person.last_name == "blundell")
 
   # We can use the class as part of a larger lens now.
   lens = List(Person, ";", type=list)

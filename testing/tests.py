@@ -311,6 +311,22 @@ def constrained_lens_object_test():
   assert(got_person.name == "james" and got_person.last_name == "bond")
   
 
+def advanced_lens_object_test() :
+  INPUT = """
+iface eth0 inet static
+    address 67.207.128.159
+    netmask 255.255.255.0
+    gateway 67.207.128.1
+    dns-nameservers 67.207.128.4 67.207.128.5
+
+auto eth0
+
+iface wlan0 inet static
+    address 1.2.3.4
+    netmask 255.255.255.0
+    gateway 67.207.128.23
+    dns-nameservers 67.207.128.4 67.207.128.5
+"""
 
 
 def init_test():
