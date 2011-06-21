@@ -260,7 +260,7 @@ def lens_object_test():
   # do this - need to cache source info of a label, which we can use when we
   # loose source info, also when a user declares attributes we can remember the
   # order and force this as model order.
-  assert_equal(output, "Person::Last   Name:bond;Name:james")
+  assert(output == "Person::Last   Name:bond;Name:james" or output == "Person::Name:james;Last   Name:bond")
   got_person = get(Person, output)
   # If all went well, we should GET back what we PUT.
   assert(got_person.name == "james" and got_person.last_name == "bond")
@@ -312,32 +312,71 @@ def constrained_lens_object_test():
   
 
 def advanced_lens_object_test() :
+  # Ref: http://manpages.ubuntu.com/manpages/hardy/man5/interfaces.5.html
   INPUT = """
-iface eth0 inet static
-    address 67.207.128.159
-    netmask 255.255.255.0
-    gateway 67.207.128.1
-    dns-nameservers 67.207.128.4 67.207.128.5
+iface eth0-home inet static
+   address 192.168.1.1
+   netmask 255.255.255.0
+   gateway 67.207.128.1
+   dns-nameservers 67.207.128.4 67.207.128.5
+   up flush-mail
 
-auto eth0
+auto lo eth0
+allow-hotplug eth1
 
-iface wlan0 inet static
-    address 1.2.3.4
-    netmask 255.255.255.0
-    gateway 67.207.128.23
-    dns-nameservers 67.207.128.4 67.207.128.5
+iface lo inet loopback
+
+mapping eth0
+   script /usr/local/sbin/map-scheme
+   map HOME eth0-home
+   map WORK eth0-work
+
+
+iface eth0-work inet dhcp
+iface eth1 inet dhcp
 """
 
   class NetworkInterface(LensObject) :
-    __lens__ = "iface" + WS(" ") + Keyword(is_label=True)
+    
+    __lens__ =  "iface" + WS(" ") + Keyword(additional_chars="_-", is_label=True) + WS(" ") + \
+                Keyword(label="address_family") + WS(" ") + Keyword(label="method") + NL() + \
+                ZeroOrMore(
+                  KeyValue(WS("   ") + Keyword(additional_chars="_-", is_label=True) + WS(" ") + Until(NL(), type=str) + NL())
+                )
     
     def __init__(self, **kargs) :
       pass
 
+    def _map_label_to_identifier(self, label) :
+      return label.replace("-","_")
+    
+    def _map_identifier_to_label(self, attribute_name) :
+      return attribute_name.replace("_", "-")
+
+
+
+    
+
+  test_description("Getting NetworkInterface")
   GlobalSettings.check_consumption = False
-  got = get(BlankLine() + NetworkInterface, INPUT)
   
-  
+  interface = get(BlankLine() + NetworkInterface, INPUT)
+  interface.cheese_type = "cheshire"
+  interface.address = "bananas"
+  before_dict = str(interface.__dict__)
+  output = put(interface) 
+  # XXX: Working here.  Investigating inconsistency of double put.
+  return
+  after_dict = str(interface.__dict__)
+  d("Before: %s" % before_dict)
+  d("After: %s" % after_dict)
+  return
+
+  lens = AutoGroup(BlankLine() + NetworkInterface)
+  got = lens.get(INPUT)
+  d(got.__dict__)
+  output = lens.put(got)
+ 
   GlobalSettings.check_consumption = True
 
 def init_test():

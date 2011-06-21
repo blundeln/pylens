@@ -1,4 +1,9 @@
 RESEARCH NOTES - for my questions and musings
+  - Have to think carefully about container state and consumption
+    - a lens may change the meta of an item before trying to put it
+      - does this get restored - i don't think so?
+    - If we put an item twice we can get different results, so need to have a
+      good think about this.
   - Allow richer class models:
     - Use static class variables to:
       - Network interfaces lens might be a good example to show this with.

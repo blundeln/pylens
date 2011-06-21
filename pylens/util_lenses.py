@@ -123,6 +123,7 @@ class NewLine(Or) :
       lens.get("abc")
     assert(lens.put("\n") == "\n")
 
+NL = NewLine # Abbreviation
 
 class Word(And) :
   """
@@ -295,8 +296,8 @@ class Keyword(Word) :
   """
   A lens for matching a typical keyword.
   """
-  def __init__(self, **kargs):
-    super(Keyword, self).__init__(alphanums+"_", init_chars = alphas+"_", **kargs)
+  def __init__(self, additional_chars="_", **kargs):
+    super(Keyword, self).__init__(alphanums+additional_chars, init_chars = alphas+additional_chars, **kargs)
 
 
 class AutoGroup(Group):
@@ -307,7 +308,7 @@ class AutoGroup(Group):
   item may be passed through the lens.  If the enclosed lens has a type, then
   this lens simply becomes a transparent wrapper.
   """
-  
+ 
   def __init__(self, lens, **kargs):
     """Note, this replaces __init__ of Group, which checks for a type."""
     if not lens.has_type() :

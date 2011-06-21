@@ -123,6 +123,8 @@ class Until(Lens) :
   """
   Match anything up until the specified lens.  This is useful for lazy parsing,
   but not the be overused (e.g. chaining can be bad: Until("X") + Until("Y")!).
+  
+  # TODO: Could parse lens but not include in stored string.
   """
   
   def __init__(self, lens, include_lens=False, **kargs):

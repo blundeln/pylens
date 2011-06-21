@@ -187,7 +187,7 @@ class Lens(object) :
       # from the container, which may have been set if there was an is_label
       # lens.
       if lens_container :
-        item._meta_data.label = lens_container.label
+        item._meta_data.label = lens_container.get_label()
 
     # Note that, even if we are not a typed lens, we may return an item
     # extracted from some sub-lens, the Or lens being a good example.
@@ -384,7 +384,7 @@ class Lens(object) :
      
       # TODO: We need to check that the container, if from an item, has been fully consumed
       # here and raise an LensException if it has not.
-      item_as_container = ContainerFactory.wrap_container(item, container_lens=self)
+      item_as_container = ContainerFactory.wrap_container(item)
       if has_value(item_as_container) :
         # The item is now represented as a consumable container.
         item = None
@@ -603,14 +603,18 @@ class Lens(object) :
 
   def _process_incoming_item(self, item) :
     """
-    Pre-processes an item in the PUT direction. 
+    Pre-processes an item in the PUT direction.  We can assume we are a lens
+    with a type when this is called.
     
     For example, reciprocating the auto_list example in
     _process_outgoing_item.
     """
-    
+   
+    # TODO: What if item was GOTen from auto list but is not being put directly
+    # - it will try to use the wrong source meta.
+
     # Handle auto_list, expanding an item into a list, being careful to restore any meta data.
-    if self.options.auto_list == True and self.has_type() and issubclass(self.type, list) and not isinstance(item, list):
+    if self.options.auto_list == True and issubclass(self.type, list) and not isinstance(item, list):
 
       # Create some variables to clarify the process.
       singleton = item
@@ -628,8 +632,14 @@ class Lens(object) :
       if singleton_meta_data :
         singleton._meta_data = singleton_meta_data
 
+    # This handles the case where we might have GOTten an item from an auto list
+    # but are now putting it directly.  We simply reinstate the singleton meta
+    # data on the item.
+    elif has_value(item._meta_data.singleton_meta_data) :
+      item._meta_data = item._meta_data.singleton_meta_data
+
     # This allows a list of chars to be combined into a string.
-    elif isinstance(item, str) and self.options.combine_chars and self.has_type() and issubclass(self.type, list):
+    elif isinstance(item, str) and self.options.combine_chars and issubclass(self.type, list):
       # Note, care should be taken to use this only when a list of single chars is used.
       original_meta = item._meta_data
       item = enable_meta_data(list(item))

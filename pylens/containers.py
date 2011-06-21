@@ -70,25 +70,25 @@ class AbstractContainer(Rollbackable) :
     self = super(AbstractContainer, cls).__new__(cls, *args, **kargs)
     # Initialise some vars regardless of __init__ being called.
     # XXX: Perhaps mark these variables as private (i.e. prefix underscore)
-    self.container_lens = None
-    self.label = None
-    self.alignment_mode = None
+    self._container_lens = None
+    self._label = None
+    self._alignment_mode = None
     return self
 
   def set_container_lens(self, lens) :
     # Called when put() is preparing the container for PUTting to associate it with its container lens.
-    self.container_lens = lens
+    self._container_lens = lens
     # Default to MODEL alignment
-    self.alignment_mode = self.container_lens.options.alignment or MODEL
+    self._alignment_mode = self._container_lens.options.alignment or MODEL
 
   def set_label(self, label) :
     assert_msg(isinstance(label, str), "The container label must be a string --- at least for the time being.")
-    if label and self.label :
-      raise Exception("Container already has a label defined: %s" % self.label)
-    self.label = label
+    if label and self._label :
+      raise Exception("Container already has a label defined: %s" % self._label)
+    self._label = label
 
   def get_label(self) :
-    return self.label
+    return self._label
 
 
   #
@@ -112,14 +112,14 @@ class AbstractContainer(Rollbackable) :
   def consume_and_put_item(self, lens, concrete_input_reader) :
     """Called by lenses that put items from the container into sub-lenses (e.g. And)."""
     assert(lens.has_type())
-    assert_msg(has_value(self.container_lens), "Our container has not been associated with a container type lens.")
+    assert_msg(has_value(self._container_lens), "Our container has not been associated with a container type lens.")
    
     # Handle is_label lens
     if lens.options.is_label:
-      if not self.label :
+      if not self._label :
         raise NoTokenToConsumeException("There was no item as this container's label to PUT.")
-      output = lens.put(self.label, concrete_input_reader, None)
-      self.label = None
+      output = lens.put(self._label, concrete_input_reader, None)
+      self._label = None
       return output
 
     # Get candidates to PUT
@@ -160,7 +160,7 @@ class AbstractContainer(Rollbackable) :
 
     # Handle MODEL alignment (i.e. PUT will be in order of items in the abstract
     # model).
-    if self.alignment_mode == MODEL :
+    if self._alignment_mode == MODEL :
       # By definition, items are already in that order.
       if len(candidate_items) > 0:
         return [candidate_items[0]]
@@ -168,7 +168,7 @@ class AbstractContainer(Rollbackable) :
         return [] 
     
     # Handle SOURCE alignment.
-    if self.alignment_mode == SOURCE :
+    if self._alignment_mode == SOURCE :
       # Copy candidate_items.
       def get_key(item) :
         if has_value(item._meta_data.concrete_start_position) :
@@ -181,7 +181,7 @@ class AbstractContainer(Rollbackable) :
       return sorted_candidate_items
     # TODO: LABEL alignment mode
     
-    raise Exception("Unknown alignment mode: %s" % self.alignment_mode)
+    raise Exception("Unknown alignment mode: %s" % self._alignment_mode)
 
 
   #
@@ -249,12 +249,12 @@ class ListContainer(AbstractContainer) :
     return self.container_item
 
   def _get_state(self, copy_state=True) :
-    state = [copy_state and copy.copy(self.container_item) or self.container_item, self.label]
+    state = [copy_state and copy.copy(self.container_item) or self.container_item, self._label]
     return state
 
   def _set_state(self, state, copy_state=True) :
     self.container_item = copy_state and copy.copy(state[0]) or state[0]
-    self.label = state[1]
+    self._label = state[1]
 
   def __str__(self) :
     return str(self.container_item)
@@ -349,7 +349,7 @@ class LensObject(AbstractContainer) :
   def set_container_lens(self, lens) :
     super(LensObject, self).set_container_lens(lens)
     # For a general class container, SOURCE alignment will be a more common default.
-    self.alignment_mode = self.container_lens.options.alignment or SOURCE
+    self._alignment_mode = self._container_lens.options.alignment or SOURCE
  
   def get_put_candidates(self, lens, concrete_input_reader) :
     candidates = []
@@ -377,7 +377,7 @@ class LensObject(AbstractContainer) :
     if not has_value(item._meta_data.label) :
       raise LensException("%s expected item %s to have a label." % (self, item))
     # TODO: If constrained attributes, check within set.
-    setattr(self, self._convert_label_to_attribute_name(item._meta_data.label), item)
+    setattr(self, self.map_label_to_identifier(item._meta_data.label), item)
 
   
   def unwrap(self):
@@ -395,33 +395,46 @@ class LensObject(AbstractContainer) :
     """
     self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"]
 
-  def _convert_label_to_attribute_name(self, label) :
+
+  def map_label_to_identifier(self, label) :
     """
     Tries to convert a typical label to a python identifier.  You may wish to
     overload this if you require more specialised conversion.
     """
-    attribute_name = label.lower()
-    # XXX: We could pre-compile this regex.
-    attribute_name = re.sub(r"[ ]+", "_", attribute_name)
-    
+    identifier = self._map_label_to_identifier(label)
+
     # Check we end up with a valid python keyword.
-    if not re.match(r"[a-zA-Z][a-zA-Z0-9_]*$", attribute_name) :
-      raise Exception("Cannot express label '%s' as a python identifer to set as an object attribute - you will have to specialise this functionality for your purposes." % label) 
+    if not re.match(r"[a-zA-Z][a-zA-Z0-9_]*$", identifier) :
+      raise Exception("Cannot express label '%s' (converted to '%s') as a python identifer to set as an object attribute - you will have to specialise this functionality for your purposes." % (label, identifier)) 
    
     # Cache this conversion on the class, since it may be useful to improve
     # CREATED labels.
-    self.__class__.__cached_labels[attribute_name] = label
+    self.__class__.__cached_labels[identifier] = label
 
-    return attribute_name
+    return identifier
 
-
-  def _convert_attribute_name_to_label(self, attribute_name) :
-    if attribute_name in self.__class__.__cached_labels :
-      return self.__class__.__cached_labels[attribute_name]
+  
+  def map_identifier_to_label(self, identifier) :
+    if identifier in self.__class__.__cached_labels :
+      return self.__class__.__cached_labels[identifier]
 
     # We assume that an underscore represents a space.
-    return attribute_name.replace("_", " ")
-   
+    return self._map_identifier_to_label(identifier)
+  
+
+  # He he: Really we should use a lens for these mappings, but perhaps it's
+  # easy enough to do it like this.
+  def _map_label_to_identifier(self, label) :
+    """ This might be overridded to specialise this functionality for a specific.  """
+    identifier = label.lower()
+    # XXX: We could pre-compile this regex.
+    identifier = re.sub(r"[ ]+", "_", identifier)
+    return identifier
+  
+  def _map_identifier_to_label(self, identifier) :
+    """ This might be overridded to specialise this functionality for a specific.  """
+    return identifier.replace("_", " ")
+
 
   def _get_data_attributes(self) :
     """Returns the names of container items that are being used to hold data items."""
@@ -440,8 +453,8 @@ class LensObject(AbstractContainer) :
       # Ensure the label of the item is updated to match the current attribute
       # name.  If our label has changed, we need to regenerate a label.
       current_label = item._meta_data.label
-      if not (has_value(current_label) and self._convert_label_to_attribute_name(current_label) == attr_name) :
-        item._meta_data.label = self._convert_attribute_name_to_label(attr_name)
+      if not (has_value(current_label) and self.map_label_to_identifier(current_label) == attr_name) :
+        item._meta_data.label = self.map_identifier_to_label(attr_name)
 
   def _get_state(self, copy_state=True) :
     state = copy_state and copy.copy(self.__dict__) or self.__dict__
@@ -498,7 +511,7 @@ class ContainerFactory:
     return container_class.__new__(container_class)
 
   @staticmethod
-  def wrap_container(incoming_object, container_lens=None) :
+  def wrap_container(incoming_object) :
     """Wraps a container if possible."""
     if incoming_object == None or issubclass(type(incoming_object), AbstractContainer) :
       return incoming_object
@@ -512,7 +525,7 @@ class ContainerFactory:
     container = container_class(incoming_object)
     # Set the (consumable) label of the container based on the item's current
     # label
-    container.label = incoming_object._meta_data.label
+    container._label = incoming_object._meta_data.label
     return container
    
   # TODO: Add tests
