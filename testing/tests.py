@@ -310,9 +310,9 @@ auto eth1
     def _map_identifier_to_label(self, attribute_name) :
       return attribute_name.replace("_", "-")
 
+  GlobalSettings.check_consumption = False
   if False :
     test_description("Testing NetworkInterface")
-    GlobalSettings.check_consumption = False
     interface = get(BlankLine() + NetworkInterface, INPUT)
     interface.cheese_type = "cheshire"
     interface.address = "bananas"
@@ -329,12 +329,10 @@ auto eth1
   class InterfaceConfiguration(LensObject) :
     __lens__ = ZeroOrMore(NetworkInterface | BlankLine() | HashComment())
 
-    interfaces = Container(store_items=[NetworkInterface], type=dict)
-
-    # TODO: Working here - need to add aggregate container support.
+    interfaces = Container(store_items_of_type=[NetworkInterface], type=dict)
   
-  return
   config = get(InterfaceConfiguration, INPUT)  
+  d(config.interfaces)
 
   GlobalSettings.check_consumption = True
 

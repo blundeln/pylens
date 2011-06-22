@@ -527,7 +527,7 @@ class Lens(object) :
 
   def _create_lens_container(self):
     """Creates a container for this lens, if the lens is of a container type."""
-    return ContainerFactory.create_container(self)
+    return ContainerFactory.create_container(self.type)
 
 
   # XXX: I don't really like these forward declarations, but for now this does

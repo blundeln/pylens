@@ -339,7 +339,9 @@ class LensObject(AbstractContainer) :
     __init__ is called.
     """
     self = super(LensObject, cls).__new__(cls, *args, **kargs)
-    
+  
+    self._create_containers()
+
     # Check for constrained attributes, define on the class.
     constrained_attributes = self._get_constrained_attributes()
     d(constrained_attributes)
@@ -349,6 +351,19 @@ class LensObject(AbstractContainer) :
     self._exclude_attributes()
     return self
 
+  def _create_containers(self) :
+    """Create any sub-containers, if declared."""
+    self._containers = {}
+    for key, value in self.__class__.__dict__.iteritems() :
+      if not isinstance(value, Container) :
+        continue
+      container_properties = value
+      assert_msg(has_value(container_properties.type), "You must declare a type for the container definition '%s'." % key)
+      container = ContainerFactory.create_container(container_properties.type)
+      assert_msg(has_value(container), "Could not create an appropriate container for '%s'." % key)
+      self._containers[key] = container 
+
+
   def _get_constrained_attributes(self) :
     attributes = []
     for key, value in self.__class__.__dict__.iteritems() :
@@ -356,11 +371,14 @@ class LensObject(AbstractContainer) :
     return attributes
 
   def set_container_lens(self, lens) :
+    # TODO: Shall we call on sub containers - perhaps not, since can set alignment from props
     super(LensObject, self).set_container_lens(lens)
     # For a general class container, SOURCE alignment will be a more common default.
     self._alignment_mode = self._container_lens.options.alignment or SOURCE
  
   def get_put_candidates(self, lens, concrete_input_reader) :
+    # TODO: Check in containers first.
+    
     candidates = []
    
     # Ensure all items that may be PUT may carry meta data.
@@ -374,6 +392,7 @@ class LensObject(AbstractContainer) :
 
  
   def remove_item(self, item) :
+    # TODO: Check for containers.
     for attr_name, value in self.__dict__.iteritems() :
       if value is item :
         del self.__dict__[attr_name]
@@ -382,7 +401,23 @@ class LensObject(AbstractContainer) :
     raise Exception("Failed to remove item %s from %s."% (item, self))
     
 
+  def _get_item_sub_container(self, item, lens) :
+    for name, container in self._containers.iteritems() :
+      container_properties = self.__class__.__dict__[name]
+      if has_value(container_properties.store_items_from_lenses) and lens in container_properties.store_items_from_lenses :
+        return container
+      elif has_value(container_properties.store_items_of_type) and type(item) in container_properties.store_items_of_type :
+        return container
+
+    return None
+
   def store_item(self, item, lens, concrete_input_reader) :
+    
+    # First see if the item is to be stored in one of our containers.
+    sub_container = self._get_item_sub_container(item, lens)
+    if sub_container :
+      return sub_container.store_item(item, lens, concrete_input_reader)
+
     if not has_value(item._meta_data.label) :
       raise LensException("%s expected item %s to have a label." % (self, item))
     # TODO: If constrained attributes, check within set.
@@ -391,6 +426,11 @@ class LensObject(AbstractContainer) :
   
   def unwrap(self):
     """We are both the container and the native object."""
+    # XXX: Note, somewhere before PUT we must reciprocate this.
+    # Unwrap any sub containers.
+    for name, container in self._containers.iteritems() :
+      setattr(self, name, container.unwrap())
+
     return self
 
 
@@ -466,11 +506,12 @@ class LensObject(AbstractContainer) :
         item._meta_data.label = self.map_identifier_to_label(attr_name)
 
   def _get_state(self, copy_state=True) :
-    state = copy_state and copy.copy(self.__dict__) or self.__dict__
+    # Could wrap containers here.
+    state = [copy_state and copy.copy(self.__dict__) or self.__dict__]
     return state
 
   def _set_state(self, state, copy_state=True) :
-    self.__dict__ = copy_state and copy.copy(state) or state
+    self.__dict__ = copy_state and copy.copy(state[0]) or state[0]
 
   def is_fully_consumed(self) :
     return len(self._get_data_attributes()) == 0
@@ -504,14 +545,14 @@ class ContainerFactory:
 
 
   @staticmethod
-  def create_container(container_lens) :
+  def create_container(container_type) :
     """
     Tries to create an container appropriate for this lens and returns None
     if there is no associated container class.
     """
 
     # See if the lens type has a container class.
-    container_class = ContainerFactory.get_container_class(container_lens.type)
+    container_class = ContainerFactory.get_container_class(container_type)
     
     if container_class == None:
       return None
