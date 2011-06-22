@@ -135,7 +135,7 @@ class AbstractContainer(Rollbackable) :
         # XXX : Overkill to copy initial state every time within automatic_rollback.
         with automatic_rollback(concrete_input_reader) :
           output = lens.put(candidate, concrete_input_reader, None)
-          self.remove_item(candidate)
+          self.remove_item(lens, candidate)
           return output
       except LensException:
         pass
@@ -193,7 +193,7 @@ class AbstractContainer(Rollbackable) :
     """Returns a list of candidate items that could be PUT into the lens."""
     raise NotImplementedError()
   
-  def remove_item(self, item) :
+  def remove_item(self, lens, item) :
     raise NotImplementedError()
 
   def store_item(self, item, lens, concrete_input_reader) :
@@ -243,7 +243,7 @@ class ListContainer(AbstractContainer) :
   def get_put_candidates(self, lens, concrete_input_reader) :
     return self.container_item
   
-  def remove_item(self, item) :
+  def remove_item(self, lens, item) :
     self.container_item.remove(item)
 
   def store_item(self, item, lens, concrete_input_reader) :
@@ -382,8 +382,12 @@ class LensObject(AbstractContainer) :
     self._alignment_mode = self._container_lens.options.alignment or SOURCE
  
   def get_put_candidates(self, lens, concrete_input_reader) :
-    # TODO: Check in containers first.
-    
+    # First see if the item is to be put from one of our containers.
+    sub_container = self._get_item_sub_container(lens)
+    if sub_container :
+      return sub_container.get_put_candidates(lens, concrete_input_reader)
+
+    # Now try to find our own candidates.
     candidates = []
    
     # Ensure all items that may be PUT may carry meta data.
@@ -396,7 +400,12 @@ class LensObject(AbstractContainer) :
     return candidates
 
  
-  def remove_item(self, item) :
+  def remove_item(self, lens, item) :
+    # First see if the item is to be put from one of our containers.
+    sub_container = self._get_item_sub_container(lens, item)
+    if sub_container :
+      return # XXX working here
+    
     # TODO: Check for containers.
     for attr_name, value in self.__dict__.iteritems() :
       if value is item :
@@ -406,12 +415,14 @@ class LensObject(AbstractContainer) :
     raise Exception("Failed to remove item %s from %s."% (item, self))
     
 
-  def _get_item_sub_container(self, item, lens) :
+  def _get_item_sub_container(self, lens, item=None) :
     for name, container in self._containers.iteritems() :
       container_properties = self.__class__.__dict__[name]
       if has_value(container_properties.store_items_from_lenses) and lens in container_properties.store_items_from_lenses :
         return container
       elif has_value(container_properties.store_items_of_type) and type(item) in container_properties.store_items_of_type :
+        return container
+      elif lens.has_type() and lens.type in container_properties.store_items_of_type :
         return container
 
     return None
@@ -419,7 +430,7 @@ class LensObject(AbstractContainer) :
   def store_item(self, item, lens, concrete_input_reader) :
     
     # First see if the item is to be stored in one of our containers.
-    sub_container = self._get_item_sub_container(item, lens)
+    sub_container = self._get_item_sub_container(lens, item)
     if sub_container :
       return sub_container.store_item(item, lens, concrete_input_reader)
 
@@ -436,6 +447,7 @@ class LensObject(AbstractContainer) :
       raw_container = enable_meta_data(raw_container)
       if raw_container :
         self._containers[name] = ContainerFactory.wrap_container(raw_container)
+
 
   def unwrap(self):
     """We are both the container and the native object."""
