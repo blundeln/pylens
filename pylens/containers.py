@@ -519,14 +519,28 @@ class LensObject(AbstractContainer) :
         item._meta_data.label = self.map_identifier_to_label(attr_name)
 
   def _get_state(self, copy_state=True) :
-    # Could wrap containers here.
+    # Get our state.
     state = [copy_state and copy.copy(self.__dict__) or self.__dict__]
+    
+    # Then append state of our containers.
+    for sub_container in self._containers.itervalues() :
+      state.append(sub_container._get_state(copy_state=copy_state))
+    
     return state
 
   def _set_state(self, state, copy_state=True) :
+    # XXX: Is there any conflict here with broad use of __dict__?
+    # Set our state.
     self.__dict__ = copy_state and copy.copy(state[0]) or state[0]
+    
+    # Then set the state of our containers.
+    i = 1
+    for sub_container in self._containers.itervalues() :
+      sub_container._set_state(state[i], copy_state=copy_state)
+      i += 1
 
   def is_fully_consumed(self) :
+    # XXX: containers.
     return len(self._get_data_attributes()) == 0
 
 

@@ -1,13 +1,9 @@
 RESEARCH NOTES - for my questions and musings
   - Allow richer class models:
     - Sub-containers (e.g. interfaces = Container(type=list, stores_lenses=[list of lenses])
-      - GET
-        get_state
-        set_state
       - PUT
         get_candidates
         remove item
-
         is_fully_consumed
     - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 
