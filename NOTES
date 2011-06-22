@@ -2,7 +2,10 @@ RESEARCH NOTES - for my questions and musings
   - Allow richer class models:
     - Sub-containers (e.g. interfaces = Container(type=list, stores_lenses=[list of lenses])
       - PUT
+        Issue with identifier to label for static labels in LensObject: example address_family is label but is altered to address-family by same rule as interface stanza keys
         is_fully_consumed
+        - How can we know that address_family should be put with label address_family and not address-family?
+        - Perhaps should convert them all in unwrap()
     - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 
   - Label ordering:

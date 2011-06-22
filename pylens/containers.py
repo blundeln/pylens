@@ -126,9 +126,13 @@ class AbstractContainer(Rollbackable) :
     # Get candidates to PUT
     candidates = self.get_put_candidates(lens, concrete_input_reader)
 
+    d("Unfiltered candidates: %s" % candidates)
+    
     # Filter and sort them appropriately for our context (e.g. the lens, the
     # alignment mode and the current input postion.
     candidates = self.filter_and_sort_candidate_items(candidates, lens, concrete_input_reader)
+    
+    d("Filtered candidates: %s" % candidates)
 
     for candidate in candidates :
       try :
@@ -156,7 +160,10 @@ class AbstractContainer(Rollbackable) :
     # straightforward - here, for flexibility, we assume several items may share
     # a static label.
     if has_value(lens.options.label) :
-      valid_candidates = [item for item in candidate_items if item._meta_data.label == lens.options.label]
+      d("Using static label: '%s'" % lens.options.label)
+      # XXX: Feels a bit of a hack to use attr_label, so will think more
+      # generally about this.
+      valid_candidates = [item for item in candidate_items if lens.options.label in [item._meta_data.label, item._meta_data.attr_label]]
       return valid_candidates
 
     # Handle MODEL alignment (i.e. PUT will be in order of items in the abstract
@@ -244,6 +251,7 @@ class ListContainer(AbstractContainer) :
     return self.container_item
   
   def remove_item(self, lens, item) :
+    #d("Removing item %s" % item)
     self.container_item.remove(item)
 
   def store_item(self, item, lens, concrete_input_reader) :
@@ -286,6 +294,7 @@ class DictContainer(ListContainer) :
     # Create a list to hold the items.
     items_as_list = []
 
+    # XXX: Perhaps this should got in prepare_for_put.
     # Now add the items to the list, updating their labels from keys.
     assert isinstance(container_item, dict)
     for key, item in container_item.iteritems() :
@@ -385,13 +394,13 @@ class LensObject(AbstractContainer) :
     # First see if the item is to be put from one of our containers.
     sub_container = self._get_item_sub_container(lens)
     if sub_container :
+      d("Using sub container %s" % sub_container)
       return sub_container.get_put_candidates(lens, concrete_input_reader)
 
     # Now try to find our own candidates.
+    d("Looking for own canidates. %s" % self.__dict__)
     candidates = []
    
-    # Ensure all items that may be PUT may carry meta data.
-    self._enable_attributes_meta()
 
     for attr_name in self._get_data_attributes() :
       value = self.__dict__[attr_name]
@@ -404,9 +413,11 @@ class LensObject(AbstractContainer) :
     # First see if the item is to be put from one of our containers.
     sub_container = self._get_item_sub_container(lens, item)
     if sub_container :
+      d("Removing %s from %s" % (item, sub_container))
       sub_container.remove_item(lens, item)
+      return
     
-    # TODO: Check for containers.
+    d("Preparing to remove %s" % item)
     for attr_name, value in self.__dict__.iteritems() :
       if value is item :
         del self.__dict__[attr_name]
@@ -441,6 +452,9 @@ class LensObject(AbstractContainer) :
 
   def prepare_for_put(self) :
     """Here we ensure any raw containers are wrapped as AbstractContainers - the opposite of unwrap()."""
+    # Ensure all items that may be PUT may carry meta data.
+    self._enable_attributes_meta()
+    
     # Note, if there is no raw_container, __new__ would have ensure we still have an empty container in _containers
     for name, container in self._containers.iteritems() :
       raw_container = getattr(self, name, None)
@@ -529,6 +543,9 @@ class LensObject(AbstractContainer) :
       current_label = item._meta_data.label
       if not (has_value(current_label) and self.map_label_to_identifier(current_label) == attr_name) :
         item._meta_data.label = self.map_identifier_to_label(attr_name)
+        # XXX: Feels like a hack for now, to get around issue of static labels
+        # being changed incorrectly in the same way as a dynamic label
+        item._meta_data.attr_label = attr_name
 
   def _get_state(self, copy_state=True) :
     # Get our state.

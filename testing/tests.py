@@ -335,9 +335,11 @@ auto eth1
     config = get(InterfaceConfiguration, INPUT)  
     d(config.interfaces)
   
+  #GlobalSettings.check_consumption = True
   interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
   config = InterfaceConfiguration()
   config.interfaces = {"eth3":interface}
+  test_description("Putting InterfaceConfiguration")
   output = put(config)
 
 
