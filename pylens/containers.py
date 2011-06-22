@@ -309,6 +309,14 @@ class DictContainer(ListContainer) :
     return items_as_dict
 
 
+#
+# LensObject and related classes.
+#
+
+# These are used for describing LensObject attributes and nested containers.
+class Attribute(Properties) : pass
+class Container(Attribute) : pass
+
 class LensObject(AbstractContainer) :
   """
   A container that stores labelled items as object attributes, providing

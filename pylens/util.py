@@ -39,13 +39,8 @@ class Properties(object):
   A useful class for holding properties (e.g. meta data or lens options), which
   uses __getattr__ to save us from always asking if it has a particular attribute.
   """
-  def __init__(self, value=None) :
-    if not has_value(value) :
-      return
-    if type(value) != dict :
-      raise Exception("Expected to be passed a dict to wrap.")
-
-    self.__dict__.update(value)
+  def __init__(self, **kargs) :
+    self.__dict__.update(kargs)
 
   def __getattr__(self, name) :
     # This is important, since obj.__dict__ would equal None!
@@ -73,7 +68,7 @@ class Properties(object):
   @staticmethod
   def TESTS() :
     d("Testing")
-    properties = Properties({"food":"cheese"})
+    properties = Properties(food="cheese")
     assert(properties.food == "cheese")
     properties.something = [1,2,3]
     assert(properties.something == [1,2,3])

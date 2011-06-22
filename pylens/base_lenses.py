@@ -71,7 +71,7 @@ class Lens(object) :
 
     # Allow arbitrary arguments to be set on the lens which can aid flexible
     # storage and retrival of items from a container.
-    self.options = Properties(kargs)
+    self.options = Properties(**kargs)
 
     #
     # Argument shortcuts

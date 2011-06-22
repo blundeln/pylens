@@ -310,18 +310,18 @@ auto eth1
     def _map_identifier_to_label(self, attribute_name) :
       return attribute_name.replace("_", "-")
 
+  if False :
+    test_description("Testing NetworkInterface")
+    GlobalSettings.check_consumption = False
+    interface = get(BlankLine() + NetworkInterface, INPUT)
+    interface.cheese_type = "cheshire"
+    interface.address = "bananas"
+    output = put(interface) 
 
-  test_description("Testing NetworkInterface")
-  GlobalSettings.check_consumption = False
-  interface = get(BlankLine() + NetworkInterface, INPUT)
-  interface.cheese_type = "cheshire"
-  interface.address = "bananas"
-  output = put(interface) 
-
-  # Try creating from scratch.
-  interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
-  output = put(interface, label="wlan3")
- 
+    # Try creating from scratch.
+    interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
+    output = put(interface, label="wlan3")
+   
   #
   # Now lets create a class to represent the whole configuration.
   #
@@ -329,9 +329,12 @@ auto eth1
   class InterfaceConfiguration(LensObject) :
     __lens__ = ZeroOrMore(NetworkInterface | BlankLine() | HashComment())
 
-    # TODO: Working here - need to add aggregate container support.
+    interfaces = Container(store_items=[NetworkInterface], type=dict)
 
-  #config = get(InterfaceConfiguration, INPUT)  
+    # TODO: Working here - need to add aggregate container support.
+  
+  return
+  config = get(InterfaceConfiguration, INPUT)  
 
   GlobalSettings.check_consumption = True
 
