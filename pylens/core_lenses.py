@@ -182,21 +182,25 @@ class Until(Lens) :
 
   def _put(self, item, concrete_input_reader, current_container) :
     
-    
-    if not self.has_type() and has_value(item):
-      raise Exception("As a nont-STORE lens, %s did not expect to be passed an item to PUT." % self)
+    if self.has_type() :
+      if not isinstance(item, str) and len(item) > 0:
+        raise Exception("Expected to be passed a string of length at least one character, not %s." % item)
+      
+      # Consume input.
+      if concrete_input_reader :
+        self.get(concrete_input_reader)
+      output = item
+    else :
+      if has_value(item):
+        raise LensException("As a non-STORE lens, %s did not expect to be passed an item %s to PUT." % (self, item))
+      
+      # Use output from input, or fail if we have no concrete input.
+      if concrete_input_reader :
+        output = self.get(concrete_input_reader)
+      else :
+        raise NoDefaultException("Cannot CREATE: a default should have been set on lens %s, or an outer lens." % self)
 
-    assert_msg(isinstance(item, str), "Expected to PUT a string.")
-
-    # TODO: We should should check that the lens does not match within the
-    # string if include_lens == False, or perhaps we just leave this to the user
-    # to improve performance.
-
-    # Ensure we consume the input if there is some.
-    if concrete_input_reader :
-      self.get(concrete_input_reader)
-
-    return item
+    return output
 
 
   @staticmethod

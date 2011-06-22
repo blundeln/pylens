@@ -327,7 +327,7 @@ auto eth1
   #
 
   class InterfaceConfiguration(LensObject) :
-    __lens__ = ZeroOrMore(NetworkInterface | BlankLine() | HashComment())
+    __lens__ = ZeroOrMore(NetworkInterface | HashComment() | BlankLine())
 
     interfaces = Container(store_items_of_type=[NetworkInterface], type=dict)
   

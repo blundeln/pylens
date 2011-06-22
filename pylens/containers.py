@@ -125,7 +125,7 @@ class AbstractContainer(Rollbackable) :
 
     # Get candidates to PUT
     candidates = self.get_put_candidates(lens, concrete_input_reader)
-   
+
     # Filter and sort them appropriately for our context (e.g. the lens, the
     # alignment mode and the current input postion.
     candidates = self.filter_and_sort_candidate_items(candidates, lens, concrete_input_reader)
@@ -404,7 +404,7 @@ class LensObject(AbstractContainer) :
     # First see if the item is to be put from one of our containers.
     sub_container = self._get_item_sub_container(lens, item)
     if sub_container :
-      return # XXX working here
+      sub_container.remove_item(lens, item)
     
     # TODO: Check for containers.
     for attr_name, value in self.__dict__.iteritems() :
