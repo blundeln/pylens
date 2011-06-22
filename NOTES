@@ -1,11 +1,15 @@
 RESEARCH NOTES - for my questions and musings
   - Allow richer class models:
-    - Use static class variables to:
-      - Network interfaces lens might be a good example to show this with.
-      - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
-      - Describe sub-containers (e.g. interfaces = Container(type=list, stores_lenses=[list of lenses])
-        - This will allow for more flexible models (i.e. we don't have to nest lens containers so rigidly)
-        - Be cautions with checking which lens the item actually came from, not necessarily which returned it (i.e. Or)
+    - Sub-containers (e.g. interfaces = Container(type=list, stores_lenses=[list of lenses])
+      - GET
+        get_state
+        set_state
+      - PUT
+        get_candidates
+        remove item
+
+        is_fully_consumed
+    - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 
   - Label ordering:
     - think about ordering for CREATED items - praps relate to above point on

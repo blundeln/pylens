@@ -331,8 +331,15 @@ auto eth1
 
     interfaces = Container(store_items_of_type=[NetworkInterface], type=dict)
   
-  config = get(InterfaceConfiguration, INPUT)  
-  d(config.interfaces)
+  if False:
+    config = get(InterfaceConfiguration, INPUT)  
+    d(config.interfaces)
+  
+  interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
+  config = InterfaceConfiguration()
+  config.interfaces = {"eth3":interface}
+  output = put(config)
+
 
   GlobalSettings.check_consumption = True
 

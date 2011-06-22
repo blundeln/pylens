@@ -199,6 +199,10 @@ class AbstractContainer(Rollbackable) :
   def store_item(self, item, lens, concrete_input_reader) :
     raise NotImplementedError()
 
+  def prepare_for_put(self) :
+    """Called prior to PUT to ensure, for example, any internal containers are wrapped as AbstractContainers."""
+    pass
+
   def unwrap(self) :
     """Unwrap to native python type where appropriate: e.g. for list and dict.""" 
     raise NotImplementedError()
@@ -361,7 +365,8 @@ class LensObject(AbstractContainer) :
       assert_msg(has_value(container_properties.type), "You must declare a type for the container definition '%s'." % key)
       container = ContainerFactory.create_container(container_properties.type)
       assert_msg(has_value(container), "Could not create an appropriate container for '%s'." % key)
-      self._containers[key] = container 
+      self._containers[key] = container
+
 
 
   def _get_constrained_attributes(self) :
@@ -423,7 +428,15 @@ class LensObject(AbstractContainer) :
     # TODO: If constrained attributes, check within set.
     setattr(self, self.map_label_to_identifier(item._meta_data.label), item)
 
-  
+  def prepare_for_put(self) :
+    """Here we ensure any raw containers are wrapped as AbstractContainers - the opposite of unwrap()."""
+    # Note, if there is no raw_container, __new__ would have ensure we still have an empty container in _containers
+    for name, container in self._containers.iteritems() :
+      raw_container = getattr(self, name, None)
+      raw_container = enable_meta_data(raw_container)
+      if raw_container :
+        self._containers[name] = ContainerFactory.wrap_container(raw_container)
+
   def unwrap(self):
     """We are both the container and the native object."""
     # XXX: Note, somewhere before PUT we must reciprocate this.
@@ -550,7 +563,6 @@ class ContainerFactory:
     Tries to create an container appropriate for this lens and returns None
     if there is no associated container class.
     """
-
     # See if the lens type has a container class.
     container_class = ContainerFactory.get_container_class(container_type)
     
@@ -577,6 +589,8 @@ class ContainerFactory:
       # Pass the raw data item to wrap.
       container = container_class(incoming_object)
    
+    # Allow the container to prepare to be PUT (e.g. wrap any sub containers).
+    container.prepare_for_put()
     # Set the (consumable) label of the container based on the item's current
     # label
     container.set_label(incoming_object._meta_data.label, overwrite=True)
