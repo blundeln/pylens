@@ -136,8 +136,11 @@ class Until(Lens) :
     self.set_sublens(lens)
     self.include_lens = include_lens
 
-  def _get(self, concrete_input_reader, current_container) :
-
+  def _get(self, concrete_input_reader, current_container, force_return=False) :
+    # Note, we add force_return here so that put can utilise output regardless of
+    # whether or not this is a STORE lens.  Really I should create a parsing
+    # function which both get and put use.
+    
     # Remember the input position before we start to consume chars.
     initial_position = concrete_input_reader.get_pos()
     
@@ -176,12 +179,15 @@ class Until(Lens) :
 
     if not parsed_chars :
       raise LensException("Expected to get at least one character!")
+  
+    if self.has_type() or force_return :
+      return parsed_chars
     
-    return parsed_chars
+    # Return nothing if we are not a STORE lens.
+    return None
 
 
   def _put(self, item, concrete_input_reader, current_container) :
-    
     if self.has_type() :
       if not isinstance(item, str) and len(item) > 0:
         raise Exception("Expected to be passed a string of length at least one character, not %s." % item)
@@ -196,7 +202,7 @@ class Until(Lens) :
       
       # Use output from input, or fail if we have no concrete input.
       if concrete_input_reader :
-        output = self.get(concrete_input_reader)
+        output = self._get(concrete_input_reader, None, force_return=True)
       else :
         raise NoDefaultException("Cannot CREATE: a default should have been set on lens %s, or an outer lens." % self)
 

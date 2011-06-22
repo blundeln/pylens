@@ -1,5 +1,6 @@
 RESEARCH NOTES - for my questions and musings
   - Allow richer class models:
+    - Make sense of last commit
     - Tidy up LensObject
     - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 

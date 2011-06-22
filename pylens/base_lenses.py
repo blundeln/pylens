@@ -175,8 +175,9 @@ class Lens(object) :
       # Now add source info to the item's meta data, which will help when
       # putting it back into a concrete structure.
       
-      # A refernce to the lens that extracted the item.
+      # A reference to the lens that extracted the item.
       item._meta_data.lens = self
+      d("Set meta on %s to %s" % (item, item._meta_data))
 
       # A reference to the concrete reader and position parsed from.
       item._meta_data.concrete_start_position = concrete_start_position

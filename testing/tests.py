@@ -323,18 +323,23 @@ auto eth1
     output = put(interface, label="wlan3")
    
   #
-  # Now lets create a class to represent the whole configuration.
+  # Now let's create a class to represent the whole configuration.
   #
 
   class InterfaceConfiguration(LensObject) :
-    __lens__ = ZeroOrMore(NetworkInterface | HashComment() | BlankLine())
+    auto_lens = Group("auto" + WS(" ") + List(Keyword(additional_chars="_-", type=str), WS(" "), type=None) + WS("") + NL(), type=list, name="auto_lens")
+    __lens__ = ZeroOrMore(NetworkInterface | auto_lens | HashComment() | BlankLine())
 
     interfaces = Container(store_items_of_type=[NetworkInterface], type=dict)
+    auto_interfaces = Container(store_items_from_lenses=[auto_lens], type=list)
   
   if True:
     config = get(InterfaceConfiguration, INPUT)  
+    d(config.auto_interfaces)
     d(config.interfaces)
     config.interfaces["eth0-home"].netmask = "bananas"
+    config.auto_interfaces[0].insert(1,"wlan2")
+    test_description("PUT")
     output = put(config)
   
   GlobalSettings.check_consumption = True
@@ -342,6 +347,7 @@ auto eth1
   interface.some_thing = "something or another"
   config = InterfaceConfiguration()
   config.interfaces = {"eth3":interface}
+  config.auto_interfaces = [["eth0"], ["wlan2", "eth2"]]
   test_description("Putting InterfaceConfiguration")
   output = put(config)
 

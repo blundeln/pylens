@@ -427,9 +427,20 @@ class LensObject(AbstractContainer) :
     
 
   def _get_item_sub_container(self, lens, item=None) :
+    # Note, for lens matching in the get direction we use item meta (since may
+    # be returned from higer lens with no type, such as Or)
+    # In the put direction, we can use lens, since will only put a token into a
+    # type lens.
+    #if has_value(item) :
+    #  d(item)
+    #  assert(item._meta_data.lens)
+
     for name, container in self._containers.iteritems() :
       container_properties = self.__class__.__dict__[name]
+      d("looking for item to match lens %s" % lens)
       if has_value(container_properties.store_items_from_lenses) and lens in container_properties.store_items_from_lenses :
+        return container
+      elif has_value(item) and has_value(container_properties.store_items_from_lenses) and has_value(item._meta_data.lens) and item._meta_data.lens in container_properties.store_items_from_lenses :
         return container
       elif has_value(container_properties.store_items_of_type) and type(item) in container_properties.store_items_of_type :
         return container
@@ -443,6 +454,7 @@ class LensObject(AbstractContainer) :
     # First see if the item is to be stored in one of our containers.
     sub_container = self._get_item_sub_container(lens, item)
     if sub_container :
+      d("Storing %s in container %s" % (item, sub_container))
       return sub_container.store_item(item, lens, concrete_input_reader)
 
     if not has_value(item._meta_data.label) :
@@ -457,7 +469,11 @@ class LensObject(AbstractContainer) :
     
     # Note, if there is no raw_container, __new__ would have ensure we still have an empty container in _containers
     for name, container in self._containers.iteritems() :
+      # Note if no instance var is set, this will return class var, hence our
+      # check to see if this was an Attribute class!!!!
       raw_container = getattr(self, name, None)
+      if not has_value(raw_container) or isinstance(raw_container, Attribute):
+        continue # Don't destroy empty container created in __new__
       raw_container = enable_meta_data(raw_container)
       if raw_container :
         self._containers[name] = ContainerFactory.wrap_container(raw_container)
