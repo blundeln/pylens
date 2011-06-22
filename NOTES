@@ -1,11 +1,6 @@
 RESEARCH NOTES - for my questions and musings
   - Allow richer class models:
-    - Sub-containers (e.g. interfaces = Container(type=list, stores_lenses=[list of lenses])
-      - PUT
-        Issue with identifier to label for static labels in LensObject: example address_family is label but is altered to address-family by same rule as interface stanza keys
-        is_fully_consumed
-        - How can we know that address_family should be put with label address_family and not address-family?
-        - Perhaps should convert them all in unwrap()
+    - Tidy up LensObject
     - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 
   - Label ordering:
@@ -25,6 +20,18 @@ RESEARCH NOTES - for my questions and musings
   - Re-organise these notes! and put broad feature ideas in TODO, rather than here.
   
   ------------- Misc ideas
+  - Edge case state issue
+    - For these, last label will be used for both since share meta - praps set it at the last
+      minute.
+        config.interfaces = {"eth3":interface}
+        config.interfaces["wlan3"] = interface
+
+  - Issue with identifier to label for static labels in LensObject: example address_family is label but is altered to address-family by same rule as interface stanza keys
+   - How can we know that address_family should be put with label address_family and not address-family?
+   - Perhaps should convert them all in unwrap()
+   - I've added a hack around this, but would be better to re-think
+     LensObject, perhaps basing it on ListContainer and setting attrs on
+     unwrap()
   - Do we need to unify the way that we deal with modifed containers and
     modified items???
     - TO solve the doulbe PUT issue, we now always store original state in PUT

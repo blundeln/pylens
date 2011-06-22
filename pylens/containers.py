@@ -481,7 +481,7 @@ class LensObject(AbstractContainer) :
     This should be called on object initialisation, before any model attributes
     are asigned.
     """
-    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"]
+    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"] + self._containers.keys()
 
 
   def map_label_to_identifier(self, label) :
@@ -569,8 +569,16 @@ class LensObject(AbstractContainer) :
       i += 1
 
   def is_fully_consumed(self) :
-    # XXX: containers.
-    return len(self._get_data_attributes()) == 0
+    # Check if our items are consumed.
+    if len(self._get_data_attributes()) > 0 :
+      return False
+
+    # Then, check if at least one of our containers is not fully consumed.
+    for sub_container in self._containers.itervalues() :
+      if not sub_container.is_fully_consumed() :
+        return False
+
+    return True
 
 
 class ContainerFactory:
