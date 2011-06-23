@@ -3,24 +3,38 @@ Pylens - Object Serialisation through a Lens
 
 Author: Nick Blundell (http://www.nickblundell.org.uk)
 
-This started off as an attempt to implement the extremely useful idea of lenses
-(bi-directional parsers) within the context of object serialisation, with the
-aim of simplifying lens definition and creating intuitive abstractions of data
-in flat file formats (e.g. UNIX configuration files) within a native scripting
-language such as python.  The fundamental approach has altered several times
-but now is starting to become more simple and more intuitive.  Hopefully I will
-make a stable release very soon.
+Here is the Problem
+-----------------------------------------------------
 
-In a nutshell, we wish to serialise some object model to and from a flat file
-with some arbitrary structure, such that changes are made surgically to those
-files to reflect changes in the model (e.g. comments and whitespace are
-preserved where possible to allow both automated and manual configuration).
+Suppose that you have some structure within some string (think of a UNIX
+configuration file) that you wish to manipulate programmatically (perhaps you
+are automating the task of wider system configuration) but you do not wish to
+destroy non-semantic artifacts within the string that are important to still
+allow for manual maintenance, such as comments, whitespace
+list delimiters, etc.  In other words, you wish to make *surgical* changes to
+the string, leaving undisturbed those parts that do not concern your
+alteration.
 
-For those familiar with `pyparsing <http://pyparsing.wikispaces.com/>`_, this is like pyparsing but it works in both
-directions, for parsing *and* unparsing abstract models of data, whilst
-keeping the idea of simple, in-language parser definition.
+This is where the concept of bi-directional programming (see references below)
+can really help us. Here we specify a *lens*, which is a parser that works not only in the
+classical sense to parse a
+string into an abstract model (for easy manipulation) but that can 
+also put back (i.e. unparse) our modified structure into an appropriate string
+form.
 
-Usage
+The Approach of pylens
+-----------------------------------------------------
+
+The pylens framework closely relates the concept of a lens with python, such
+that lenses may be defined simply as python code (greatly inspired by
+`pyparsing <http://pyparsing.wikispaces.com/>`_) and may mapped to python
+structures, such as lists, dicts, and classes.
+
+This resembles a special kind of serialisation where we can extract python
+structures from arbitrary string structures, easily modify the structure, and
+then put the model back into a string structure that embodies our changes.
+
+Example
 -----------------------------------------------------
 
 The library is used as follows::
