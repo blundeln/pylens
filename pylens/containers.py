@@ -333,11 +333,13 @@ class Container(Attribute) : pass
 class LensObject(AbstractContainer) :
   """
   A container that stores labelled items as object attributes, providing
-  simple converstion of lables to and from python identifiers to store as
+  simple conversion of labels to and from python identifiers to store as
   attributes.  For example an item with the label "Last Name" would be stored
   as an object attribute as "last_name".
 
-  We can either constrain the attributes used with lenses or leave it open.
+  To enhance the default behaviour of a LensObject, it is possible to constrain
+  valid attributes and to declare sub-containers (e.g. lists, dict, etc.) which
+  can be used to store specific items.
   """
 
   # Used to help with re-generating labels from object attribute names.  The
@@ -348,7 +350,7 @@ class LensObject(AbstractContainer) :
   def __new__(cls, *args, **kargs) :
     """
     It is important that container objects can be created without arguments
-    (a la serialisation), so here we initialise important variables before the
+    (a la serialisation), so here we initialise important internal variables before the
     __init__ is called.
     """
     self = super(LensObject, cls).__new__(cls, *args, **kargs)
@@ -364,25 +366,6 @@ class LensObject(AbstractContainer) :
     self._exclude_attributes()
     return self
 
-  def _create_containers(self) :
-    """Create any sub-containers, if declared."""
-    self._containers = {}
-    for key, value in self.__class__.__dict__.iteritems() :
-      if not isinstance(value, Container) :
-        continue
-      container_properties = value
-      assert_msg(has_value(container_properties.type), "You must declare a type for the container definition '%s'." % key)
-      container = ContainerFactory.create_container(container_properties.type)
-      assert_msg(has_value(container), "Could not create an appropriate container for '%s'." % key)
-      self._containers[key] = container
-
-
-
-  def _get_constrained_attributes(self) :
-    attributes = []
-    for key, value in self.__class__.__dict__.iteritems() :
-      d(key)
-    return attributes
 
   def set_container_lens(self, lens) :
     # TODO: Shall we call on sub containers - perhaps not, since can set alignment from props
@@ -424,30 +407,6 @@ class LensObject(AbstractContainer) :
         return
 
     raise Exception("Failed to remove item %s from %s."% (item, self))
-    
-
-  def _get_item_sub_container(self, lens, item=None) :
-    # Note, for lens matching in the get direction we use item meta (since may
-    # be returned from higer lens with no type, such as Or)
-    # In the put direction, we can use lens, since will only put a token into a
-    # type lens.
-    #if has_value(item) :
-    #  d(item)
-    #  assert(item._meta_data.lens)
-
-    for name, container in self._containers.iteritems() :
-      container_properties = self.__class__.__dict__[name]
-      d("looking for item to match lens %s" % lens)
-      if has_value(container_properties.store_items_from_lenses) and lens in container_properties.store_items_from_lenses :
-        return container
-      elif has_value(item) and has_value(container_properties.store_items_from_lenses) and has_value(item._meta_data.lens) and item._meta_data.lens in container_properties.store_items_from_lenses :
-        return container
-      elif has_value(container_properties.store_items_of_type) and type(item) in container_properties.store_items_of_type :
-        return container
-      elif lens.has_type() and lens.type in container_properties.store_items_of_type :
-        return container
-
-    return None
 
   def store_item(self, item, lens, concrete_input_reader) :
     
@@ -488,17 +447,6 @@ class LensObject(AbstractContainer) :
     return self
 
 
-
-  def _exclude_attributes(self) :
-    """
-    Just excludes attributes of our object that we do not expect to be used
-    as container state.
-    This should be called on object initialisation, before any model attributes
-    are asigned.
-    """
-    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"] + self._containers.keys()
-
-
   def map_label_to_identifier(self, label) :
     """
     Tries to convert a typical label to a python identifier.  You may wish to
@@ -515,7 +463,6 @@ class LensObject(AbstractContainer) :
     self.__class__.__cached_labels[identifier] = label
 
     return identifier
-
   
   def map_identifier_to_label(self, identifier) :
     if identifier in self.__class__.__cached_labels :
@@ -523,6 +470,72 @@ class LensObject(AbstractContainer) :
 
     # We assume that an underscore represents a space.
     return self._map_identifier_to_label(identifier)
+
+
+  def is_fully_consumed(self) :
+    # Check if our items are consumed.
+    if len(self._get_data_attributes()) > 0 :
+      return False
+
+    # Then, check if at least one of our containers is not fully consumed.
+    for sub_container in self._containers.itervalues() :
+      if not sub_container.is_fully_consumed() :
+        return False
+
+    return True
+
+  def _create_containers(self) :
+    """Create any sub-containers, if declared."""
+    self._containers = {}
+    for key, value in self.__class__.__dict__.iteritems() :
+      if not isinstance(value, Container) :
+        continue
+      container_properties = value
+      assert_msg(has_value(container_properties.type), "You must declare a type for the container definition '%s'." % key)
+      container = ContainerFactory.create_container(container_properties.type)
+      assert_msg(has_value(container), "Could not create an appropriate container for '%s'." % key)
+      self._containers[key] = container
+
+  def _get_constrained_attributes(self) :
+    attributes = []
+    for key, value in self.__class__.__dict__.iteritems() :
+      d(key)
+    return attributes
+
+  def _get_item_sub_container(self, lens, item=None) :
+    # Note, for lens matching in the get direction we use item meta (since may
+    # be returned from higer lens with no type, such as Or)
+    # In the put direction, we can use lens, since will only put a token into a
+    # type lens.
+    #if has_value(item) :
+    #  d(item)
+    #  assert(item._meta_data.lens)
+
+    for name, container in self._containers.iteritems() :
+      container_properties = self.__class__.__dict__[name]
+      d("looking for item to match lens %s" % lens)
+      if has_value(container_properties.store_items_from_lenses) and lens in container_properties.store_items_from_lenses :
+        return container
+      elif has_value(item) and has_value(container_properties.store_items_from_lenses) and has_value(item._meta_data.lens) and item._meta_data.lens in container_properties.store_items_from_lenses :
+        return container
+      elif has_value(container_properties.store_items_of_type) and type(item) in container_properties.store_items_of_type :
+        return container
+      elif lens.has_type() and lens.type in container_properties.store_items_of_type :
+        return container
+
+    return None
+
+
+  def _exclude_attributes(self) :
+    """
+    Just excludes attributes of our object that we do not expect to be used
+    as container state.
+    This should be called on object initialisation, before any model attributes
+    are asigned.
+    """
+    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"] + self._containers.keys()
+
+
   
 
   # He he: Really we should use a lens for these mappings, but perhaps it's
@@ -582,18 +595,6 @@ class LensObject(AbstractContainer) :
     for sub_container in self._containers.itervalues() :
       sub_container._set_state(state[i], copy_state=copy_state)
       i += 1
-
-  def is_fully_consumed(self) :
-    # Check if our items are consumed.
-    if len(self._get_data_attributes()) > 0 :
-      return False
-
-    # Then, check if at least one of our containers is not fully consumed.
-    for sub_container in self._containers.itervalues() :
-      if not sub_container.is_fully_consumed() :
-        return False
-
-    return True
 
 
 class ContainerFactory:
