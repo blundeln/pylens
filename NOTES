@@ -1,6 +1,8 @@
 RESEARCH NOTES - for my questions and musings
   - Work on examples
+  - Get rid of default type on list
   - Work on docs
+    - http://packages.python.org/an_example_pypi_project/buildanduploadsphinx.html
   - Allow richer class models:
     - Tidy up LensObject
     - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)

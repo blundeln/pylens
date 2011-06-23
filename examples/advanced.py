@@ -36,16 +36,107 @@ from pylens import *
 from pylens.debug import d # Like print(...)
 
 
-DEB_CTRL = """Source: libconfig-model-perl
-Section: perl
-Maintainer: Debian Perl Group <pkg-perl-maintainers@xx>
-Build-Depends: debhelper (>= 7.0.0),
-               perl-modules (>= 5.10) | libmodule-build-perl
-Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
-                     libconfig-tiny-perl, libexception-class-perl,
-                     libparse-recdescent-perl (>= 1.90.0),
-                     liblog-log4perl-perl (>= 1.11)
+def complex_class_test() :
+  """
+  This is an example of how we could embedded lenses within classes to
+  manipulate the widely used interfaces.conf file to configure network
+  interfaces of a UNIX systems.
+
+  Note that it does not aim to be complete, just a demonstration of how you
+  could compose such a mapping.
+  """
+ 
+  INPUT = """
+iface eth0-home inet static
+   address 192.168.1.1
+   netmask 255.255.255.0
+   gateway  67.207.128.1
+   dns-nameservers 67.207.128.4 67.207.128.5
+   up flush-mail
+
+auto lo eth0
+# A comment
+auto eth1 
 """
+
+  # First we define a class to represent the iface stanza.  I break it up a
+  # little to make it clearer.
+  class NetworkInterface(LensObject) :
+    
+    # Some component lenses.
+    indent = WS("   ")
+    interface_attribute = KeyValue(indent + Keyword(additional_chars="_-", is_label=True) + WS(" ") + Until(NL(), type=str) + NL())
+    
+    # Put it all together.
+    __lens__ =  "iface" + WS(" ") + Keyword(additional_chars="_-", is_label=True) + WS(" ") + \
+      Keyword(label="address_family") + WS(" ") + Keyword(label="method") + NL() + \
+      ZeroOrMore(interface_attribute)
+    
+    def __init__(self, **kargs) :
+      """A simple constructor, which simply store keyword args as attributes."""
+      for key, value in kargs.iteritems() :
+        setattr(self, key, value)
+
+    # Define label mappings, so labels such as "dns-nameservers" are mapped to and
+    # from a valid python identifier such as "dns_nameservers" and can
+    # therefore be manipulated as object attributes.
+    def _map_label_to_identifier(self, label) :
+      return label.replace("-","_")
+    
+    def _map_identifier_to_label(self, attribute_name) :
+      return attribute_name.replace("_", "-")
+
+  # Now we can define a class to represent the whole configuration, such that
+  # it will contain NetworkInterface objects, etc.
+
+  class InterfaceConfiguration(LensObject) :
+    auto_lens = Group("auto" + WS(" ") + List(Keyword(additional_chars="_-", type=str), WS(" "), type=None) + WS("") + NL(), type=list, name="auto_lens")
+    __lens__ = ZeroOrMore(NetworkInterface | auto_lens | HashComment() | BlankLine())
+
+    interfaces = Container(store_items_of_type=[NetworkInterface], type=dict)
+    auto_interfaces = Container(store_items_from_lenses=[auto_lens], type=list)
+  
+  if True:
+    test_description("GET InterfaceConfiguration")
+    config = get(InterfaceConfiguration, INPUT)
+    assert_equal(config.interfaces["eth0-home"].address, "192.168.1.1")
+    assert_equal(config.auto_interfaces[0][1],"eth0")
+    assert_equal(len(config.auto_interfaces),2)
+    
+    test_description("PUT InterfaceConfiguration")
+    config.interfaces["eth0-home"].netmask = "bananas"
+    config.auto_interfaces[0].insert(1,"wlan2")
+    output = put(config)
+    assert_equal(output, """
+iface eth0-home inet static
+   address 192.168.1.1
+   gateway  67.207.128.1
+   dns-nameservers 67.207.128.4 67.207.128.5
+   up flush-mail
+   netmask bananas
+
+auto lo wlan2 eth0
+# A comment
+auto eth1 
+""")
+  
+  test_description("CREATE InterfaceConfiguration")
+  GlobalSettings.check_consumption = True
+  interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
+  interface.some_thing = "something or another"
+  config = InterfaceConfiguration()
+  config.interfaces = {"eth3":interface}
+  config.auto_interfaces = [["eth0"], ["wlan2", "eth2"]]
+  
+  output = put(config)
+  assert_equal(output, """iface eth3 inet static
+   dns-nameservers 1.2.3.4 1.2.3.5
+   some-thing something or another
+   netmask 255.255.255.0
+auto eth0
+auto wlan2 eth2
+""")
+
 
 
 def debctrl_test() :
@@ -56,6 +147,19 @@ def debctrl_test() :
   # This lens demonstrates the use of labels and the auto_list lens modifier. I
   # also use incremental testing throughout, which should help you to follow
   # it.
+
+  DEB_CTRL = """Source: libconfig-model-perl
+Section: perl
+Maintainer: Debian Perl Group <pkg-perl-maintainers@xx>
+Build-Depends: debhelper (>= 7.0.0),
+               perl-modules (>= 5.10) | libmodule-build-perl
+Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
+                     libconfig-tiny-perl, libexception-class-perl,
+                     libparse-recdescent-perl (>= 1.90.0),
+                     liblog-log4perl-perl (>= 1.11)
+"""
+
+ 
 
   # We build up the lens starting with the easier parts, testing snippets as we go.
   # Recall, when we set is_label we imply the lens has type=str (i.e is a STORE

@@ -27,7 +27,7 @@ The Approach of pylens
 
 The pylens framework closely relates the concept of a lens with python, such
 that lenses may be defined simply as python code (greatly inspired by
-`pyparsing <http://pyparsing.wikispaces.com/>`_) and may mapped to python
+`pyparsing <http://pyparsing.wikispaces.com/>`_) and may be mapped to and from python
 structures, such as lists, dicts, and classes.
 
 This resembles a special kind of serialisation where we can extract python
