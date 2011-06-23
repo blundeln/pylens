@@ -69,13 +69,16 @@ class AbstractContainer(Rollbackable) :
   def __new__(cls, *args, **kargs) :
     self = super(AbstractContainer, cls).__new__(cls, *args, **kargs)
     # Initialise some vars regardless of __init__ being called.
-    # XXX: Perhaps mark these variables as private (i.e. prefix underscore)
     self._container_lens = None
     self._label = None
     self._alignment_mode = None
+
+    # Return the pre-__init__ instance.
     return self
 
   def set_container_lens(self, lens) :
+    # XXX: It's not the lens that's import, just that we wish to look at it to
+    # set some defaults.
     # Called when put() is preparing the container for PUTting to associate it with its container lens.
     self._container_lens = lens
     # Default to MODEL alignment
@@ -355,24 +358,47 @@ class LensObject(AbstractContainer) :
     """
     self = super(LensObject, cls).__new__(cls, *args, **kargs)
   
+    # If sub-containers have been specified on the class, instantiate them on the instance.
     self._create_containers()
 
-    # Check for constrained attributes, define on the class.
-    constrained_attributes = self._get_constrained_attributes()
-    d(constrained_attributes)
+    # Exclude attributes that should not be considered as container state.
+    self._set_excluded_attributes()
 
-    # This automatically builds a list of attributes to exclude from our
-    # container's state.
-    self._exclude_attributes()
     return self
 
 
+  def store_item(self, item, lens, concrete_input_reader) :
+    
+    # First see if the item is to be stored in one of our containers.
+    sub_container = self._get_item_sub_container(lens, item)
+    if sub_container :
+      d("Storing %s in container %s" % (item, sub_container))
+      return sub_container.store_item(item, lens, concrete_input_reader)
+
+    if not has_value(item._meta_data.label) :
+      raise LensException("%s expected item %s to have a label." % (self, item))
+    # TODO: If constrained attributes, check within set.
+    setattr(self, self.map_label_to_identifier(item._meta_data.label), item)
+
+  
+  def unwrap(self):
+    """We are both the container and the native object."""
+    # XXX: Note, somewhere before PUT we must reciprocate this.
+    # Unwrap any sub containers.
+    for name, container in self._containers.iteritems() :
+      setattr(self, name, container.unwrap())
+
+    return self
+  
+  
   def set_container_lens(self, lens) :
     # TODO: Shall we call on sub containers - perhaps not, since can set alignment from props
     super(LensObject, self).set_container_lens(lens)
     # For a general class container, SOURCE alignment will be a more common default.
+    # Maybe LABEL mode would be more suitable when I implement it.
     self._alignment_mode = self._container_lens.options.alignment or SOURCE
  
+
   def get_put_candidates(self, lens, concrete_input_reader) :
     # First see if the item is to be put from one of our containers.
     sub_container = self._get_item_sub_container(lens)
@@ -383,12 +409,13 @@ class LensObject(AbstractContainer) :
     # Now try to find our own candidates.
     d("Looking for own canidates. %s" % self.__dict__)
     candidates = []
-   
 
+    # Append all of our data attributes that are not None.
     for attr_name in self._get_data_attributes() :
-      value = self.__dict__[attr_name]
-      if has_value(value) and attr_name not in self.excluded_attributes :
-        candidates.append(value)
+      item = self.__dict__[attr_name]
+      if has_value(item) :
+        candidates.append(item)
+    
     return candidates
 
  
@@ -408,18 +435,6 @@ class LensObject(AbstractContainer) :
 
     raise Exception("Failed to remove item %s from %s."% (item, self))
 
-  def store_item(self, item, lens, concrete_input_reader) :
-    
-    # First see if the item is to be stored in one of our containers.
-    sub_container = self._get_item_sub_container(lens, item)
-    if sub_container :
-      d("Storing %s in container %s" % (item, sub_container))
-      return sub_container.store_item(item, lens, concrete_input_reader)
-
-    if not has_value(item._meta_data.label) :
-      raise LensException("%s expected item %s to have a label." % (self, item))
-    # TODO: If constrained attributes, check within set.
-    setattr(self, self.map_label_to_identifier(item._meta_data.label), item)
 
   def prepare_for_put(self) :
     """Here we ensure any raw containers are wrapped as AbstractContainers - the opposite of unwrap()."""
@@ -437,15 +452,9 @@ class LensObject(AbstractContainer) :
         self._containers[name] = ContainerFactory.wrap_container(raw_container)
 
 
-  def unwrap(self):
-    """We are both the container and the native object."""
-    # XXX: Note, somewhere before PUT we must reciprocate this.
-    # Unwrap any sub containers.
-    for name, container in self._containers.iteritems() :
-      setattr(self, name, container.unwrap())
-
-    return self
-
+  #
+  # Identifer mapping.
+  #
 
   def map_label_to_identifier(self, label) :
     """
@@ -471,6 +480,18 @@ class LensObject(AbstractContainer) :
     # We assume that an underscore represents a space.
     return self._map_identifier_to_label(identifier)
 
+  # He he: Really we should use a lens for these mappings, but perhaps it's
+  # easy enough to do it like this.
+  def _map_label_to_identifier(self, label) :
+    """ This might be overridded to specialise this functionality for a specific.  """
+    identifier = label.lower()
+    # XXX: We could pre-compile this regex.
+    identifier = re.sub(r"[ ]+", "_", identifier)
+    return identifier
+  
+  def _map_identifier_to_label(self, identifier) :
+    """ This might be overridded to specialise this functionality for a specific.  """
+    return identifier.replace("_", " ")
 
   def is_fully_consumed(self) :
     # Check if our items are consumed.
@@ -526,37 +547,28 @@ class LensObject(AbstractContainer) :
     return None
 
 
-  def _exclude_attributes(self) :
+  def _set_excluded_attributes(self) :
     """
-    Just excludes attributes of our object that we do not expect to be used
-    as container state.
-    This should be called on object initialisation, before any model attributes
-    are asigned.
+    In the case where the user does not constrain which attributes are treated
+    as container state (i.e. to be GOT and PUT by the lens), here we try to
+    exclude any attributes that are obviously not such state.  This
+    automatically builds a list of attributes to exclude from our container's
+    state.  This should be called on object initialisation, before any model
+    attributes are asigned.
+
+    Note that any attribute that starts with an underscore will be excluded, so
+    this aims to exclude any other attributes, such as sub-container attributes.
     """
-    self.excluded_attributes = self.__dict__.keys() + ["excluded_attributes"] + self._containers.keys()
+    self._excluded_attributes = self.__dict__.keys() + self._containers.keys()
 
 
-  
-
-  # He he: Really we should use a lens for these mappings, but perhaps it's
-  # easy enough to do it like this.
-  def _map_label_to_identifier(self, label) :
-    """ This might be overridded to specialise this functionality for a specific.  """
-    identifier = label.lower()
-    # XXX: We could pre-compile this regex.
-    identifier = re.sub(r"[ ]+", "_", identifier)
-    return identifier
-  
-  def _map_identifier_to_label(self, identifier) :
-    """ This might be overridded to specialise this functionality for a specific.  """
-    return identifier.replace("_", " ")
 
 
   def _get_data_attributes(self) :
-    """Returns the names of container items that are being used to hold data items."""
+    """Returns the names of attributes that are being used to hold data items."""
     attributes = []
     for attr_name in self.__dict__.keys() :
-      if attr_name not in self.excluded_attributes and not attr_name.startswith("_"):
+      if attr_name not in self._excluded_attributes and not attr_name.startswith("_"):
         attributes.append(attr_name)
     
     return attributes
