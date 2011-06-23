@@ -469,11 +469,10 @@ class LensObject(AbstractContainer) :
     
     # Note, if there is no raw_container, __new__ would have ensure we still have an empty container in _containers
     for name, container in self._containers.iteritems() :
-      # Note if no instance var is set, this will return class var, hence our
-      # check to see if this was an Attribute class!!!!
-      raw_container = getattr(self, name, None)
-      if not has_value(raw_container) or isinstance(raw_container, Attribute):
-        continue # Don't destroy empty container created in __new__
+      # We do not use getattr, since it may return a class attribute by same name.
+      raw_container = get_instance_attr(self, name, None)
+      if not has_value(raw_container):
+        continue # Don't destroy empty container already prepared in __new__
       raw_container = enable_meta_data(raw_container)
       if raw_container :
         self._containers[name] = ContainerFactory.wrap_container(raw_container)

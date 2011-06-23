@@ -76,9 +76,25 @@ class Properties(object):
     assert(properties.nothing == None)
 
 
+def get_class_attr(obj, name, default=None):
+  """Specifically get an attribute of an object's class."""
+  return getattr(obj.__class__, name, default)
 
+def get_instance_attr(obj, name, default=None) :
+  """
+  Specifically get an attribute of an instance (i.e. do not fall back on a
+  class attribute with the same name, as does getattr).
+  """
+  class_value = get_class_attr(obj, name)
+  obj_value = getattr(obj, name, default)
+  
+  # If there was no instance attribute by that name, getattr will return the
+  # class_value if it exists, which we do not want.
+  if has_value(class_value) and obj_value is class_value :
+    return default
+  
+  return obj_value
 
-# XXX: For efficiency, we should ensure these are only used in debug mode.
 
 def escape_for_display(s) :
   """Substitute certain chars to assist debug traces."""
@@ -106,3 +122,24 @@ def range_truncate(s, max_len=8) :
 def has_value(var) :
   """To avoid possible comparison bugs with empty values vs None."""
   return var != None
+
+
+#
+# TESTS
+#
+
+def attr_test():
+  test_description("Test behaviour of getattr when there is ambiguity over instance and class attributes")
+  class A:
+    a1 = 2
+  a = A()
+
+  assert_equal(getattr(a,"a1",None), 2)
+  assert_equal(get_instance_attr(a,"a1",None), None)
+  a.a1 = 5
+  assert_equal(getattr(a,"a1",None), 5)
+  assert_equal(get_instance_attr(a,"a1",None), 5)
+  assert_equal(get_class_attr(a,"a1",None), 2)
+
+
+
