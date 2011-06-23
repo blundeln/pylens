@@ -7,10 +7,11 @@ target: 1.0.0b1
     - Alter obj attr names to be valid python variables.
   - More example lenses.
     - Need a good example in main README to show what the framework allows
-  - Regex lens? Might as well since we have a cheeky Until lens
 
 target: 1.0.0b2
   - Allow label alignment proper (e.g. if label changes move item)
+  - Allow constrained LensException attributes.
+  - Regex lens? Might as well since we have a cheeky Until lens
 
 target: 1.0.0rc1
   - Polish code (mainly comments, etc.)

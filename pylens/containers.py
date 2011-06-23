@@ -366,6 +366,9 @@ class LensObject(AbstractContainer) :
 
     return self
 
+  #
+  # GET related.
+  #
 
   def store_item(self, item, lens, concrete_input_reader) :
     
@@ -389,7 +392,10 @@ class LensObject(AbstractContainer) :
       setattr(self, name, container.unwrap())
 
     return self
-  
+ 
+  #
+  # PUT related.
+  #
   
   def set_container_lens(self, lens) :
     # TODO: Shall we call on sub containers - perhaps not, since can set alignment from props
@@ -451,6 +457,17 @@ class LensObject(AbstractContainer) :
       if raw_container :
         self._containers[name] = ContainerFactory.wrap_container(raw_container)
 
+  def is_fully_consumed(self) :
+    # Check if our items are consumed.
+    if len(self._get_data_attributes()) > 0 :
+      return False
+
+    # Then, check if at least one of our containers is not fully consumed.
+    for sub_container in self._containers.itervalues() :
+      if not sub_container.is_fully_consumed() :
+        return False
+
+    return True
 
   #
   # Identifer mapping.
@@ -493,17 +510,9 @@ class LensObject(AbstractContainer) :
     """ This might be overridded to specialise this functionality for a specific.  """
     return identifier.replace("_", " ")
 
-  def is_fully_consumed(self) :
-    # Check if our items are consumed.
-    if len(self._get_data_attributes()) > 0 :
-      return False
-
-    # Then, check if at least one of our containers is not fully consumed.
-    for sub_container in self._containers.itervalues() :
-      if not sub_container.is_fully_consumed() :
-        return False
-
-    return True
+  #
+  # Other internal functions.
+  #
 
   def _create_containers(self) :
     """Create any sub-containers, if declared."""
