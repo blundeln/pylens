@@ -312,15 +312,33 @@ auto eth1
 
   GlobalSettings.check_consumption = False
   if True :
-    test_description("Testing NetworkInterface")
+    test_description("Test GET NetworkInterface")
     interface = get(BlankLine() + NetworkInterface, INPUT)
+    # Do some spot checks of our extracted object.
+    assert_equal(interface._meta_data.singleton_meta_data.label, "eth0-home")
+    assert_equal(interface.address_family, "inet") 
+    assert_equal(interface.method, "static") 
+    assert_equal(interface.dns_nameservers, "67.207.128.4 67.207.128.5") 
+    assert_equal(interface.up, "flush-mail") 
+    
+    test_description("Test PUT NetworkInterface")
     interface.cheese_type = "cheshire"
     interface.address = "bananas"
-    output = put(interface) 
+    output = put(interface)
+    assert_equal(output, """iface eth0-home inet static
+   netmask 255.255.255.0
+   gateway  67.207.128.1
+   dns-nameservers 67.207.128.4 67.207.128.5
+   up flush-mail
+   cheese-type cheshire
+   address bananas\n""")
 
     # Try creating from scratch.
     interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
     output = put(interface, label="wlan3")
+    assert_equal(output, """iface wlan3 inet static
+   dns-nameservers 1.2.3.4 1.2.3.5
+   netmask 255.255.255.0\n""")
    
   #
   # Now let's create a class to represent the whole configuration.
