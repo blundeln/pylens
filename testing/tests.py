@@ -352,24 +352,45 @@ auto eth1
     auto_interfaces = Container(store_items_from_lenses=[auto_lens], type=list)
   
   if True:
-    config = get(InterfaceConfiguration, INPUT)  
-    d(config.auto_interfaces)
-    d(config.interfaces)
+    test_description("GET InterfaceConfiguration")
+    config = get(InterfaceConfiguration, INPUT)
+    assert_equal(config.interfaces["eth0-home"].address, "192.168.1.1")
+    assert_equal(config.auto_interfaces[0][1],"eth0")
+    assert_equal(len(config.auto_interfaces),2)
+    
+    test_description("PUT InterfaceConfiguration")
     config.interfaces["eth0-home"].netmask = "bananas"
     config.auto_interfaces[0].insert(1,"wlan2")
-    test_description("PUT")
     output = put(config)
+    assert_equal(output, """
+iface eth0-home inet static
+   address 192.168.1.1
+   gateway  67.207.128.1
+   dns-nameservers 67.207.128.4 67.207.128.5
+   up flush-mail
+   netmask bananas
+
+auto lo wlan2 eth0
+# A comment
+auto eth1 
+""")
   
+  test_description("CREATE InterfaceConfiguration")
   GlobalSettings.check_consumption = True
   interface = NetworkInterface(address_family="inet", method="static", dns_nameservers="1.2.3.4 1.2.3.5", netmask="255.255.255.0")
   interface.some_thing = "something or another"
   config = InterfaceConfiguration()
   config.interfaces = {"eth3":interface}
   config.auto_interfaces = [["eth0"], ["wlan2", "eth2"]]
-  test_description("Putting InterfaceConfiguration")
+  
   output = put(config)
-
-  GlobalSettings.check_consumption = True
+  assert_equal(output, """iface eth3 inet static
+   dns-nameservers 1.2.3.4 1.2.3.5
+   some-thing something or another
+   netmask 255.255.255.0
+auto eth0
+auto wlan2 eth2
+""")
 
 
 def init_test():
