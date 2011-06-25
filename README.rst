@@ -99,7 +99,7 @@ We use the pylens framework as follows::
 
   # Modify the structure using standard python.
   config.auto_interfaces[0].insert(1, "wlan0")
-  config.interface_mappings.script = "/home/fred/map_script"
+  config.interface_mappings["eth0"].script = "/home/fred/map_script"
   config.interfaces["eth0-home"].dns_nameservers = ["192.168.1.4", "192.168.1.5"]
   config.interfaces["wlan0"] = Interface(address_family="inet", method="dhcp")
 
