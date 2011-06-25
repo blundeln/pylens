@@ -37,21 +37,77 @@ then put the model back into a string structure that embodies our changes.
 Example
 -----------------------------------------------------
 
-The library is used as follows::
+Suppose we have a config file that looks like this::
+
+  # Auto interfaces.
+  auto lo eth0
+
+  allow-hotplug eth1
+
+  # Define mapping for eth0.
+  mapping eth0
+       # Mapping script
+       script /usr/local/sbin/map-scheme
+       map HOME eth0-home
+       map WORK eth0-work
+
+  # eth0 home configuration.
+  iface eth0-home inet static
+       address 192.168.1.1
+       netmask 255.255.255.0
+       up flush-mail
+
+and we wish to programatically make some changes so that it becomes (the
+changes are highlighted with square brackets)::
+
+  # Auto interfaces.
+  auto lo [wlan0] eth0
+
+  allow-hotplug eth1
+
+  # Define mapping for eth0.
+  mapping eth0
+       # Mapping script
+       script [/home/fred/map_script]
+       map HOME eth0-home
+       map WORK eth0-work
+
+  # eth0 home configuration.
+  iface eth0-home inet static
+       address 192.168.1.1
+       [dns-nameservers 192.168.1.4 192.168.1.5]
+       netmask 255.255.255.0
+       up flush-mail
+  
+  [iface wlan0 inet dhcp]
+
+We use the pylens framework as follows::
   
   from pylens import *
 
-  # Define your lens (a special kind of grammar).
-  lens = ... define your lens ...
+  # Define our python model and a lens for mapping our model to
+  # and from the string structure.
+  class NetworkConfiguration(LensObject) :
+    __lens__ = [Our definition of the lens which maps
+               between the string structure and this class]
+    
+    def __init__(self, ...) :
+      ...
+  
+  # Extract our model's representation from the config string.
+  config = get(NetworkConfiguration, CONFIG_STRING)
 
-  # Extract some structured string into a python structure.
-  data = lens.get("some string structure")
+  # Modify the structure using standard python.
+  config.auto_interfaces[0].insert(1, "wlan0")
+  config.interface_mappings.script = "/home/fred/map_script"
+  config.interfaces["eth0-home"].dns_nameservers = ["192.168.1.4", "192.168.1.5"]
+  config.interfaces["wlan0"] = Interface(address_family="inet", method="dhcp")
 
-  # Manipulate your data using standard python.
-  ...
+  # Then weave the changes back into the original config string (i.e. change
+  # only what needs to be changed, disturbing as little of the original config
+  # string as possible).
+  MODIFIED_CONFIG_STRING = lens.put(config)
 
-  # Then weave your changes back into the string format.
-  output = lens.put(data)
 
 I will work on some better docs very soon, but for now you can look in the following
 source files:
@@ -59,7 +115,7 @@ source files:
 For some examples of how to use pylens, see `Examples
 <https://github.com/blundeln/pylens/tree/master/examples>`_
 
-For more examples, see the extensive unit tests and longer tests in the following files::
+For more undocumented examples, see the extensive unit tests and longer tests in the following files::
 
   testing/tests.py
   pylens/*_lenses.py
@@ -67,33 +123,26 @@ For more examples, see the extensive unit tests and longer tests in the followin
 Limitations
 -----------------------------------------------------
 
-Note that, the initial aim of this project is to see if we can create some
-richer abstractions of data (i.e. using native language objects) for use with
-lenses, but that, since we do not use an FSA like Augeas and Boomerang,
-ambiguity checking is not supported, though I'm interested in exploring
+Note that the initial aim of this project was to see if we could 
+integrate more closely the concept of lenses and bi-directional
+programming with a language such as python, allowing rich models to be
+composed of classes and native types (e.g. strings, floats, lists, dicts,
+etc.) but this has been achieved through compromise, since there is currently
+no validation of lens behavedness, which requires the expensive analysis
+of finite state automata.  You can read more about this in the theory
+references below, and how it relates to ambiguity.
+
+I am interested in exploring
 how we can implement some kind of certainty of non-ambiguity into the
-framework, if not full ambiguity checking.  pylens does not claim to be a full
-typed checked system, and leaves sanity checking down to the lens designer.
-
-The main idea here is to increase flexibility of the framework at the price of
-weaker type-checking, leaving part of that responsibility to the lens authors.
-
-Status
------------------------------------------------------
-
-For an informal TODO list see the TODO file:
-https://github.com/blundeln/pylens/blob/master/TODO
+framework, if not full ambiguity checking, so for now sanity checking is
+left down to the lens author and I have provided within the framework aids to
+support the incremental development and testing of lenses.
 
 The Theory
 -----------------------------------------------------
 
-
-For more details on the theory see the work
-relating to lenses/bi-directional-programming of Nate Foster et al. (links
-below).
-
-Pylens is Inspired By
-------------------------------------------------------
+For more details on the theory and inspiration of pylens, please see the
+following links.
 
 * Lens theory: Nate Foster, et al.: http://www.cs.cornell.edu/~jnfoster/
 * Functionality: http://augeas.net/
