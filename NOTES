@@ -1,14 +1,14 @@
 RESEARCH NOTES - for my questions and musings
   - Add Sphinx docs
-   - Add doc build to distribution
-   - Add commit test for valid doc build
    - Gen example pages from python code.
-  - Work on examples
-  - Get rid of default type on list
-  - Work on docs
+  - distribution script
+   - auto upload release
+   - auto upload generated docs
     - http://packages.python.org/an_example_pypi_project/buildanduploadsphinx.html
+  
+  - Get rid of default type on list
   - Allow richer class models:
-    - Tidy up LensObject
+    - Tidy up LensObject - have I done this already?
     - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 
   - Label ordering:

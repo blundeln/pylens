@@ -43,7 +43,7 @@ except ImportError:
 
 def run(command) :
   d(command)
-  os.system(command)
+  return os.system(command)
 
 def distribute() :
   # Store the source root dir.
@@ -70,6 +70,13 @@ def distribute() :
   # Run tests on packaged code, and if a single test fails, this will raise an
   # exception and abort our distribution.
   run("python2 scripts/run_tests.py all_tests")
+
+  # Build docs
+  #os.chdir(SOURCE_DIR)
+  exit_code = run("python2 scripts/generate_docs.py")
+  if exit_code :
+    raise Exception("Failed to build sphinx docs for distribution.")
+  
 
   # TODO: Upload package and docs to PyPi.
   # TODO: Test local installation - perhaps not necessary.
