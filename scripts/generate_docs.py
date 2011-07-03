@@ -33,7 +33,6 @@
 # 
 #
 
-import glob
 import os
 
 try :
@@ -45,34 +44,15 @@ def run(command) :
   d(command)
   os.system(command)
 
-def distribute() :
-  # Store the source root dir.
-  # TODO: Generate sphinx docs for the package and for upload to a web server.
-  # sphinx-build -b html ./source ./build
+def main():
   SOURCE_DIR = os.getcwd()
   
-  # Create docs.
-  run("cp README.rst README") # For PyPi
+  # Generate index.rst from our README file.
+  index_content = open("README.rst").read()
+  index_content = index_content.replace(".. TOC", "\n\n\n" + open("docs/source/master_toc").read())
+  open("docs/source/index.rst", "w").write(index_content)
   
-  # Remove all old dist files
-  run("rm -rf dist")
-  
-  # Create a source distribution.
-  run("python2 setup.py sdist")
-  
-  # Extract the package for inspection.
-  os.chdir("dist")
-  source_package = glob.glob("pylens*.gz")[0]
-  package_root = source_package.replace(".tar.gz", "")
-  run("tar xzf %s" % source_package)
-  os.chdir(package_root)
-  
-  # Run tests on packaged code, and if a single test fails, this will raise an
-  # exception and abort our distribution.
-  run("python2 scripts/run_tests.py all_tests")
-
-  # TODO: Upload package and docs to PyPi.
-  # TODO: Test local installation - perhaps not necessary.
+  run("sphinx-build -W -b html docs/source docs/build")
 
 if __name__ == "__main__" :
-  distribute()
+  main()

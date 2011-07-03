@@ -3,6 +3,8 @@ Pylens - Object Serialisation through a Lens
 
 Author: Nick Blundell (http://www.nickblundell.org.uk)
 
+.. TOC
+
 Here is the Problem
 -----------------------------------------------------
 

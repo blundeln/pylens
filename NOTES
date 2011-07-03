@@ -1,6 +1,8 @@
 RESEARCH NOTES - for my questions and musings
   - Add Sphinx docs
-   - set up docs and distribution script
+   - Add doc build to distribution
+   - Add commit test for valid doc build
+   - Gen example pages from python code.
   - Work on examples
   - Get rid of default type on list
   - Work on docs
@@ -16,10 +18,6 @@ RESEARCH NOTES - for my questions and musings
     - LABEL mode
       - Now Or fixed for A | empty() case, can make source order mode more accurate by matching exact source position of gotten items.
         - Or perhaps it is fine as it is: ordering put candidates by source.
-  - dist
-    - Copy README.rst to README for benefit of PyPi
-    - Gen some html docs, perhaps with sphinx and some custom parsing of example
-      code.
   - Get rid of default type on List lens - too confusing and not really
     intuitive in most cases.
   
