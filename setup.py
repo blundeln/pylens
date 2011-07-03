@@ -29,6 +29,11 @@ from distutils.core import setup
 
 from pylens import version
 
+# Add distutils extensions.
+sys.path.append("third_party")
+import sphinx_pypi_upload
+
+
 data_files = [ ]
 
 setup(
@@ -49,4 +54,7 @@ setup(
   ],
   packages=['pylens'],
   data_files=data_files,
+  cmdclass = {
+    "upload_docs": sphinx_pypi_upload.UploadDoc,
+  }
 )

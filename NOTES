@@ -1,9 +1,9 @@
 RESEARCH NOTES - for my questions and musings
+  - auto upload generated docs
   - Add Sphinx docs
    - Gen example pages from python code.
   - distribution script
    - auto upload release
-   - auto upload generated docs
     - http://packages.python.org/an_example_pypi_project/buildanduploadsphinx.html
   
   - Get rid of default type on list

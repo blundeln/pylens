@@ -45,7 +45,7 @@ def run(command) :
   d(command)
   return os.system(command)
 
-def distribute() :
+def distribute(upload=False) :
   # Store the source root dir.
   # TODO: Generate sphinx docs for the package and for upload to a web server.
   # sphinx-build -b html ./source ./build
@@ -77,8 +77,10 @@ def distribute() :
   if exit_code :
     raise Exception("Failed to build sphinx docs for distribution.")
   
-
-  # TODO: Upload package and docs to PyPi.
+  # TODO: perhaps put this in a separate script to be run manually.
+  if upload :
+    # TODO: Test this.
+    run("python2 setup.py upload_docs")
   # TODO: Test local installation - perhaps not necessary.
 
 if __name__ == "__main__" :

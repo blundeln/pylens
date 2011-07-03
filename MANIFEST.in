@@ -1,5 +1,6 @@
 include *.rst
 recursive-include testing *.py
+recursive-include third_party *.py
 recursive-include docs/source *
 recursive-include examples *.py
 recursive-include scripts *.py

@@ -51,8 +51,10 @@ def main():
   index_content = open("README.rst").read()
   index_content = index_content.replace(".. TOC", "\n\n\n" + open("docs/source/master_toc").read())
   open("docs/source/index.rst", "w").write(index_content)
-  
-  exit_code = run("sphinx-build -W -b html docs/source docs/build")
+ 
+  # Generate tutorials from source.
+
+  exit_code = run("sphinx-build -W -b html docs/source docs/build/html")
   if exit_code :
     raise Exception("Sphinx build failed")
 
