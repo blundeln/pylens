@@ -42,7 +42,7 @@ except ImportError:
 
 def run(command) :
   d(command)
-  os.system(command)
+  return os.system(command)
 
 def main():
   SOURCE_DIR = os.getcwd()
@@ -52,7 +52,9 @@ def main():
   index_content = index_content.replace(".. TOC", "\n\n\n" + open("docs/source/master_toc").read())
   open("docs/source/index.rst", "w").write(index_content)
   
-  run("sphinx-build -W -b html docs/source docs/build")
+  exit_code = run("sphinx-build -W -b html docs/source docs/build")
+  if exit_code :
+    raise Exception("Sphinx build failed")
 
 if __name__ == "__main__" :
   main()
