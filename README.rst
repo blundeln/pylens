@@ -110,17 +110,19 @@ We use the pylens framework as follows::
   # string as possible).
   MODIFIED_CONFIG_STRING = lens.put(config)
 
+Documentation
+-----------------------------------------------------
 
-I will work on some better docs very soon, but for now you can look in the following
-source files:
+You can find online documentation for pylens here:
+http://packages.python.org/pylens/
 
-For some examples of how to use pylens, see `Examples
-<https://github.com/blundeln/pylens/tree/master/examples>`_
+For more of a detailed insight into pylens, you might also wish to look at some of the
+source files, which contain extensive testing code::
 
-For more undocumented examples, see the extensive unit tests and longer tests in the following files::
-
+  examples/*.py
   testing/tests.py
   pylens/*_lenses.py
+
 
 Limitations
 -----------------------------------------------------
