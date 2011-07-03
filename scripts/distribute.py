@@ -33,24 +33,45 @@
 # 
 #
 
-from nbdebug import d
+import glob
+import os
+
+try :
+  from nbdebug import d
+except ImportError:
+  def d(*args, **kargs):pass
 
 def run(command) :
   d(command)
+  os.system(command)
 
-def main() :
-  # rm -rf ~/.local/lib/python2.7/site-packages/pylens*
-  # python2 setup.py sdist
-  # cd dist
-  # tar xzf pylens-1.0.0a2.tar.gz
-  # cd pylens-1....
-  # python2 setup.py install --user
-  # cd ../../examples
-  # NBDEBUG="" python2 advanced.py
-  # Actually, might as well run the full test script
-  # Then perhaps upload: python2 setup.py sdist upload
-  pass
+def distribute() :
+  # Store the source root dir.
+  # TODO: Generate sphinx docs for the package and for upload to a web server.
+  SOURCE_DIR = os.getcwd()
   
+  # Create docs.
+  run("cp README.rst README") # For PyPi
+  
+  # Remove all old dist files
+  run("rm -rf dist")
+  
+  # Create a source distribution.
+  run("python2 setup.py sdist")
+  
+  # Extract the package for inspection.
+  os.chdir("dist")
+  source_package = glob.glob("pylens*.gz")[0]
+  package_root = source_package.replace(".tar.gz", "")
+  run("tar xzf %s" % source_package)
+  os.chdir(package_root)
+  
+  # Run tests on packaged code, and if a single test fails, this will raise an
+  # exception and abort our distribution.
+  run("python2 scripts/run_tests.py all_tests")
+
+  # TODO: Upload package and docs to PyPi.
+  # TODO: Test local installation - perhaps not necessary.
 
 if __name__ == "__main__" :
-  main()
+  distribute()

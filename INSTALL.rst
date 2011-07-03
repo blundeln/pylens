@@ -26,3 +26,11 @@ Or, to test specific things::
 For detailed debug log (using module nbdebug), run like this::
 
   $ NBDEBUG="" python scripts/run_tests.py test iface_test
+
+
+Development Notes
+=========================================================
+
+To generate and test the package, then upload it and the docs to PyPi run::
+  
+  python2 ./scripts/distribute.py

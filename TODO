@@ -2,11 +2,9 @@ TODO
 ----
 
 target: 1.0.0b1
-  - Allow the definition of arbitrary type containers.
-    - This is what I have been heading towards.
-    - Alter obj attr names to be valid python variables.
   - More example lenses.
     - Need a good example in main README to show what the framework allows
+  - Basic docs
 
 target: 1.0.0b2
   - Allow label alignment proper (e.g. if label changes move item)

@@ -29,7 +29,7 @@ from distutils.core import setup
 
 from pylens import version
 
-data_files = []
+data_files = [ ]
 
 setup(
   name='pylens',
