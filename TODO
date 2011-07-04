@@ -2,8 +2,6 @@ TODO
 ----
 
 target: 1.0.0b1
-  - More example lenses.
-    - Need a good example in main README to show what the framework allows
   - Basic docs
 
 target: 1.0.0b2

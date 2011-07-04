@@ -34,6 +34,10 @@
 #
 
 import os
+import sys
+import re
+
+SOURCE_DIR = os.getcwd()
 
 try :
   from nbdebug import d
@@ -44,15 +48,66 @@ def run(command) :
   d(command)
   return os.system(command)
 
-def main():
-  SOURCE_DIR = os.getcwd()
+def generate_pages_from_example_code(python_file) :
+  d(python_file)
   
+  content = open(python_file).read()
+
+  while True:
+    # Match the test function.
+    match = re.search("def\s+(.+?)_test", content, re.DOTALL)
+    if not match :
+      break
+    
+    d(match.group(1))
+    content = content[match.end(0):]
+    
+    # Now try to match comments and code.
+    match = re.search("\"\"\"(.+?)\"\"\"", content, re.DOTALL)
+    if match :
+      d(match.group(1))
+      content = content[match.end(0):]
+
+    match = re.search("#(.+?)\n", content, re.DOTALL)
+    if match :
+      d(match.group(1))
+      content = content[match.end(0):]
+    
+  
+  return
+  lines = open(python_file).readlines()
+  pages = {}
+  current_page = None
+  current_text = []
+  current_code = []
+  for line in lines:
+    
+    # Start a new page from the test function.
+    match = re.search("def\s+(.+)_test", line)
+    if match: 
+      current_page = match.group(1)
+      pages[current_page] = []
+      
+
+  d(pages)
+
+def generate_docs_from_example_tests():
+  d("sds")
+ 
+  generate_pages_from_example_code(os.path.join(SOURCE_DIR, "examples/basic.py"))
+  sys.exit(0)
+
+def main():
+  
+  # Generate tutorials from source.
+  generate_docs_from_example_tests()
+  
+
   # Generate index.rst from our README file.
   index_content = open("README.rst").read()
   index_content = index_content.replace(".. TOC", "\n\n\n" + open("docs/source/master_toc").read())
   open("docs/source/index.rst", "w").write(index_content)
  
-  # Generate tutorials from source.
 
   exit_code = run("sphinx-build -W -b html docs/source docs/build/html")
   if exit_code :
