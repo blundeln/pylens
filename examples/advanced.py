@@ -46,8 +46,7 @@ def complex_class_test() :
   could compose such a mapping.
   """
  
-  INPUT = """
-iface eth0-home inet static
+  INPUT = """iface eth0-home inet static
    address 192.168.1.1
    netmask 255.255.255.0
    gateway  67.207.128.1
@@ -107,8 +106,7 @@ auto eth1
     config.interfaces["eth0-home"].netmask = "bananas"
     config.auto_interfaces[0].insert(1,"wlan2")
     output = put(config)
-    assert_equal(output, """
-iface eth0-home inet static
+    assert_equal(output, """iface eth0-home inet static
    address 192.168.1.1
    gateway  67.207.128.1
    dns-nameservers 67.207.128.4 67.207.128.5

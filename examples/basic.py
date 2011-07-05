@@ -334,10 +334,14 @@ def mapping_lenses_to_classes_test():
   # Let's alter out abstract model, then put it back as a string.
   people.insert(1,Person("Fred", "Flintstone"))
   output = lens.put(people)
+  
+  # Note that there is a minor limitation in the framework that means Fred's last name is
+  # listed in arbitrary order in this example, though I will fix this minor
+  # issue soon.
   assert(output == "Person::Name:nick,Last Name:blundell;Person::Last Name:Flintstone,Name:Fred;Person::Name:albert,Last Name:camus" or output == "Person::Name:nick,Last Name:blundell;Person::Name:Fred,Last Name:Flintstone;Person::Name:albert,Last Name:camus")
-  # Great.
-  # Note that there is a fundamental limitation in the framework that means Fred's last name is
-  # listed in arbitrary order in this example, though I have an idea to fix this which I will work on soon.
+ 
+  # For more details on usage, until I add to this documentation, please see
+  # the source files, which contain lots of testing code.
 
 
 # TODO: Alignment mode examples.

@@ -36,6 +36,7 @@
 import os
 import sys
 import re
+import glob
 
 SOURCE_DIR = os.getcwd()
 
@@ -57,7 +58,7 @@ def generate_pages_from_example_code(python_file) :
   matches = []
 
   multiline_comment_matches = []
-  for match in re.finditer("^\s+\"\"\"(.+?)\"\"\".*?\n", content, re.DOTALL + re.MULTILINE) :
+  for match in re.finditer("^\s\s\"\"\"(.+?)\"\"\".*?\n", content, re.DOTALL + re.MULTILINE) :
     if match:
       multiline_comment_matches.append(match)
   
@@ -122,14 +123,29 @@ def generate_pages_from_example_code(python_file) :
 
 
 def generate_docs_from_example_tests():
-  output = generate_pages_from_example_code(os.path.join(SOURCE_DIR, "examples/basic.py"))
+  examples_path = os.path.join(SOURCE_DIR, "examples")
+  
   try :
     os.makedirs("docs/source/examples")
   except :
-    pass
+    run("rm docs/source/examples/*.rst")
+  
+  for source_file in glob.glob(examples_path+"/*.py") :
+    name = os.path.basename(source_file).replace(".py","")
+    
+    # TODO: Improve handling of fully-left justified code.
+    if name != "basic" :
+      continue
+    
+    if name.startswith("_") :
+      continue
+    output = generate_pages_from_example_code(source_file)
 
-  if output.strip() :
-    open("docs/source/examples/basic.rst","w").write(output)
+    # Add page title
+    output = name.capitalize() + "\n" + "="*80 + "\n\n" + output
+
+    if output.strip() :
+      open("docs/source/examples/%s.rst" % name,"w").write(output)
 
 def main():
   
