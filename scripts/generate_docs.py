@@ -48,54 +48,88 @@ def run(command) :
   d(command)
   return os.system(command)
 
+
 def generate_pages_from_example_code(python_file) :
   d(python_file)
   
   content = open(python_file).read()
+ 
+  matches = []
 
-  while True:
-    # Match the test function.
-    match = re.search("def\s+(.+?)_test", content, re.DOTALL)
-    if not match :
-      break
-    
-    d(match.group(1))
-    content = content[match.end(0):]
-    
-    # Now try to match comments and code.
-    match = re.search("\"\"\"(.+?)\"\"\"", content, re.DOTALL)
-    if match :
-      d(match.group(1))
-      content = content[match.end(0):]
-
-    match = re.search("#(.+?)\n", content, re.DOTALL)
-    if match :
-      d(match.group(1))
-      content = content[match.end(0):]
-    
+  multiline_comment_matches = []
+  for match in re.finditer("^\s+\"\"\"(.+?)\"\"\".*?\n", content, re.DOTALL + re.MULTILINE) :
+    if match:
+      multiline_comment_matches.append(match)
   
-  return
-  lines = open(python_file).readlines()
-  pages = {}
-  current_page = None
-  current_text = []
-  current_code = []
-  for line in lines:
-    
-    # Start a new page from the test function.
-    match = re.search("def\s+(.+)_test", line)
-    if match: 
-      current_page = match.group(1)
-      pages[current_page] = []
-      
+  hash_comment_matches = []
+  for match in re.finditer("^\s\s#(.*?)\n", content, re.DOTALL + re.MULTILINE) :
+    if match:
+      hash_comment_matches.append(match)
 
-  d(pages)
+  
+  test_function_matches = []
+  for match in re.finditer("def\s+(.+?)_test.+?\n", content, re.DOTALL) :
+    if match:
+      test_function_matches.append(match)
+
+  all_matches = []
+  all_matches.extend(multiline_comment_matches)
+  all_matches.extend(hash_comment_matches)
+  all_matches.extend(test_function_matches)
+
+  # Sort matches by their source positions.
+  all_matches = sorted(all_matches, key=lambda x: x.start())
+  
+  output_blocks = []
+  prev_match = None
+  for match in all_matches:
+    if prev_match :
+      code_block = content[prev_match.end(0):match.start(0)].strip()
+
+      if code_block :
+        code_block = "\n\n::\n\n  %s\n\n" % code_block
+        output_blocks.append([prev_match.end(0), code_block])
+    prev_match = match
+
+
+  match = None
+  for match in all_matches:
+    text = match.group(1)
+    if match in test_function_matches:
+      text = "\n\n" + " ".join([s.capitalize() for s in text.split("_")]) + "\n" + "-"*80 + "\n\n"
+    elif match in multiline_comment_matches:
+      text = text.replace("\n  ","\n")+"\n\n"
+    elif match in hash_comment_matches:
+      text = text[1:]+"\n"
+    output_blocks.append((match.start(0), text))
+
+  output_blocks = sorted(output_blocks, key=lambda x: x[0])
+
+  output = ""
+  for x in output_blocks :
+    output += x[1]
+
+
+  return output
+
+  open("test.rst","w").write(output)
+
+  # TODO
+  #  Add functions
+  #  Put all matches together and sort by source order
+  #  Figure out code blocks from comments.
+  #  Build each function into an rst page
+
 
 def generate_docs_from_example_tests():
-  d("sds")
- 
-  generate_pages_from_example_code(os.path.join(SOURCE_DIR, "examples/basic.py"))
-  sys.exit(0)
+  output = generate_pages_from_example_code(os.path.join(SOURCE_DIR, "examples/basic.py"))
+  try :
+    os.makedirs("docs/source/examples")
+  except :
+    pass
+
+  if output.strip() :
+    open("docs/source/examples/basic.rst","w").write(output)
 
 def main():
   

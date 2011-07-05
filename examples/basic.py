@@ -70,7 +70,7 @@ def fundamentals_test() :
   
   # This lens, though in itself not so interesting, demonstrates the interface of a lens and
   # some fundamental properties.  This lens will GET and PUT a single character
-  # if it falls withing the set of 'nums' (simply a predefined set of chars
+  # if it falls within the set of 'nums' (simply a predefined set of chars
   # '1234..89'); otherwise it will fail.
   #
   # There are two main types of lenses: those that STORE items into the abstract
@@ -149,6 +149,7 @@ def joining_lenses_test() :
   #  - A + B + C -> And(A, B, C)
   #  - "---" -> Literal("---"), where possible literal strings will be
   #    interpreted within aggregate lenses as the Literal lens.
+  #
   # And since we use '+', we use the convenience lens 'Group' to set some
   # parameters of the And lens it contains - in this case we set the type to
   # list.
@@ -213,17 +214,13 @@ def useful_lenses_test() :
   assert(variables == ["variable_1", "variable_2", "variable_3"])
   # Whitespace(default_output): Optionally matches one or more common whitespace chars.
   # WS(): Just a shortcut alias of Whitespace.
-  # Word(body_chars[, init_chars]): for matching keywords of certain body and
-  #   initial characters.
+  # Word(body_chars[, init_chars]): for matching keywords of certain body and initial characters.
   # NewLine(): Matches the end of a line but also optionally the end of the input string.
 
   variables.extend(["variable_4", "variable_5"])
   output = lens.put(variables)
   assert(output == "\tvariable_1    \n     variable_2\n variable_3\n\tvariable_4\n\tvariable_5\n")
   
-  # For others, look in the pylens/*_lenses.py files, and look at their
-  # accompanying test cases.
-
 
 
 def simple_list_test() :
@@ -259,7 +256,7 @@ def more_complex_structure_test() :
 
   animals: [snake,tiger,monkey]
   food: [beans, eggs]
-"""
+  """
 
   # This lens defines the comma separator of the list lens we will use it in
   # next.  For convenience, the first arg of Whitespace is the default value to

@@ -5,3 +5,4 @@ dist
 build
 README
 docs/source/index.rst
+docs/source/examples
