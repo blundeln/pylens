@@ -33,4 +33,4 @@ Development Notes
 
 To generate and test the package, then upload it and the docs to PyPi run::
   
-  python2 ./scripts/distribute.py
+  python2 ./scripts/distribute.py [upload]

@@ -232,7 +232,6 @@ def simple_list_test() :
   # whitespace and delimiters.
   lens = List(Word(alphas, type=str), WS("") + "," + WS(" ", optional=True))
   got = lens.get(INPUT_STRING)
-  d(got)
   assert(got == ["monkeys", "monsters", "rabbits", "frogs", "badgers"])
 
   # But the idea of a lens (a bi-directional parsing element) is that once we
@@ -242,7 +241,6 @@ def simple_list_test() :
   del got[1] # Remove 'monsters'
   got.extend(["dinosaurs", "snails"])
   output = lens.put(got)
-  d(output)
 
   # Notice, from my assert statement, that additional spacing was preserved in
   # the outputted list and that the new items on the end use default spacing
@@ -288,7 +286,6 @@ def more_complex_structure_test() :
   assert(got == {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
   got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
-  d(output)
   assert_equal(output, """
   people: [bill, ben]
 

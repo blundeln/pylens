@@ -1,9 +1,6 @@
 TODO
 ----
 
-target: 1.0.0b1
-  - Basic docs
-
 target: 1.0.0b2
   - Allow label alignment proper (e.g. if label changes move item)
   - Allow constrained LensException attributes.

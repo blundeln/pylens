@@ -35,6 +35,7 @@
 
 import glob
 import os
+import sys
 
 try :
   from nbdebug import d
@@ -77,11 +78,11 @@ def distribute(upload=False) :
   if exit_code :
     raise Exception("Failed to build sphinx docs for distribution.")
   
-  # TODO: perhaps put this in a separate script to be run manually.
   if upload :
     # TODO: Test this.
+    run("python2 setup.py sdist upload")
     run("python2 setup.py upload_docs")
   # TODO: Test local installation - perhaps not necessary.
 
 if __name__ == "__main__" :
-  distribute()
+  distribute(upload = "upload" in sys.argv)

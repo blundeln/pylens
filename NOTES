@@ -1,11 +1,4 @@
 RESEARCH NOTES - for my questions and musings
-  - for beta 1
-    - Add Sphinx docs
-     - Gen example pages from python code.
-      - auto upload generated docs - check this works
-    - distribution script
-     - auto upload release
-      - http://packages.python.org/an_example_pypi_project/buildanduploadsphinx.html
     
   - Get rid of default type on list
   - Allow richer class models:
