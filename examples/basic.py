@@ -255,8 +255,7 @@ def more_complex_structure_test() :
   people: [bill, ben]
 
   animals: [snake,tiger,monkey]
-  food: [beans, eggs]
-  """
+  food: [beans, eggs]\n"""
 
   # This lens defines the comma separator of the list lens we will use it in
   # next.  For convenience, the first arg of Whitespace is the default value to
