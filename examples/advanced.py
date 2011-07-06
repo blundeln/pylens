@@ -239,7 +239,7 @@ Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
   # Now we wrap the package options in a comma separated list.  Notice how we do
   # not set the type to list, since we wish these items to be stored in a higher
   # level list, to avoid excessive list nesting.
-  depends_list = List(package_options, comma_sep, type=None)
+  depends_list = List(package_options, comma_sep)
 
   # It might be over the top, but let's make sure this part works too.
   # Note that, for the isolated test of this lens we must set a type on it,

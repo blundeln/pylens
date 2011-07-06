@@ -262,7 +262,7 @@ def more_complex_structure_test() :
   
   # This defines the comma-separated list lens, specifying that we wish to store
   # the items (which contain only the alphabhetic characters) as strings.
-  item_list = List(Word(alphas, type=str), comma_separator, type=None)
+  item_list = List(Word(alphas, type=str), comma_separator)
   
   # Recall, WS is simply an abbreviation of the Whitespace lens.
   entry = Group(WS("  ") + Word(alphas, is_label=True) + WS("") + ":" + WS("") + "[" + item_list + "]" + NewLine(), type=list)
@@ -311,7 +311,6 @@ def mapping_lenses_to_classes_test():
     __lens__ = "Person::" + List(
       KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
       ",",
-      type=None
     )
     
     def __init__(self, name, last_name) :

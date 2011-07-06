@@ -1,9 +1,10 @@
 RESEARCH NOTES - for my questions and musings
     
-  - Fix example generation for advanced.py
-  - Allow richer class models:
-    - Tidy up LensObject - have I done this already?
-    - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
+  - Docs
+    - Fix example generation for advanced.py
+    - API docs
+  
+  - Describe constrained attributes on LensObject (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 
   - Label ordering:
     - think about ordering for CREATED items - praps relate to above point on
