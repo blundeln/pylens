@@ -1,6 +1,6 @@
 RESEARCH NOTES - for my questions and musings
     
-  - Get rid of default type on list
+  - Fix example generation for advanced.py
   - Allow richer class models:
     - Tidy up LensObject - have I done this already?
     - Describe constrained attributes (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)

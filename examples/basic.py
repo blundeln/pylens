@@ -80,7 +80,7 @@ def fundamentals_test() :
   # the set of digit characters.
   lens = AnyOf(nums, type=int)
   
-  # So when we call GET on the lens with an input string "123" we extract a 1.
+  # So when we call GET on the lens with an input string "1" we extract a 1.
   my_number = lens.get("1")
   assert(my_number == 1)
 
@@ -230,7 +230,7 @@ def simple_list_test() :
   # the item and a lens for the delimiter.  In this case we wish to extract the
   # animal names as strings to store in a list, whereas we wish to discard the
   # whitespace and delimiters.
-  lens = List(Word(alphas, type=str), WS("") + "," + WS(" ", optional=True))
+  lens = List(Word(alphas, type=str), WS("") + "," + WS(" ", optional=True), type=list)
   got = lens.get(INPUT_STRING)
   assert(got == ["monkeys", "monsters", "rabbits", "frogs", "badgers"])
 

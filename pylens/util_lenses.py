@@ -76,18 +76,14 @@ class Optional(Or) :
 
 
 class List(And) :
-  # XXX: Perhaps we shouldn't default to a list type - since it is a bit
-  # obscure.
-  """Shortcut for defining a lens-delimetered list."""
+  """Shortcut lens for delimited lists."""
   def __init__(self, lens, delimiter_lens, **kargs):
-    if "type" not in kargs :
-      kargs["type"] = list
     super(List, self).__init__(lens, ZeroOrMore(And(delimiter_lens, lens)), **kargs)
 
   @staticmethod
   def TESTS() :
     
-    lens = List(AnyOf(nums, type=int), ",")
+    lens = List(AnyOf(nums, type=int), ",", type=list)
     d("GET")
     assert(lens.get("1,2,3") == [1,2,3])
     d("PUT")
@@ -97,8 +93,9 @@ class List(And) :
     test_description("Test a bug I found with nested lists.")
     INPUT = "1|2,3|4,5|6"
     lens = List(
-             List(AnyOf(nums, type=int), "|", name="inner_list"),
-             ",", name="outer_list"
+             List(AnyOf(nums, type=int), "|", name="inner_list", type=list),
+             ",", name="outer_list",
+             type=list,
            )
     got = lens.get(INPUT)
     assert_equal(got, [[1,2],[3,4],[5,6]])

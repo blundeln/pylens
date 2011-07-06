@@ -3,8 +3,8 @@ TODO
 
 target: 1.0.0b2
   - Allow label alignment proper (e.g. if label changes move item)
-  - Allow constrained LensException attributes.
-  - Regex lens? Might as well since we have a cheeky Until lens
+  - Allow constrained (and explicitly ordered) LensException attributes.
+  - More docs: API
 
 target: 1.0.0rc1
   - Polish code (mainly comments, etc.)
@@ -12,6 +12,7 @@ target: 1.0.0rc1
 
 
 target: future
+  - Regex lens? Might as well since we have a cheeky Until lens
   - Use of auto containers for convenience of when none is specified.
   - Port for python 3
   - How to handle default indentation in recursive grammars.

@@ -225,6 +225,7 @@ Build-Depends-Indep: perl (>= 5.8.8-12), libcarp-assert-more-perl,
                       ),
                       option_sep,
                       auto_list=True,
+                      type=list,
                     )
   
   got = package_options.get("perl-modules (>= 5.10) | libmodule-build-perl") 
