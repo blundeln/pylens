@@ -312,34 +312,44 @@ def mapping_lenses_to_classes_test():
       KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
       ",",
     )
-    
+   
+    # If we declare attributes of our model, we can (a) restrict lens storage
+    # only to these and (b) define the order of which item to PUT first when
+    # CREATEing, otherwise order would be arbitrary..
+    # If we don't declare these, the lens can use any (viable) attribute of the
+    # object.
+    name = Attribute()
+    last_name = Attribute()
+
     def __init__(self, name, last_name) :
       self.name, self.last_name = name, last_name
 
   # Extract a person instance from the string.  Note how the field with label
   # "Last Name" gets mapped automatically to the attribute last_name. 
-  person = get(Person, "Person::Name:nick,Last Name:blundell")
-  assert(person.name == "nick" and person.last_name == "blundell")
+  person = get(Person, "Person::Name:Nick,Last Name:Blundell")
+  assert(person.name == "Nick" and person.last_name == "Blundell")
 
   # We can use the class as part of a larger lens now.
   lens = List(Person, ";", type=list)
-  people = lens.get("Person::Name:nick,Last Name:blundell;Person::Name:albert,Last Name:camus")
+  people = lens.get("Person::Name:Nick,Last Name:Blundell;Person::Last Name:Camus,Name:Albert")
   # Here extract a python list of Person instances.
-  assert(people[0].name == "nick" and people[1].last_name == "camus")
+  assert(people[0].name == "Nick" and people[1].last_name == "Camus")
 
-  # Let's alter out abstract model, then put it back as a string.
+  # Let's alter our abstract model, then put it back as a string.
   people.insert(1,Person("Fred", "Flintstone"))
   output = lens.put(people)
   
-  # Note that there is a minor limitation in the framework that means Fred's last name is
-  # listed in arbitrary order in this example, though I will fix this minor
-  # issue soon.
-  assert(output == "Person::Name:nick,Last Name:blundell;Person::Last Name:Flintstone,Name:Fred;Person::Name:albert,Last Name:camus" or output == "Person::Name:nick,Last Name:blundell;Person::Name:Fred,Last Name:Flintstone;Person::Name:albert,Last Name:camus")
+  # Note, here, that when we CREATE the new person, Fred, the order in which
+  # 'Name' and 'Last Name' would be arbitrary should we not have optionally
+  # declared those attributes, name and last_name, within our class.
+  # In the case where we modify an existing (i.e. GOT) Person the labelled items
+  # will be aligned according to the original source.
+  assert_equal(output, "Person::Name:Nick,Last Name:Blundell;Person::Name:Fred,Last Name:Flintstone;Person::Last Name:Camus,Name:Albert")
  
   # For more details on usage, until I add to this documentation, please see
   # the source files, which contain lots of testing code.
 
-
+#
 # TODO: Alignment mode examples.
 # TODO: Until, auto_list
 # TODO: Aggregate containers.

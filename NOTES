@@ -1,22 +1,14 @@
 RESEARCH NOTES - for my questions and musings
     
   - Docs
+    - assert_equals(X, Y) => X --> Y
     - Fix example generation for advanced.py
     - API docs
-  
-  - Describe constrained attributes on LensObject (e.g.  last_name = Attribute(create_label="Last Name", default_value=...)
 
-  - Label ordering:
-    - think about ordering for CREATED items - praps relate to above point on
-      constraining attributes.
-      - perhaps proper LABEL ordering is what we want for this case - otherwise we may over complicate things
+  - (Proper) Label ordering:
     - LABEL mode
       - Now Or fixed for A | empty() case, can make source order mode more accurate by matching exact source position of gotten items.
         - Or perhaps it is fine as it is: ordering put candidates by source.
-  - Get rid of default type on List lens - too confusing and not really
-    intuitive in most cases.
-  
-  - Re-organise these notes! and put broad feature ideas in TODO, rather than here.
   
   ------------- Misc ideas
   - Automate use of Until for partial parsing of input strings

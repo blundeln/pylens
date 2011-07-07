@@ -2,11 +2,10 @@ TODO
 ----
 
 target: 1.0.0b2
-  - Allow label alignment proper (e.g. if label changes move item)
-  - Allow constrained (and explicitly ordered) LensException attributes.
-  - More docs: API
+  - More docs: API + improve
 
 target: 1.0.0rc1
+  - Allow label alignment proper (e.g. if label changes move item)
   - Polish code (mainly comments, etc.)
   - Docs, site and bug tracker set up for launch.
 

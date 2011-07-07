@@ -329,9 +329,28 @@ class DictContainer(ListContainer) :
 # LensObject and related classes.
 #
 
-# These are used for describing LensObject attributes and nested containers.
-class Attribute(Properties) : pass
-class Container(Attribute) : pass
+# Note that later we may manipulate attribute actions based on arbitrary
+# properties set on these two classes, such as specific label-attribute
+# mappings, etc.
+
+class Attribute(Properties) : 
+  """
+  This class is used for declaring an attribute of a LensObject
+  
+  The static counter is used so we can infer the order of declaration of attributes.
+  """
+  
+  counter = 0
+  def __init__(self, *args, **kargs) :
+    super(Attribute, self).__init__(*args, **kargs)
+    self._counter = self.__class__.counter
+    self.__class__.counter += 1
+    
+    
+class Container(Attribute) :
+  """Used for declaring a container attribute of a LensObject."""
+  pass
+
 
 class LensObject(AbstractContainer) :
   """
@@ -359,7 +378,7 @@ class LensObject(AbstractContainer) :
     self = super(LensObject, cls).__new__(cls, *args, **kargs)
   
     # If sub-containers have been specified on the class, instantiate them on the instance.
-    self._create_containers()
+    self._create_containers_and_attributes()
 
     # Exclude attributes that should not be considered as container state.
     self._set_excluded_attributes()
@@ -417,7 +436,11 @@ class LensObject(AbstractContainer) :
     candidates = []
 
     # Append all of our data attributes that are not None.
-    for attr_name in self._get_data_attributes() :
+    for attr_name in self._get_attribute_names() :
+      # Skip if the item has not been set.
+      if attr_name not in self.__dict__ :
+        continue
+
       item = self.__dict__[attr_name]
       if has_value(item) :
         candidates.append(item)
@@ -459,8 +482,9 @@ class LensObject(AbstractContainer) :
 
   def is_fully_consumed(self) :
     # Check if our items are consumed.
-    if len(self._get_data_attributes()) > 0 :
-      return False
+    for attribute_name in self._get_attribute_names() :
+      if attribute_name in self.__dict__ and has_value(self.__dict__[attribute_name]) :
+        return False
 
     # Then, check if at least one of our containers is not fully consumed.
     for sub_container in self._containers.itervalues() :
@@ -514,23 +538,23 @@ class LensObject(AbstractContainer) :
   # Other internal functions.
   #
 
-  def _create_containers(self) :
+  def _create_containers_and_attributes(self) :
     """Create any sub-containers, if declared."""
     self._containers = {}
+    self._constrained_attributes = {}
     for key, value in self.__class__.__dict__.iteritems() :
-      if not isinstance(value, Container) :
-        continue
-      container_properties = value
-      assert_msg(has_value(container_properties.type), "You must declare a type for the container definition '%s'." % key)
-      container = ContainerFactory.create_container(container_properties.type)
-      assert_msg(has_value(container), "Could not create an appropriate container for '%s'." % key)
-      self._containers[key] = container
+      # Handle containers.
+      if isinstance(value, Container) :
+        container_properties = value
+        assert_msg(has_value(container_properties.type), "You must declare a type for the container definition '%s'." % key)
+        container = ContainerFactory.create_container(container_properties.type)
+        assert_msg(has_value(container), "Could not create an appropriate container for '%s'." % key)
+        self._containers[key] = container
 
-  def _get_constrained_attributes(self) :
-    attributes = []
-    for key, value in self.__class__.__dict__.iteritems() :
-      d(key)
-    return attributes
+      # Handle explicit attributes, which will constainer those accepted and define CREATE order.
+      elif isinstance(value, Attribute) :
+        self._constrained_attributes[key] = value
+
 
   def _get_item_sub_container(self, lens, item=None) :
     # Note, for lens matching in the get direction we use item meta (since may
@@ -571,10 +595,17 @@ class LensObject(AbstractContainer) :
     self._excluded_attributes = self.__dict__.keys() + self._containers.keys()
 
 
-
-
-  def _get_data_attributes(self) :
+  def _get_attribute_names(self) :
     """Returns the names of attributes that are being used to hold data items."""
+    
+    # If the useable attributes have been declared, use their names here, in declaration order.
+    if self._constrained_attributes :
+      # Sort the items according to their declaration order - captured by a static counter in Attribute
+      items = sorted(self._constrained_attributes.iteritems(), key=lambda x: x[1]._counter)
+      attributes = [item[0] for item in items]
+      return attributes
+
+    # Otherwise, use every object attribute that is not excluded.
     attributes = []
     for attr_name in self.__dict__.keys() :
       if attr_name not in self._excluded_attributes and not attr_name.startswith("_"):
@@ -584,7 +615,10 @@ class LensObject(AbstractContainer) :
 
   def _enable_attributes_meta(self) :
     """Enables meta on attributes that may be used as container state."""
-    for attr_name in self._get_data_attributes() :
+    for attr_name in self._get_attribute_names() :
+      if attr_name not in self.__dict__ :
+        continue
+
       item = enable_meta_data(self.__dict__[attr_name])
       self.__dict__[attr_name] = item
       # Ensure the label of the item is updated to match the current attribute

@@ -92,6 +92,7 @@ auto eth1
     auto_lens = Group("auto" + WS(" ") + List(Keyword(additional_chars="_-", type=str), WS(" "), type=None) + WS("") + NL(), type=list, name="auto_lens")
     __lens__ = ZeroOrMore(NetworkInterface | auto_lens | HashComment() | BlankLine())
 
+    # Define containers within this container.
     interfaces = Container(store_items_of_type=[NetworkInterface], type=dict)
     auto_interfaces = Container(store_items_from_lenses=[auto_lens], type=list)
   
