@@ -315,18 +315,24 @@ def more_complex_structure_test() :
 
 def mapping_lenses_to_classes_test():
   """
-  We have seen how we can use list and dict containers, but we can also easily define
+  We have seen how we can use list and dict container types to store items
+  extracted by a lens but we can also easily define
   classes that map to lenses, and we can use these as elements of larger lenses,
   allowing us to (surgically) manipulate potentially complex structured files in a
-  consistent python model (e.g. for configuring a UNIX system).
+  flexible class model.
 
   This can be thought of as a special form of serialisation whereby a class
-  defines the lens that it uses for serialisation.
+  defines the lens that it uses for serialisation to and from the flat string
+  structure.
   """
 
-  # Define our Person class, which internally defines its lens.
+  # Define our Person class, which internally defines its lens, using the
+  # special __lens__ attribute.
   class Person(LensObject) :
-    # We define the lens that maps an element of some grammer to and from this class.
+    # We define the lens that maps an element of some grammer to and from this
+    # class.  The KeyValue lens is a simple wrapper of the Group to set
+    # default lens values that are useful storing key-value structures - look
+    # at the code.
     __lens__ = "Person::" + List(
       KeyValue(Word(alphas+" ", is_label=True) + ":" + Word(alphas+" ", type=str)),
       ",",
@@ -336,23 +342,28 @@ def mapping_lenses_to_classes_test():
     # only to these and (b) define the order of which item to PUT first when
     # CREATEing, otherwise order would be arbitrary..
     # If we don't declare these, the lens can use any (viable) attribute of the
-    # object.
+    # object for storing or putting items.
     name = Attribute()
     last_name = Attribute()
 
+    # Example of a simple function.
     def __init__(self, name, last_name) :
       self.name, self.last_name = name, last_name
 
+
   # Extract a person instance from the string.  Note how the field with label
-  # "Last Name" gets mapped automatically to the attribute last_name. 
+  # "Last Name" gets mapped automatically to the attribute last_name.  This
+  # default behaviour can be customised by overloading certain functions of
+  # LensObject
   person = get(Person, "Person::Name:Nick,Last Name:Blundell")
   assert_equal(person.name,  "Nick")
   assert_equal(person.last_name,  "Blundell")
 
   # We can use the class as part of a larger lens now.
   lens = List(Person, ";", type=list)
-  people = lens.get("Person::Name:Nick,Last Name:Blundell;Person::Last Name:Camus,Name:Albert")
+  
   # Here extract a python list of Person instances.
+  people = lens.get("Person::Name:Nick,Last Name:Blundell;Person::Last Name:Camus,Name:Albert")
   assert_equal(people[0].name,  "Nick")
   assert_equal(people[1].last_name,  "Camus")
 
@@ -363,12 +374,15 @@ def mapping_lenses_to_classes_test():
   # Note, here, that when we CREATE the new person, Fred, the order in which
   # 'Name' and 'Last Name' would be arbitrary should we not have optionally
   # declared those attributes, name and last_name, within our class.
+  #
   # In the case where we modify an existing (i.e. GOT) Person the labelled items
-  # will be aligned according to the original source.
+  # will be aligned according to the original source, compare the order of Camus with
+  # Blundell.
   assert_equal(output,  "Person::Name:Nick,Last Name:Blundell;Person::Name:Fred,Last Name:Flintstone;Person::Last Name:Camus,Name:Albert")
  
   # For more details on usage, until I add to this documentation, please see
-  # the source files, which contain lots of testing code.
+  # the source files, which contain lots of testing code to demonstrate
+  # different things.
 
 #
 # TODO: Alignment mode examples.
