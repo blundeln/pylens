@@ -53,6 +53,7 @@ def distribute(upload=False) :
   SOURCE_DIR = os.getcwd()
   
   # Create docs.
+  # XXX: Maybe this not necessary, since pypi uses pkg-info
   run("cp README.rst README") # For PyPi
   
   # Remove all old dist files

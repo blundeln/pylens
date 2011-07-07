@@ -56,6 +56,7 @@ setup(
   packages=['pylens'],
   data_files=data_files,
   cmdclass = {
-    "upload_docs": sphinx_pypi_upload.UploadDoc,
-  }
+    "upload_docs": sphinx_pypi_upload.UploadDoc, # Automates pypi doc upload.
+  },
+  long_description=open('README.rst').read(),
 )

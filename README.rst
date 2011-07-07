@@ -8,33 +8,44 @@ Author: Nick Blundell (http://www.nickblundell.org.uk)
 Here is the Problem
 -----------------------------------------------------
 
-Suppose that you have some structure within some string (think of a UNIX
-configuration file) that you wish to manipulate programmatically (perhaps you
-are automating the task of wider system configuration) but you do not wish to
-destroy non-semantic artifacts within the string that are important to still
-allow for manual maintenance, such as comments, whitespace
-list delimiters, etc.  In other words, you wish to make *surgical* changes to
-the string, leaving undisturbed those parts that do not concern your
-alteration.
+Suppose that you wish to programatically change part of a potentially complex
+structure stored within a string (e.g. perhaps a UNIX configuration file) such that
+the rest of the structure is left untouched, perhaps things like comments and
+spacing, to still allow for manual maintenance.
 
-This is where the concept of bi-directional programming (see references below)
-can really help us. Here we specify a *lens*, which is a parser that works not only in the
-classical sense to parse a
-string into an abstract model (for easy manipulation) but that can 
-also put back (i.e. unparse) our modified structure into an appropriate string
-form.
+If we parsed such a structure using a typical parser, we will certainly
+extract an abstract model of the structure that we can work with and change,
+but the problem comes when we wish to write those changes back out as a
+string, since all of the non-semantic artifacts (e.g. whitespace, comments,
+etc.) get lost in the parsing process.
+
+To put it another way, we wish in certain circumstances to make *surgical* changes to
+the string, leaving undisturbed those parts that do not concern our
+alteration, and therefore without us stomping over artifacts that may be
+important to other co-operating systems or manual editors.
+
+This is where the concept of bi-directional programming (see references below
+for more of the background) can really help us. Here we specify a so-called *lens*,
+which is a parser that works not only in the classical sense to parse a string
+into an abstract model (for easy manipulation) but that can also be used to weave
+our modified structure back into the original string.
+
+The lens concept is a generalisation of the classic view-update problem often
+found in database technology, where we wish to modify a simplified view of
+some data and have the changes reflected in the data proper.
 
 The Approach of pylens
 -----------------------------------------------------
 
-The pylens framework closely relates the concept of a lens with python, such
-that lenses may be defined simply as python code (greatly inspired by
+The pylens framework closely relates the concept of a lens with python code, such
+that lenses may be defined simply in python (greatly inspired by
 `pyparsing <http://pyparsing.wikispaces.com/>`_) and may be mapped to and from python
 structures, such as lists, dicts, and classes.
 
 This resembles a special kind of serialisation where we can extract python
 structures from arbitrary string structures, easily modify the structure, and
-then put the model back into a string structure that embodies our changes.
+then surgically put the model back into the original string structure such
+that it embodies our changes.
 
 Example
 -----------------------------------------------------
