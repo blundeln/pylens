@@ -10,6 +10,7 @@ RESEARCH NOTES - for my questions and musings
         - Or perhaps it is fine as it is: ordering put candidates by source.
   
   ------------- Misc ideas
+  - PP dontate button
   - Automate use of Until for partial parsing of input strings
   - Use instance creation order to figure out source order of attribute definitions.
   - Edge case state issue

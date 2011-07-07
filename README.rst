@@ -47,10 +47,14 @@ structures from arbitrary string structures, easily modify the structure, and
 then surgically put the model back into the original string structure such
 that it embodies our changes.
 
+Since lenses are represented as python classes, it is straightforward to
+extend their functionality.
+
 Example
 -----------------------------------------------------
 
-Suppose we have a config file that looks like this::
+Suppose we have a config file that looks like this, and let's assume it has
+been read into a variable **CONFIG_STRING**::
 
   # Auto interfaces.
   auto lo eth0
@@ -70,7 +74,7 @@ Suppose we have a config file that looks like this::
        netmask 255.255.255.0
        up flush-mail
 
-and we wish to programatically make some changes so that it becomes (the
+and we wish to programatically make some changes, so that it becomes this (the
 changes are highlighted with square brackets)::
 
   # Auto interfaces.
@@ -101,25 +105,29 @@ We use the pylens framework as follows::
   # Define our python model and a lens for mapping our model to
   # and from the string structure.
   class NetworkConfiguration(LensObject) :
-    __lens__ = [Our definition of the lens which maps
-               between the string structure and this class]
+    # Our definition of the lens which maps between the string structure and
+    # this class - this will become clearer in the tutorials.
+    __lens__ = ZeroOrMore(NetworkInterface | auto_lens | HashComment() | BlankLine())
     
+    # We can add whatever functions we like for manipulating out class, such
+    # as a constructor.
     def __init__(self, ...) :
       ...
   
-  # Extract our model's representation from the config string.
-  config = get(NetworkConfiguration, CONFIG_STRING)
+  # Now extract our model's representation from the config string.
+  net_config = get(NetworkConfiguration, CONFIG_STRING)
 
-  # Modify the structure using standard python.
-  config.auto_interfaces[0].insert(1, "wlan0")
-  config.interface_mappings["eth0"].script = "/home/fred/map_script"
-  config.interfaces["eth0-home"].dns_nameservers = ["192.168.1.4", "192.168.1.5"]
-  config.interfaces["wlan0"] = Interface(address_family="inet", method="dhcp")
+  # Then modify the structure using standard python.
+  net_config.auto_interfaces[0].insert(1, "wlan0")
+  net_config.interface_mappings["eth0"].script = "/home/fred/map_script"
+  net_config.interfaces["eth0-home"].dns_nameservers = ["192.168.1.4", "192.168.1.5"]
+  net_config.interfaces["wlan0"] = Interface(address_family="inet", method="dhcp")
 
   # Then weave the changes back into the original config string (i.e. change
   # only what needs to be changed, disturbing as little of the original config
   # string as possible).
-  MODIFIED_CONFIG_STRING = lens.put(config)
+  CONFIG_STRING = lens.put(net_config)
+
 
 Documentation
 -----------------------------------------------------
@@ -128,7 +136,8 @@ You can find online documentation for pylens here:
 http://packages.python.org/pylens/
 
 For more of a detailed insight into pylens, you might also wish to look at some of the
-source files, which contain extensive testing code::
+source files, which contain extensive testing code that works full but which
+has yet to be documented (e.g. recursion, etc.)::
 
   examples/*.py
   testing/tests.py
