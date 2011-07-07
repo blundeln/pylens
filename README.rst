@@ -109,7 +109,7 @@ We use the pylens framework as follows::
     # this class - this will become clearer in the tutorials.
     __lens__ = ZeroOrMore(NetworkInterface | auto_lens | HashComment() | BlankLine())
     
-    # We can add whatever functions we like for manipulating out class, such
+    # We can add whatever functions we like for manipulating our class, such
     # as a constructor.
     def __init__(self, ...) :
       ...
@@ -136,7 +136,7 @@ You can find online documentation for pylens here:
 http://packages.python.org/pylens/
 
 For more of a detailed insight into pylens, you might also wish to look at some of the
-source files, which contain extensive testing code that works full but which
+source files, which contain extensive testing code that works fully but which
 has yet to be documented (e.g. recursion, etc.)::
 
   examples/*.py
@@ -147,20 +147,23 @@ has yet to be documented (e.g. recursion, etc.)::
 Limitations
 -----------------------------------------------------
 
-Note that the initial aim of this project was to see if we could 
-integrate more closely the concept of lenses and bi-directional
-programming with a language such as python, allowing rich models to be
-composed of classes and native types (e.g. strings, floats, lists, dicts,
-etc.) but this has been achieved through compromise, since there is currently
-no validation of lens behavedness, which requires the expensive analysis
-of finite state automata.  You can read more about this in the theory
-references below, and how it relates to ambiguity.
+Note that the initial aim of this project was to see if the concept of lenses
+and bi-directional programming could be integrated more closely with a
+language such as python, allowing rich models to be composed of classes and
+other native types (e.g. strings, floats, lists, dicts, etc.), but this has
+been achieved through compromise, since there is currently no validation of
+lens behavedness (as you will find in the tool Augeas, referenced below),
+which requires the expensive analysis of finite state automata.  Put simply, a
+well-behaved lens will always adhere to the following rules::
 
-I am interested in exploring
-how we can implement some kind of certainty of non-ambiguity into the
-framework, if not full ambiguity checking, so for now sanity checking is
-left down to the lens author and I have provided within the framework aids to
-support the incremental development and testing of lenses.
+  lens.get(lens.put(x)) == x
+  lens.put(lens.get(y)) == y
+
+I am interested in exploring how we can implement some kind of certainty of
+behavedness into the framework, if not full ambiguity checking, but for now
+sanity checking is left down to the lens author, though I have provided within the
+framework aids to support the incremental development and testing of lenses,
+which should help you to create something that works for you.
 
 The Theory
 -----------------------------------------------------
