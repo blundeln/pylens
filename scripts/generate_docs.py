@@ -88,6 +88,21 @@ def generate_pages_from_example_code(python_file) :
       code_block = content[prev_match.end(0):match.start(0)].strip()
 
       if code_block :
+        # Convert our assertions to showing expected outputs.
+        def f(match) :
+          args = match.group(1)
+          if ",  " in args :
+            # Since ',' may appear inside two args, we use double space to
+            # indicate docs should be transformed in this way.
+            return args.replace(",  ", " ---> ")
+          else :
+            return match.group(0)
+        
+        if "assert_equal" in code_block : 
+          code_block = re.sub("assert_equal\((.+?)\)\s*$", f, code_block, flags=re.MULTILINE)
+          # TODO: Need to handle multilines. 
+          #code_block = re.sub("assert_equal\((.+?)\)\s*\n", f, code_block, flags=re.DOTALL)
+          
         code_block = "\n\n::\n\n  %s\n\n" % code_block
         output_blocks.append([prev_match.end(0), code_block])
     prev_match = match
@@ -112,14 +127,6 @@ def generate_pages_from_example_code(python_file) :
 
 
   return output
-
-  open("test.rst","w").write(output)
-
-  # TODO
-  #  Add functions
-  #  Put all matches together and sort by source order
-  #  Figure out code blocks from comments.
-  #  Build each function into an rst page
 
 
 def generate_docs_from_example_tests():

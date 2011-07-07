@@ -82,12 +82,12 @@ def fundamentals_test() :
   
   # So when we call GET on the lens with an input string "1" we extract a 1.
   my_number = lens.get("1")
-  assert(my_number == 1)
+  assert_equal(my_number,  1)
 
   # Then, perhaps after modifying the piece of data we extracted, we PUT it
   # back (into its original string form).
   my_number += 5
-  assert(lens.put(my_number) == "6")
+  assert_equal(lens.put(my_number),  "6")
 
   # Okay, that doesn't look too useful yet, but stick with me.
   # Now let's see how a similar though non-store lens behaves - see the
@@ -97,19 +97,19 @@ def fundamentals_test() :
   # Since this is a non-store lens, we extract nothing for our abstract
   # structure, though the character will still be consumed from the concrete
   # input string.
-  assert(lens.get("b") == None)
+  assert_equal(lens.get("b"),  None)
   
   # Now, we have no abstact item to PUT (i.e. None as first arg), though if we
   # pass the original input string as the second arg it will be copied to generate
   # new (concrete) output for this lens.
-  assert(lens.put(None, "b") == "b")
+  assert_equal(lens.put(None, "b"),  "b")
 
   # But suppose we have no original input, since we may be extending the
   # concrete string somehow.  In this case, if the lens has a default value set,
   # it will output that; otherwise it will fail.
   # In the lens literature, this special case of PUT is refered to as CREATE,
   # since we are creating new artifacts in the concrete structure.
-  assert(lens.put(None) == "x")
+  assert_equal(lens.put(None),  "x")
 
   # These are the fundamentals of this lens framework and become very useful when
   # we aggregate smaller lenses into more complex ones.
@@ -126,21 +126,21 @@ def joining_lenses_test() :
   
   # Get the list.
   my_list = lens.get("b---3")
-  assert(my_list == ["b",3])
+  assert_equal(my_list,  ["b",3])
 
   # Modify it
   my_list[0] = "n"
   my_list[1] -= 2
 
   # Put it back into string form.
-  assert(lens.put(my_list) == "n---1")
+  assert_equal(lens.put(my_list),  "n---1")
 
   # Or, CREATE afresh without first GETing
-  assert(lens.put(["g", 7]) == "g---7")
+  assert_equal(lens.put(["g", 7]),  "g---7")
 
   # We might also wish to repeat such a lens indefinitely.
   repeated_lens = Repeat(lens, type=list)
-  assert(repeated_lens.get("d---4f---8s---2") == [["d", 4], ["f", 8], ["s", 2]])
+  assert_equal(repeated_lens.get("d---4f---8s---2"),  [["d", 4], ["f", 8], ["s", 2]])
 
   # Note that there are some syntax shortcuts (a la pyparsing) we can use when
   # defining lenses.
@@ -156,15 +156,15 @@ def joining_lenses_test() :
   
   
   # Let's confirm this works identically to our first lens.
-  assert(lens.get("b---3") == ["b",3])
+  assert_equal(lens.get("b---3"),  ["b",3])
 
 
   # Sometimes we wish to combine aggregated single character lenses into a
   # string, which can be done with the combine_chars argument of an approprietly
   # constructed lens with type list.
   lens = Repeat(AnyOf(alphas, type=str) + "---" + AnyOf(nums, type=str), type=list, combine_chars=True)
-  assert(lens.get("g---2n---4c---6") == "g2n4c6")
-  assert(lens.put("b8m2s8l2") == "b---8m---2s---8l---2")
+  assert_equal(lens.get("g---2n---4c---6"),  "g2n4c6")
+  assert_equal(lens.put("b8m2s8l2"),  "b---8m---2s---8l---2")
 
 
 
@@ -177,14 +177,14 @@ def conditional_lenses_test() :
  
   # So we store ints or alphabhetical chars - but not the (non-store) stars.
   my_list = lens.get("1a*2b*3**d*45*6e78")
-  assert(my_list == [1, 'a', 2, 'b', 3, 'd', 4, 5, 6, 'e', 7, 8])
+  assert_equal(my_list,  [1, 'a', 2, 'b', 3, 'd', 4, 5, 6, 'e', 7, 8])
 
   # Lets modify our list to demonstrate how non-store input is preserved - note
   # where the stars are in the modified output string.
   my_list[0] = 'x'
   my_list[1] = 9
   my_list[4] += 4 # 3 -> 7
-  assert_equal(lens.put(my_list), "x9*2b*7**d*45*6e78")
+  assert_equal(lens.put(my_list),  "x9*2b*7**d*45*6e78")
   # In practical terms, this translates to the preservation of important
   # artifacts of, say, configuration files, such as comments, whitespace,
   # indentation, etc. that whilst not important to us when modifying the
@@ -211,7 +211,7 @@ def useful_lenses_test() :
   # Here is a demo of some, explained below.
   lens = Repeat(Whitespace("\t") + Word(alphanums+"_", init_chars=alphanums, type=str) + WS("", optional=True) + NewLine(), type=list)
   variables = lens.get("\tvariable_1    \n     variable_2\n variable_3\n")
-  assert(variables == ["variable_1", "variable_2", "variable_3"])
+  assert_equal(variables,  ["variable_1", "variable_2", "variable_3"])
   # Whitespace(default_output): Optionally matches one or more common whitespace chars.
   # WS(): Just a shortcut alias of Whitespace.
   # Word(body_chars[, init_chars]): for matching keywords of certain body and initial characters.
@@ -219,7 +219,7 @@ def useful_lenses_test() :
 
   variables.extend(["variable_4", "variable_5"])
   output = lens.put(variables)
-  assert(output == "\tvariable_1    \n     variable_2\n variable_3\n\tvariable_4\n\tvariable_5\n")
+  assert_equal(output,  "\tvariable_1    \n     variable_2\n variable_3\n\tvariable_4\n\tvariable_5\n")
   
 
 
@@ -232,7 +232,7 @@ def simple_list_test() :
   # whitespace and delimiters.
   lens = List(Word(alphas, type=str), WS("") + "," + WS(" ", optional=True), type=list)
   got = lens.get(INPUT_STRING)
-  assert(got == ["monkeys", "monsters", "rabbits", "frogs", "badgers"])
+  assert_equal(got,  ["monkeys", "monsters", "rabbits", "frogs", "badgers"])
 
   # But the idea of a lens (a bi-directional parsing element) is that once we
   # have modified that abstract model, we can write it back, preserving
@@ -245,7 +245,7 @@ def simple_list_test() :
   # Notice, from my assert statement, that additional spacing was preserved in
   # the outputted list and that the new items on the end use default spacing
   # that the Whitespace lenses were initialised with.
-  assert(output == "monkeys,  rabbits,    frogs, badgers, dinosaurs, snails")
+  assert_equal(output,   "monkeys,  rabbits,    frogs, badgers, dinosaurs, snails")
 
 
 def more_complex_structure_test() :
@@ -268,7 +268,7 @@ def more_complex_structure_test() :
   entry = Group(WS("  ") + Word(alphas, is_label=True) + WS("") + ":" + WS("") + "[" + item_list + "]" + NewLine(), type=list)
 
   # Test the parts 
-  assert(entry.get("  something: [a , b,c,d]\n") == ["a","b","c","d"])
+  assert_equal(entry.get("  something: [a , b,c,d]\n"),  ["a","b","c","d"])
  
   # Now put the lens together, and set the type to dict, so we can make use of
   # the labels.  Note that, especially with dictionaries, there are a few
@@ -283,10 +283,10 @@ def more_complex_structure_test() :
 
   # Let's GET it, modify it, then PUT it back as a string.
   got = lens.get(INPUT_STRING)
-  assert(got == {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
+  assert_equal(got,  {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
   got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
-  assert_equal(output, """
+  assert_equal(output,  """
   people: [bill, ben]
 
   animals: [snake,tiger,monkey]
@@ -327,13 +327,15 @@ def mapping_lenses_to_classes_test():
   # Extract a person instance from the string.  Note how the field with label
   # "Last Name" gets mapped automatically to the attribute last_name. 
   person = get(Person, "Person::Name:Nick,Last Name:Blundell")
-  assert(person.name == "Nick" and person.last_name == "Blundell")
+  assert_equal(person.name,  "Nick")
+  assert_equal(person.last_name,  "Blundell")
 
   # We can use the class as part of a larger lens now.
   lens = List(Person, ";", type=list)
   people = lens.get("Person::Name:Nick,Last Name:Blundell;Person::Last Name:Camus,Name:Albert")
   # Here extract a python list of Person instances.
-  assert(people[0].name == "Nick" and people[1].last_name == "Camus")
+  assert_equal(people[0].name,  "Nick")
+  assert_equal(people[1].last_name,  "Camus")
 
   # Let's alter our abstract model, then put it back as a string.
   people.insert(1,Person("Fred", "Flintstone"))
@@ -344,7 +346,7 @@ def mapping_lenses_to_classes_test():
   # declared those attributes, name and last_name, within our class.
   # In the case where we modify an existing (i.e. GOT) Person the labelled items
   # will be aligned according to the original source.
-  assert_equal(output, "Person::Name:Nick,Last Name:Blundell;Person::Name:Fred,Last Name:Flintstone;Person::Last Name:Camus,Name:Albert")
+  assert_equal(output,  "Person::Name:Nick,Last Name:Blundell;Person::Name:Fred,Last Name:Flintstone;Person::Last Name:Camus,Name:Albert")
  
   # For more details on usage, until I add to this documentation, please see
   # the source files, which contain lots of testing code.

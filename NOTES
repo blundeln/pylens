@@ -1,7 +1,6 @@
 RESEARCH NOTES - for my questions and musings
     
   - Docs
-    - assert_equals(X, Y) => X --> Y
     - Fix example generation for advanced.py
     - API docs
 
