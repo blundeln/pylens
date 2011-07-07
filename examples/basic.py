@@ -49,35 +49,33 @@ def fundamentals_test() :
   structure and which we are not.  For example, later on we will write a lens to
   extract words from some comma-separated list structure into a python list,
   disregarding uninteresting artifacts such as delimiters and whitespace.
+  
   However, when we later wish to recreate the string structure to include our
-  pythonic modifications, we would like to restore those non-python-model
+  pythonic modifications, we would like to restore those non--python-model
   artifacts where possible and create new such artifacts where we have added to
   the original string structure (i.e. we appended a list, so now will need to
   generate a new comma and perhaps some space when reflecting that change in the
-  string structure).  In lens-speak we talk about converting
-  structures between concrete (i.e. original, flat string form) and abstract
-  (i.e. native language types and classes in which we can easily manipulate the
-  data)
-  forms.
+  string structure).
+  
+  In lens-speak we talk about converting structures between concrete (i.e.
+  original, flat string form) and abstract forms (i.e. native language types and
+  classes in which we can easily manipulate the data).
 
   Since the grammar works for both parsing and un-parsing, we describe parsing
   as GETing (the abstract structure) and un-parsing as PUTing (the modified
   abstract structure back into an appropriate concrete structure).
-
-  Another way to think of this is as a kind of serialisation that is based on an
-  arbitrary grammar.
   """
   
-  # This lens, though in itself not so interesting, demonstrates the interface of a lens and
-  # some fundamental properties.  This lens will GET and PUT a single character
-  # if it falls within the set of 'nums' (simply a predefined set of chars
-  # '1234..89'); otherwise it will fail.
+  # The following lens, though in itself not so interesting, demonstrates the
+  # interface of a lens and some fundamental properties.  This lens will GET
+  # and PUT a single character if it falls within the set of 'nums' (simply a
+  # predefined set of chars '1234..89'); otherwise it will fail.
   #
-  # There are two main types of lenses: those that STORE items into the abstract
-  # structure and those that discard them (i.e. NON-STORE).  Whenever we set a
-  # type on a lens it becomes a STORE lens.  In this case, we wish to store the
-  # matched character as a python int, an obvious choice if we are dealing with
-  # the set of digit characters.
+  # There are two main types of lenses: those that STORE items into the
+  # abstract structure and those that discard them (i.e. NON-STORE).  Whenever
+  # we set a type on a lens it becomes a STORE lens.  In this case, we wish to
+  # store the matched character as a python int, an obvious choice if we are
+  # dealing with the set of digit characters.
   lens = AnyOf(nums, type=int)
   
   # So when we call GET on the lens with an input string "1" we extract a 1.
@@ -90,16 +88,16 @@ def fundamentals_test() :
   assert_equal(lens.put(my_number),  "6")
 
   # Okay, that doesn't look too useful yet, but stick with me.
-  # Now let's see how a similar though non-store lens behaves - see the
-  # assertions.  I will explain the 'default' arg shortly.
+  #
+  # Now let's see how a similar though non-store lens behaves.  I will explain the 'default' arg shortly.
   lens = AnyOf(alphas, default="x")   # alphas is the set of alphabhetic chars.
 
   # Since this is a non-store lens, we extract nothing for our abstract
-  # structure, though the character will still be consumed from the concrete
+  # structure (i.e. we get None), though the character will still be consumed from the concrete
   # input string.
   assert_equal(lens.get("b"),  None)
   
-  # Now, we have no abstact item to PUT (i.e. None as first arg), though if we
+  # Now, we have no abstract item to PUT (i.e. None as first arg), though if we
   # pass the original input string as the second arg it will be copied to generate
   # new (concrete) output for this lens.
   assert_equal(lens.put(None, "b"),  "b")
@@ -107,25 +105,29 @@ def fundamentals_test() :
   # But suppose we have no original input, since we may be extending the
   # concrete string somehow.  In this case, if the lens has a default value set,
   # it will output that; otherwise it will fail.
-  # In the lens literature, this special case of PUT is refered to as CREATE,
+  # In the lens literature, this special case of PUT is referred to as CREATE,
   # since we are creating new artifacts in the concrete structure.
   assert_equal(lens.put(None),  "x")
 
-  # These are the fundamentals of this lens framework and become very useful when
-  # we aggregate smaller lenses into more complex ones.
+  # These are the fundamentals of this lens framework and their usefulness
+  # will become very apparent when we aggregate smaller lenses into more
+  # complex ones, much like building up a BNF grammar.
  
 
-def joining_lenses_test() :
+def aggregating_lenses_test() :
   
-  # We can use the And lens to concatenate several lenses.  Note that, here we
+  # We can use the And lens to concatenate several other lenses.  Note that, here we
   # specify the And's type as a python list, otherwise we will have nothing into
-  # which the extracted values of the two AnyOf lenses can be stored.
-  # Also here we introduce the Literal lens, which conveniently handles literal (i.e.
-  # constant strings).
-  lens = And(AnyOf(alphas, type=str), Literal("---"), AnyOf(nums, type=int), type=list)
+  # which the extracted values of the two AnyOf lenses can be stored - which
+  # will give an error.
+  #
+  # Also, here we introduce the Literal lens, a very simple lens which conveniently handles literal (i.e.
+  # constant strings that we are usually not interested in extracting into our
+  # model).
+  lens = And(AnyOf(alphas, type=str), Literal("--=--"), AnyOf(nums, type=int), type=list)
   
-  # Get the list.
-  my_list = lens.get("b---3")
+  # Get the list from our input string.
+  my_list = lens.get("b--=--3")
   assert_equal(my_list,  ["b",3])
 
   # Modify it
@@ -133,65 +135,46 @@ def joining_lenses_test() :
   my_list[1] -= 2
 
   # Put it back into string form.
-  assert_equal(lens.put(my_list),  "n---1")
+  assert_equal(lens.put(my_list),  "n--=--1")
 
   # Or, CREATE afresh without first GETing
-  assert_equal(lens.put(["g", 7]),  "g---7")
+  assert_equal(lens.put(["g", 7]),  "g--=--7")
 
   # We might also wish to repeat such a lens indefinitely.
   repeated_lens = Repeat(lens, type=list)
-  assert_equal(repeated_lens.get("d---4f---8s---2"),  [["d", 4], ["f", 8], ["s", 2]])
+  assert_equal(repeated_lens.get("d--=--4f--=--8s--=--2"),  [["d", 4], ["f", 8], ["s", 2]])
+
+def grouping_test():
 
   # Note that there are some syntax shortcuts (a la pyparsing) we can use when
   # defining lenses.
-  lens = Group(AnyOf(alphas, type=str) + "---" + AnyOf(nums, type=int), type=list)
-  # Here:
-  #  - A + B + C -> And(A, B, C)
-  #  - "---" -> Literal("---"), where possible literal strings will be
-  #    interpreted within aggregate lenses as the Literal lens.
-  #
-  # And since we use '+', we use the convenience lens 'Group' to set some
-  # parameters of the And lens it contains - in this case we set the type to
-  # list.
+
+  # Here the And lens is implied when using the addition operand: A + B + C ->
+  # And(A, B, C); and the string "--=--" is automatically coerced to the
+  # lens Literal("--=--").
+  lens_part = AnyOf(alphas, type=str) + "--=--" + AnyOf(nums, type=int)
   
+  # Since the previous lens was not defined explicitly as And, we could not
+  # set its type to list.  We could either do this like: lens_part.type = int;
+  # or it can be more convenient to use the Group lens, this this, which
+  # closes part of a larger lens within its own container:
+  lens = Group(AnyOf(alphas, type=str) + "--=--" + AnyOf(nums, type=int), type=list)
   
-  # Let's confirm this works identically to our first lens.
-  assert_equal(lens.get("b---3"),  ["b",3])
-
-
-  # Sometimes we wish to combine aggregated single character lenses into a
-  # string, which can be done with the combine_chars argument of an approprietly
-  # constructed lens with type list.
-  lens = Repeat(AnyOf(alphas, type=str) + "---" + AnyOf(nums, type=str), type=list, combine_chars=True)
-  assert_equal(lens.get("g---2n---4c---6"),  "g2n4c6")
-  assert_equal(lens.put("b8m2s8l2"),  "b---8m---2s---8l---2")
-
+  # Let's confirm this works identically to our previous lens.
+  assert_equal(lens.get("b--=--3"),  ["b",3])
 
 
 def conditional_lenses_test() :
 
   # But we also need to allow for alternative branching in realistic grammar
   # parsing (and unparsing), so here we can use the Or lens.
-  lens = Repeat(AnyOf(nums, type=int) | AnyOf(alphas, type=str) | "*", type=list)
   # Here the syntax A | B | C  is shorthand for Or(A, B, C).
+  lens = Repeat(AnyOf(nums, type=int) | AnyOf(alphas, type=str) | "*", type=list)
  
-  # So we store ints or alphabhetical chars - but not the (non-store) stars.
+  # So we store ints or alphabhetical chars - but not the (non-store)
+  # asterisks.
   my_list = lens.get("1a*2b*3**d*45*6e78")
   assert_equal(my_list,  [1, 'a', 2, 'b', 3, 'd', 4, 5, 6, 'e', 7, 8])
-
-  # Lets modify our list to demonstrate how non-store input is preserved - note
-  # where the stars are in the modified output string.
-  my_list[0] = 'x'
-  my_list[1] = 9
-  my_list[4] += 4 # 3 -> 7
-  assert_equal(lens.put(my_list),  "x9*2b*7**d*45*6e78")
-  # In practical terms, this translates to the preservation of important
-  # artifacts of, say, configuration files, such as comments, whitespace,
-  # indentation, etc. that whilst not important to us when modifying the
-  # semantics of the structure are extremely important for manual maintenance of
-  # such files --- in fact, this is the main motivation behaind the thoery of
-  # lenses, namely how to make surgical changes to concrete structures to
-  # reflect semantic changes.
 
   # Note that the order of lenses is important when using Or: in both the GET
   # and PUT direction, the first-most lens is favoured, so as a general rule of
@@ -201,22 +184,50 @@ def conditional_lenses_test() :
   # re-ordered to 'cheeseshop' | 'cheese'.  This is ultimately down to the
   # behaviour that the lens author desires.
 
+  # Now let's modify our list to demonstrate how non-store input is preserved - note
+  # where the asterisks are in the modified output string: where they were in
+  # the input string.
+  my_list[0] = 'x'
+  my_list[1] = 9
+  my_list[4] += 4 # 3 -> 7
+  assert_equal(lens.put(my_list),  "x9*2b*7**d*45*6e78")
+  
+  # In practical terms, this translates to the preservation of important
+  # artifacts of, say, configuration files, such as comments, whitespace,
+  # indentation, etc. that, whilst not important to us when modifying the
+  # semantics of the structure, are extremely important for manual maintenance of
+  # such files --- in fact, this is the main motivation behind the theory of
+  # lenses, namely how to make surgical changes to concrete structures to
+  # reflect semantic changes.
+
+
+
+
+def combining_characters_test():
+
+  # Sometimes we wish to combine aggregated single character lenses into a
+  # string, which can be done with the combine_chars argument of an appropriately
+  # constructed lens of type list.
+  lens = Repeat(AnyOf(alphas, type=str) + "--=--" + AnyOf(nums, type=str), type=list, combine_chars=True)
+  assert_equal(lens.get("g--=--2n--=--4c--=--6"),  "g2n4c6")
+  assert_equal(lens.put("b8m2s8l2"),  "b--=--8m--=--2s--=--8l--=--2")
 
 def useful_lenses_test() :
 
   # It is very easy to extend pylens with new lenses but I've created a few
   # already based on common parser patterns and on those useful parsing classes
-  # in pyparsing.
+  # you can find in pyparsing.
 
   # Here is a demo of some, explained below.
   lens = Repeat(Whitespace("\t") + Word(alphanums+"_", init_chars=alphanums, type=str) + WS("", optional=True) + NewLine(), type=list)
   variables = lens.get("\tvariable_1    \n     variable_2\n variable_3\n")
   assert_equal(variables,  ["variable_1", "variable_2", "variable_3"])
-  # Whitespace(default_output): Optionally matches one or more common whitespace chars.
-  # WS(): Just a shortcut alias of Whitespace.
+  # Whitespace(default_output_when_creating): Optionally matches one or more common whitespace chars.
+  # WS: Just a shortcut alias of Whitespace.
   # Word(body_chars[, init_chars]): for matching keywords of certain body and initial characters.
   # NewLine(): Matches the end of a line but also optionally the end of the input string.
 
+  # And let's modify then put back our list of variable names.
   variables.extend(["variable_4", "variable_5"])
   output = lens.put(variables)
   assert_equal(output,  "\tvariable_1    \n     variable_2\n variable_3\n\tvariable_4\n\tvariable_5\n")
@@ -224,11 +235,12 @@ def useful_lenses_test() :
 
 
 def simple_list_test() :
-  INPUT_STRING = "monkeys,  monsters,    rabbits, frogs, badgers"
+  # Let's define some sample input.
+  INPUT_STRING = "monkeys,\tmonsters,\t rabbits, frogs, badgers"
   
   # Here is an example of the List lens, which allows us to specify a lens for
   # the item and a lens for the delimiter.  In this case we wish to extract the
-  # animal names as strings to store in a list, whereas we wish to discard the
+  # animal names as strings to store in a python list, whereas we wish to discard the
   # whitespace and delimiters.
   lens = List(Word(alphas, type=str), WS("") + "," + WS(" ", optional=True), type=list)
   got = lens.get(INPUT_STRING)
@@ -238,17 +250,19 @@ def simple_list_test() :
   # have modified that abstract model, we can write it back, preserving
   # artifacts of the original string, or creating default artifacts for new
   # data.
-  del got[1] # Remove 'monsters'
-  got.extend(["dinosaurs", "snails"])
+  del got[1]    # Remove 'monsters'.
+  got.extend(["dinosaurs", "snails"])  # Throw a few more in.
   output = lens.put(got)
 
-  # Notice, from my assert statement, that additional spacing was preserved in
+  # Notice that additional spacing is preserved in
   # the outputted list and that the new items on the end use default spacing
-  # that the Whitespace lenses were initialised with.
-  assert_equal(output,   "monkeys,  rabbits,    frogs, badgers, dinosaurs, snails")
+  # that the Whitespace lenses were initialised with (i.e. no space before the
+  # comma and a single space after).
+  assert_equal(output,   "monkeys,\trabbits,\t frogs, badgers, dinosaurs, snails")
 
 
 def more_complex_structure_test() :
+  # Let's define out input structure.
   INPUT_STRING = """
   people: [bill, ben]
 
@@ -256,7 +270,7 @@ def more_complex_structure_test() :
   food: [beans, eggs]\n"""
 
   # This lens defines the comma separator of the list lens we will use it in
-  # next.  For convenience, the first arg of Whitespace is the default value to
+  # shortly.  For convenience, the first arg of Whitespace is the default value to
   # use when CREATING with this lens.
   comma_separator = WS("") + "," + WS(" ", optional=True)
   
@@ -264,25 +278,30 @@ def more_complex_structure_test() :
   # the items (which contain only the alphabhetic characters) as strings.
   item_list = List(Word(alphas, type=str), comma_separator)
   
-  # Recall, WS is simply an abbreviation of the Whitespace lens.
+  # Recall, WS is simply an abbreviation of the Whitespace lens.  Note the use
+  # of is_label on the Word lens, which effectively sets this lenses matching
+  # string as the label of the current Group (type=str is implied when we set
+  # is_label on a lens).
   entry = Group(WS("  ") + Word(alphas, is_label=True) + WS("") + ":" + WS("") + "[" + item_list + "]" + NewLine(), type=list)
 
-  # Test the parts 
+  # Test the parts - its always good to work incrementally.
   assert_equal(entry.get("  something: [a , b,c,d]\n"),  ["a","b","c","d"])
  
   # Now put the lens together, and set the type to dict, so we can make use of
-  # the labels.  Note that, especially with dictionaries, there are a few
+  # the labels of the key lens in entry.  Note that, especially with dictionaries, there are a few
   # possibilities of realigning them with the source: based on label strings,
   # original location within the source, and abstract ordering (i.e. arbitrary
-  # for python dicts).
-  # TODO: I will write more on alignment soon.
+  # for python dicts).  TODO: I will write more on alignment soon.
   lens = OneOrMore(entry | BlankLine(), type=dict, alignment=SOURCE)
   
-  # For debugging: will name lenses by their local variable names.
+  # This is a useful function for debugging lenses, which simply scans the
+  # local variables for lenses and then sets each lens' debugging name to the
+  # variable name (e.g. item_list.name = "item_list")
   auto_name_lenses(locals())
 
-  # Let's GET it, modify it, then PUT it back as a string.
+  # Great.  Now let's GET it, modify it, then PUT it back as a string.
   got = lens.get(INPUT_STRING)
+  # Excellent, we have it as a python structure.
   assert_equal(got,  {'food': ['beans', 'eggs'], 'animals': ['snake', 'tiger', 'monkey'], 'people': ['bill', 'ben']})
   got["newthing"] = ["thinga", "thingb"]
   output = lens.put(got)
